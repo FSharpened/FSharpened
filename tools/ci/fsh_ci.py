@@ -37,6 +37,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -610,6 +611,26 @@ def execute(names: list[str], ctx: Ctx, cache: Cache, jobs: int, keep_going: boo
     return results
 
 
+def publish_to_hub(summary: dict) -> None:
+    """Best-effort: POST the run summary to the FSharpened hub (worker/). Never changes the exit code.
+    Enabled only when FSH_HUB_URL and FSH_HUB_TOKEN are set; the token is never logged."""
+    url, token = os.environ.get("FSH_HUB_URL"), os.environ.get("FSH_HUB_TOKEN")
+    if not url or not token:
+        return
+    payload = dict(summary)
+    payload["source"] = "github-actions" if os.environ.get("GITHUB_ACTIONS") else "local"
+    payload["branch"] = os.environ.get("GITHUB_REF_NAME") or (git_lines("rev-parse", "--abbrev-ref", "HEAD") or [""])[0]
+    payload["run_url"] = (f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+                          if os.environ.get("GITHUB_RUN_ID") else "")
+    req = urllib.request.Request(url.rstrip("/") + "/api/ingest/ci", data=json.dumps(payload).encode("utf-8"), method="POST",
+                                 headers={"content-type": "application/json", "authorization": "Bearer " + token, "user-agent": "fsh-ci"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"hub: published ({resp.status})")
+    except Exception as ex:  # telemetry must never break the build
+        print(f"hub: publish skipped ({type(ex).__name__})")
+
+
 # --------------------------------------------------------------------------- reporting
 ICON = {PASS: "PASS", FAIL: "FAIL", SKIP: "skip", WARN: "WARN", BLOCKED: "blkd", CACHED: "cache"}
 
@@ -731,6 +752,7 @@ def cmd_run(args) -> int:
                 print("    " + n)
             summary = write_reports(ctx, args.profile, pre, ["preflight"], time.time() - t0)
             print("preflight failed; nothing else was run")
+            publish_to_hub(summary)
             return 1
         for n in pre["preflight"].notes:
             if not n.startswith("PASS"):
@@ -749,6 +771,7 @@ def cmd_run(args) -> int:
         print(f"\n{'PASS' if summary['ok'] else 'FAIL'} in {total:.1f}s  report: {run_dir / 'report.md'}")
         if summary["rids_not_verified_locally"] and args.profile != "fast":
             print("platform coverage: verified " + (", ".join(summary["rids_verified_locally"]) or "none") + "; the rest rely on the GitHub matrix")
+        publish_to_hub(summary)
         prune_runs()
         return 0 if summary["ok"] else 1
     finally:
