@@ -14,7 +14,7 @@
 - [x] P0.4 - Scaffold `.agents/personas/`, `memory/`, `skills/`. **Owner:** Orchestrator
 - [x] P0.5 - Write governance, threat model, performance budgets. **Owner:** Architect + Documentation
 - [ ] P0.6 - Scaffold `pipelines/benchmarks/` with BenchmarkDotNet and per-RID baselines. **Owner:** QA/Release *(stub only)*
-- [ ] P0.7 - First compile on a machine with the SDK; fix skeleton build errors. **Owner:** Tooling Builder
+- [x] P0.7 - First compile on a machine with the SDK; fix skeleton build errors. **Owner:** Tooling Builder *(2026-11-16: SDK 9.0.321, win-x64; 0 warnings, 9/9 tests; fixes: explicit FSharp.Core under CPM, RollForward)*
 
 ## Phase 0.5 - Statepoint and Semantic Substrates (Weeks 4-8)
 - [ ] P0.5.1 - Harden `FSharpened.Platform`: `IFileWatcher` (overflow, polling fallback), `ITransport`, `IPathNormalizer`, `IOverlayStore`, `ISandbox`. Three-OS tests. **Owner:** Pillar Builder *(interfaces + in-memory overlay exist)*

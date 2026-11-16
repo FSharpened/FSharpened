@@ -3,7 +3,7 @@
 Pulled from `PLAN.md` and `HANDOVER.md`.
 
 ## P0 - Blocking
-- [ ] **P0.7** - On a machine with .NET SDK 9.0.200+: `dotnet build FSharpened.slnx`, fix any skeleton compile errors, run `dotnet test`. Record results in `HANDOVER.md`.
+- [x] **P0.7** - (done 2026-11-16, win-x64 only) On a machine with .NET SDK 9.0.200+: `dotnet build FSharpened.slnx`, fix any skeleton compile errors, run `dotnet test`. Record results in `HANDOVER.md`.
 - [ ] **P0.5.2** - Make `StatepointGraph` thread-safe; add concurrent fork/merge tests. `src/FSharpened.Statepoints/Statepoints.fs`.
 - [ ] **P0.5.4** - Replace the static availability probe in `Resolver.resolve` with real ONNX Runtime provider discovery per RID. `src/FSharpened.ML.Hardware/Hardware.fs`.
 - [ ] **P1.4** - Harmony-based method patching in `dotnet fsh watch`; target <500 ms round-trip on `linux-x64` and `win-x64`.

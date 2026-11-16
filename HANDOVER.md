@@ -3,7 +3,7 @@
 *A snapshot, not a transcript. The "Exact Next Action" field is the one that matters.*
 
 ## Status Snapshot
-The repository skeleton, specification, governance, agent operating system and generated project skeletons exist. **Nothing has been compiled or run**: the scaffolding environment had no .NET SDK. All status claims below mean "files written", not "verified".
+The repository skeleton, specification, governance, agent operating system and generated project skeletons exist. **First build done 2026-11-16 on win-x64 (SDK 9.0.321): 0 warnings, 0 errors, 9/9 tests pass, `fsh doctor` runs.** Other RIDs, NativeAOT, Fantomas and the CI matrix are unverified.
 
 ## What Was Done
 - Read the 30-message design conversation (DeepSeek share) and distilled it into `registry/pillars.json` (28 pillars, 2 tools, 14 invariants).
@@ -25,7 +25,7 @@ The repository skeleton, specification, governance, agent operating system and g
 - `FSharpened.Semantic`, `CompilerBridge`, `Analyzers`, `Debugging` etc. contain no behaviour yet.
 
 ## Open TODOs
-- [ ] **P0** - First build and test on a machine with the SDK (P0.7).
+- [x] First build and test (P0.7) - fixed: FSharp.Core must be referenced explicitly under central package management; `RollForward=LatestMajor` so net8.0 tests run on SDK-only 9.x machines.
 - [ ] **P0** - Fill `LICENSE` with full Apache-2.0 text (human).
 - [ ] **P1** - Validate `ML.Portability` contracts against real TorchSharp / ONNX Runtime versions.
 
@@ -36,4 +36,4 @@ The repository skeleton, specification, governance, agent operating system and g
 - `scaffold.py` never overwrites; use `--force` only on files you have not hand-edited.
 
 ## Exact Next Action
-On a machine with .NET SDK 9.0.200+, run `dotnet build FSharpened.slnx` from the repo root. Fix compile errors in the order they appear (most likely in `src/FSharpened.Platform/Platform.fs` and `tests/FSharpened.Skeleton.Tests/SkeletonTests.fs`), then `dotnet test FSharpened.slnx`. Do not change pillar structure to make it compile; if a design rule seems wrong, write an ADR. Record the outcome here and tick P0.7 in `PLAN.md`.
+Run `dotnet fantomas --check .` (after `dotnet tool restore`) and fix formatting; then copy `pipelines/github-actions/ci.yml` to `.github/workflows/`, fix whatever the six-RID matrix and per-RID `PublishAot` publish expose (the CLI may need trimming/AOT fixes), and record per-RID results here. Then start P0.5.2 (thread-safe `StatepointGraph`).

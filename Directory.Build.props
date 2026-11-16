@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
+    <!-- Runs on the net8.0 runtime when present, otherwise rolls forward (e.g. SDK-only 9.x machines, CI). -->
+    <RollForward>LatestMajor</RollForward>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
@@ -16,5 +18,11 @@
     <PackageReadmeFile Condition="Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
     <Version>0.0.1-skeleton</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The F# SDK disables its implicit FSharp.Core reference under central package management,
+         so reference it explicitly. Version is pinned in Directory.Packages.props. -->
+    <PackageReference Include="FSharp.Core" />
+  </ItemGroup>
 
 </Project>

@@ -1,8 +1,8 @@
 # STATUS.md - What Works Today (2026-11-16)
 
-"Written" means files exist. **Nothing has been compiled or executed yet** (no .NET SDK in the scaffolding environment). Update this file when a status is actually verified, and say how.
+"Written" means files exist. **Verified so far:** `dotnet build FSharpened.slnx` (0 warnings, 0 errors) and `dotnet test` (9/9 pass) on **win-x64 only**, SDK 9.0.321, 2026-11-16. Not verified: other five RIDs, NativeAOT, Fantomas, CI matrix. Update this file when a status is actually verified, and say how.
 
-## Written, minimal real code (unverified)
+## Written, minimal real code (builds and tested on win-x64)
 - `FSharpened.Platform` - interfaces, `RuntimeIdentity.detect`, in-memory overlay. No OS implementations of watcher/transport/sandbox yet.
 - `FSharpened.Statepoints` - single-threaded graph: snapshot, fork, rollback, merge, lineage.
 - `FSharpened.Diagnostics` - `StructuredDiagnostic` model only.

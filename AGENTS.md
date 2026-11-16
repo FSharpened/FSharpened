@@ -32,4 +32,4 @@
 - F# compilation is file-order dependent; `docs/architecture/boundaries.md` explains it.
 - TorchSharp is x64-shaped. Use `ML.Portability` contracts.
 - `dotnet watch` does not support F#. Use `dotnet fsh watch`.
-- The skeleton was scaffolded without a .NET SDK; the first real compile may need fixes (see HANDOVER.md).
+- FSharp.Core is referenced explicitly in Directory.Build.props (central package management disables the implicit one).
