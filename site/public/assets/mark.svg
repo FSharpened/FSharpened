@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="FSharpened">
+  <title>FSharpened</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4338CA"/><stop offset="1" stop-color="#1E1B4B"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- F with sharpened (diagonally cut) arms -->
+  <path fill="#FFFFFF" d="M140 104H408L346 176H228V240H336L296 312H228V408H140Z"/>
+  <!-- the extension: a sharp accent, not a fork -->
+  <path fill="#22D3EE" d="M372 296L424 348L372 400L320 348Z"/>
+</svg>

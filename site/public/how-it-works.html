@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How it works · FSharpened</title><meta name="description" content="A layered satellite architecture around FCS, analyzers, NuGet and LSP.">
+<meta property="og:title" content="How it works · FSharpened"><meta property="og:description" content="A layered satellite architecture around FCS, analyzers, NuGet and LSP."><meta property="og:type" content="website">
+<meta property="og:image" content="/assets/og.png"><meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#4338ca"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/site.css"></head><body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site"><div class="wrap"><a class="brand" href="/"><img src="/assets/mark.svg" alt="" width="30" height="30">FSharpened</a>
+<nav class="main" aria-label="Main"><a href="/">Home</a><a href="/why.html">Why</a><a href="/how-it-works.html" aria-current=page>How it works</a><a href="/pillars.html">Pillars</a><a href="/platforms.html">Platforms</a><a href="/status.html">Status</a><a href="/contribute.html">Contribute</a><a class="btn" href="https://github.com/FSharpened/FSharpened">GitHub</a></nav></div></header>
+<main id="main"><div class="page-head wrap"><h1>How it works</h1><p class="sub">A layered satellite architecture around the F# toolchain.</p></div>
+<section><div class="wrap"><div class="steps"><div class="card"><h3>Wrap the platform</h3><p>FSharpened.Platform hides every OS difference (file watching, IPC, paths, sandboxing, terminals) behind interfaces and a capability manifest. Nothing else may use <code>#if</code> on a platform.</p></div><div class="card"><h3>Share one state substrate</h3><p>FSharpened.Statepoints stores content-addressed snapshots with fork, rollback and merge. Hot reload sessions, AI edits and training runs are all statepoint consumers.</p></div><div class="card"><h3>Ground everything semantically</h3><p>FSharpened.Semantic exposes symbol resolution over the F# compiler services and MCP, so tools and agents work from facts, not text guesses.</p></div><div class="card"><h3>Compose the best tools</h3><p>Product pillars connect Fantomas, analyzers, debuggers and editors. We write glue and contracts, not replacements.</p></div><div class="card"><h3>Add ML behind contracts</h3><p>ML pillars reach frameworks only through ML.Portability, pick a backend per device through ML.Hardware, and always end in a deterministic fallback chain.</p></div><div class="card"><h3>Prove it on every RID</h3><p>One local-first pipeline (<code>fsh_ci.py</code>) runs identically in hooks, on your machine and in the six-RID GitHub matrix, including NativeAOT.</p></div></div></div></section>
+<section class="alt"><div class="wrap prose"><h2>The fallback chain</h2>
+<p>Any model-backed feature resolves through five deterministic layers, so the tool keeps working when a model is missing, slow or untrusted:</p>
+<ol><li>Specialised model</li><li>Sibling model</li><li>Symbolic rules</li><li>Warm checkpoint</li><li>Structured escalation to a human</li></ol>
+<h2>Invariants, not vibes</h2><p>Fourteen constitutional invariants are written down, mirrored in the registry and checked mechanically. They are what lets agents and humans change the project safely for years.</p>
+<p><a class="btn" href="https://github.com/FSharpened/FSharpened/blob/main/MAINTAINER.md">Read the invariants</a></p></div></section></main>
+<footer class="site"><div class="wrap"><div><strong>FSharpened</strong><br>Sharpen your existing F#. Not a fork. An extension.</div>
+<div><a href="https://github.com/FSharpened/FSharpened">Source</a> · <a href="https://github.com/FSharpened/FSharpened/blob/main/docs/spec/SPEC.md">Specification</a> · <a href="https://github.com/FSharpened/FSharpened/tree/main/docs/adr">ADRs</a> · <a href="https://github.com/FSharpened/FSharpened/blob/main/SECURITY.md">Security</a></div>
+<div>Apache-2.0. Maintained by humans and agents together.</div></div></footer>
+<script src="/assets/site.js" defer></script></body></html>
