@@ -7,7 +7,7 @@ Run summaries (RID, profile, result, durations, stage results, short commit, bra
 
 ## Live deployment
 - Site: https://fsharpened.fsharpened.workers.dev (`site/`, `wrangler deploy`)
-- Hub: https://fsharpened-hub.fsharpened.workers.dev (D1 `fsharpened-hub`, KV `SETTINGS`; migration 0001 applied)
+- Hub: https://hub.fsharpened.workers.dev (D1 `fsharpened-hub`, KV `SETTINGS`; migration 0001 applied)
 - Admin sign-in: GitHub OAuth (app "FSharpened Hub" owned by the FSharpened account), allowlist `ADMIN_GITHUB_USERS` in `worker/wrangler.jsonc`; secrets `GITHUB_CLIENT_SECRET` and `SESSION_SECRET` live only in the Worker. Cloudflare Access remains an optional second path (Zero Trust needs a card on file).
 
 ## First-time deploy (maintainer)
