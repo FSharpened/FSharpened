@@ -12,7 +12,7 @@ Checks:
 
 Exit 0 = pass, 1 = failures printed. Skill: .agents/skills/update-docs-map.md
 """
-import json, pathlib, re, sys
+import json, os, pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 errors = []
@@ -20,6 +20,26 @@ errors = []
 
 def err(msg):
     errors.append(msg)
+
+
+def exists_exact(path: pathlib.Path) -> bool:
+    """Case-exact existence on every OS (Windows/macOS are case-insensitive; Linux is not).
+    A link that only resolves on a case-insensitive filesystem is a bug (Invariant 1)."""
+    path = pathlib.Path(path)
+    if not path.exists():
+        return False
+    # Do NOT use Path.resolve(): on Windows/macOS it normalises to the on-disk case and hides the bug.
+    absolute = pathlib.Path(os.path.normpath(os.path.abspath(path)))
+    try:
+        rel = absolute.relative_to(pathlib.Path(os.path.abspath(ROOT)))
+    except ValueError:
+        return True
+    cur = pathlib.Path(os.path.abspath(ROOT))
+    for part in rel.parts:
+        if part not in {c.name for c in cur.iterdir()}:
+            return False
+        cur = cur / part
+    return True
 
 
 def read(p):
@@ -38,7 +58,7 @@ for p in reg["pillars"]:
         f"docs/architecture/pillars/{pid}.md",
         f".agents/skills/{p['skill']}.md",
     ):
-        if not (ROOT / rel).exists():
+        if not exists_exact(ROOT / rel):
             err(f"[registry] missing {rel}")
     for d in p["depends"]:
         if d not in ids:
@@ -71,7 +91,7 @@ for doc in ("docs/README.md", "AGENTS.md"):
         target = m.group(1)
         if "<" in target:
             continue
-        if not (ROOT / target).exists():
+        if not exists_exact(ROOT / target):
             err(f"[routing] {doc} routes to missing {target}")
 
 # 4 relative markdown links
@@ -83,8 +103,8 @@ for md in ROOT.rglob("*.md"):
         href = m.group(1)
         if href.startswith(("http://", "https://", "mailto:", "#")):
             continue
-        target = (md.parent / href.split("#")[0]).resolve()
-        if not target.exists():
+        target = pathlib.Path(os.path.normpath(md.parent / href.split("#")[0]))
+        if not exists_exact(target):
             err(f"[link] {md.relative_to(ROOT)} -> {href}")
 
 # 5 invariants
