@@ -20,7 +20,7 @@ The repository skeleton, specification, governance, agent operating system and g
 | Registry JSON as source of truth | Docs, projects, skills are generated/validated from it | Hand-maintained lists (drift) |
 
 ## Current State
-- Real code (uncompiled): see "What Was Done". Everything else: marker module (`Status = "Skeleton"`).
+- Real code (builds, 9 tests pass on win-x64): see "What Was Done". Everything else: marker module (`Status = "Skeleton"`).
 - CI workflows exist but have never run. No release, no packages, no baselines.
 - `FSharpened.Semantic`, `CompilerBridge`, `Analyzers`, `Debugging` etc. contain no behaviour yet.
 
