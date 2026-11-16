@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { authenticateAdmin, type AppCtx, type Env } from "./auth";
+import { isAllowed, parseAllowlist, parseCookies, signSession } from "./logic";
 import {
   DEFAULT_FLAGS, SIX_RIDS, matrixState, newToken, percentile, sanitizeFlags, sha256Hex, validateIngest, type Flags,
 } from "./logic";
@@ -36,6 +37,56 @@ app.get("/api/status.json", async (c) => {
   const { results } = await c.env.DB.prepare("SELECT rid, ok, profile FROM runs WHERE branch IN ('main','master') ORDER BY received_at DESC LIMIT 60").all<{ rid: string; ok: number; profile: string }>();
   c.header("cache-control", "public, max-age=60");
   return c.json({ updated: now(), matrix: matrixState(results) });
+});
+
+
+// ---------------------------------------------------------------- GitHub OAuth (admin sign-in)
+const SESSION_TTL = 8 * 3600;
+const cookie = (name: string, value: string, maxAge: number) => `${name}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+
+app.get("/api/auth/login", (c) => {
+  if (!c.env.GITHUB_CLIENT_ID || !c.env.GITHUB_CLIENT_SECRET || (c.env.SESSION_SECRET ?? "").length < 32) return c.json({ error: "GitHub sign-in is not configured" }, 503);
+  const state = [...crypto.getRandomValues(new Uint8Array(16))].map((x) => x.toString(16).padStart(2, "0")).join("");
+  const redirect = new URL("/api/auth/callback", c.req.url).toString();
+  const u = new URL("https://github.com/login/oauth/authorize");
+  u.searchParams.set("client_id", c.env.GITHUB_CLIENT_ID);
+  u.searchParams.set("redirect_uri", redirect);
+  u.searchParams.set("state", state);
+  u.searchParams.set("allow_signup", "false");
+  c.header("set-cookie", cookie("fsh_oauth_state", state, 600));
+  return c.redirect(u.toString(), 302);
+});
+
+app.get("/api/auth/callback", async (c) => {
+  const code = c.req.query("code") ?? "", state = c.req.query("state") ?? "";
+  const expected = parseCookies(c.req.header("cookie"))["fsh_oauth_state"];
+  c.header("set-cookie", cookie("fsh_oauth_state", "", 0));
+  if (!code || !state || !expected || state !== expected) return c.text("Sign-in failed (state mismatch). Start again at /api/auth/login.", 400);
+  const tok = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST", headers: { accept: "application/json", "content-type": "application/json", "user-agent": "fsharpened-hub" },
+    body: JSON.stringify({ client_id: c.env.GITHUB_CLIENT_ID, client_secret: c.env.GITHUB_CLIENT_SECRET, code, redirect_uri: new URL("/api/auth/callback", c.req.url).toString() }),
+  });
+  const access = ((await tok.json().catch(() => ({}))) as { access_token?: string }).access_token;
+  if (!access) return c.text("Sign-in failed (token exchange).", 400);
+  const me = await fetch("https://api.github.com/user", { headers: { authorization: "Bearer " + access, accept: "application/vnd.github+json", "user-agent": "fsharpened-hub" } });
+  const login = ((await me.json().catch(() => ({}))) as { login?: string }).login;
+  if (!login) return c.text("Sign-in failed (profile).", 400);
+  if (!isAllowed(login, parseAllowlist(c.env.ADMIN_GITHUB_USERS))) {
+    await audit(c.env, login, "login.denied", "not on the admin allowlist");
+    return c.text("This GitHub account is not authorised for the FSharpened hub.", 403);
+  }
+  await audit(c.env, login, "login", "github");
+  const session = await signSession(c.env.SESSION_SECRET, login, SESSION_TTL, now());
+  const headers = new Headers({ location: "/" });
+  headers.append("set-cookie", cookie("fsh_oauth_state", "", 0));
+  headers.append("set-cookie", cookie("fsh_session", session, SESSION_TTL));
+  return new Response(null, { status: 302, headers });
+});
+
+app.post("/api/auth/logout", (c) => {
+  if (c.req.header("x-fsh-admin") !== "1") return c.json({ error: "forbidden" }, 403);
+  c.header("set-cookie", cookie("fsh_session", "", 0));
+  return c.json({ ok: true });
 });
 
 // ---------------------------------------------------------------- ingest (bearer token)

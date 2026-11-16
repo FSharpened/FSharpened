@@ -34,3 +34,4 @@ input[type=text],input[type=number],select{font:inherit;background:var(--bg);col
 @media (max-width:760px){.shell{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}nav#nav{flex-direction:row;flex-wrap:wrap}.who{margin:0}.bar{grid-template-columns:90px 1fr 70px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .pad{margin-top:24px}h2.pad{margin-bottom:12px}
+.signin{max-width:440px;margin:12vh auto;text-align:center}.signin .sub{margin-bottom:20px}.who .btn{margin-top:6px;padding:5px 10px;font-size:13px}

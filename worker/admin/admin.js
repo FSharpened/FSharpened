@@ -149,9 +149,19 @@ async function route() {
     const v = m ? await views.run(decodeURIComponent(m[1])) : await (views[{ "#/": "overview", "#/runs": "runs", "#/stages": "stages", "#/settings": "settings", "#/tokens": "tokens", "#/audit": "audit" }[h] || "overview"])();
     main.replaceChildren(v); applyWidths(main);
   } catch (e) {
-    main.replaceChildren(el("h1", {}, "Something went wrong"), el("p", { class: "muted" }, e.message === "unauthorized" ? "Your session is not authorised. Sign in through Cloudflare Access." : e.message));
+    if (e.message === "unauthorized") return showSignIn(main);
+    main.replaceChildren(el("h1", {}, "Something went wrong"), el("p", { class: "muted" }, e.message));
   }
 }
+function showSignIn(main) {
+  $("#nav").replaceChildren();
+  main.replaceChildren(el("div", { class: "panel signin" }, el("img", { src: "/mark.svg", alt: "", width: 56, height: 56 }), el("h1", {}, "FSharpened Hub"),
+    el("p", { class: "sub" }, "Sign in with an authorised GitHub account to manage CI telemetry, tokens and settings."),
+    el("a", { class: "btn", href: "/api/auth/login" }, "Sign in with GitHub")));
+}
 addEventListener("hashchange", route);
-api("/me").then((m) => { $("#who").textContent = m.email + (m.environment === "dev" ? " (dev)" : ""); }).catch(() => {});
+api("/me").then((m) => {
+  const who = $("#who"); who.textContent = m.email + (m.environment === "dev" ? " (dev) " : " ");
+  if (m.environment !== "dev") { const b = el("button", { class: "btn ghost" }, "Sign out"); b.addEventListener("click", async () => { await fetch("/api/auth/logout", { method: "POST", headers: { "x-fsh-admin": "1" } }); location.hash = "#/"; location.reload(); }); who.append(el("div", {}, b)); }
+}).catch(() => {});
 route();

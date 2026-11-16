@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { parseCookies, verifySession } from "./logic";
 
 export interface Env {
   DB: D1Database;
@@ -8,6 +9,10 @@ export interface Env {
   ACCESS_TEAM_DOMAIN: string;
   ACCESS_AUD: string;
   RETENTION_DAYS: string;
+  GITHUB_CLIENT_ID: string;
+  GITHUB_CLIENT_SECRET: string;
+  SESSION_SECRET: string;
+  ADMIN_GITHUB_USERS: string;
 }
 export type AppCtx = Context<{ Bindings: Env; Variables: { actor: string } }>;
 
@@ -53,9 +58,14 @@ export async function verifyAccessJwt(token: string, env: Env): Promise<string |
   }
 }
 
-/** Admin authentication: Cloudflare Access JWT in production; a fixed dev identity only when ENVIRONMENT=dev. */
+/** Admin authentication, in order: dev identity (ENVIRONMENT=dev only), signed GitHub session cookie, Cloudflare Access JWT (optional). */
 export async function authenticateAdmin(c: AppCtx): Promise<string | null> {
   if (c.env.ENVIRONMENT === "dev") return "dev@localhost";
+  const cookie = parseCookies(c.req.header("cookie"))["fsh_session"];
+  if (cookie && c.env.SESSION_SECRET) {
+    const u = await verifySession(c.env.SESSION_SECRET, cookie, Math.floor(Date.now() / 1000));
+    if (u) return u;
+  }
   const jwt = c.req.header("cf-access-jwt-assertion");
   return jwt ? verifyAccessJwt(jwt, c.env) : null;
 }

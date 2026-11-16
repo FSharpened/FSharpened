@@ -9,5 +9,5 @@ npm run db:migrate:local
 npx wrangler dev --var ENVIRONMENT:dev     # admin UI at http://localhost:8787 (dev identity, no Access)
 ```
 
-- `src/logic.ts` pure, unit-tested validation and aggregation. `src/auth.ts` Cloudflare Access JWT verification. `src/index.ts` routes.
+- `src/logic.ts` pure, unit-tested validation and aggregation. `src/auth.ts` Cloudflare Access JWT (optional) and GitHub session auth. `src/index.ts` routes.
 - `admin/` dependency-free UI (no inline script/style; strict CSP in `admin/_headers`).

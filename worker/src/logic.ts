@@ -103,3 +103,49 @@ export function sanitizeFlags(input: unknown, current: Flags): Flags {
     regressionPct: clamp(o.regressionPct, 5, 300, current.regressionPct),
   };
 }
+
+// ---------------------------------------------------------------- sessions (HMAC-signed cookie) and allowlist
+const b64u = (b: Uint8Array): string => btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64u = (s: string): Uint8Array => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(s.length / 4) * 4, "=")), (c) => c.charCodeAt(0));
+
+async function hmacKey(secret: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+
+export interface Session { u: string; exp: number }
+
+export async function signSession(secret: string, user: string, ttlSeconds: number, nowSec: number): Promise<string> {
+  const payload = b64u(new TextEncoder().encode(JSON.stringify({ u: user, exp: nowSec + ttlSeconds } satisfies Session)));
+  const sig = await crypto.subtle.sign("HMAC", await hmacKey(secret), new TextEncoder().encode(payload));
+  return payload + "." + b64u(new Uint8Array(sig));
+}
+
+/** Returns the user if the signature is valid and unexpired, else null. Requires a secret of at least 32 chars. */
+export async function verifySession(secret: string, token: string, nowSec: number): Promise<string | null> {
+  if (secret.length < 32) return null;
+  const [payload, sig, extra] = token.split(".");
+  if (!payload || !sig || extra !== undefined) return null;
+  try {
+    const ok = await crypto.subtle.verify("HMAC", await hmacKey(secret), unb64u(sig), new TextEncoder().encode(payload));
+    if (!ok) return null;
+    const s = JSON.parse(new TextDecoder().decode(unb64u(payload))) as Partial<Session>;
+    return typeof s.u === "string" && typeof s.exp === "number" && s.exp > nowSec ? s.u : null;
+  } catch {
+    return null;
+  }
+}
+
+export function parseCookies(header: string | undefined | null): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of (header ?? "").split(";")) {
+    const i = part.indexOf("=");
+    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+  }
+  return out;
+}
+
+/** "Alice, bob" -> ["alice","bob"] (GitHub logins are case-insensitive). */
+export function parseAllowlist(v: string | undefined): string[] {
+  return (v ?? "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => /^[a-z0-9-]{1,39}$/.test(x));
+}
+export const isAllowed = (login: string, list: string[]): boolean => list.includes(login.toLowerCase());

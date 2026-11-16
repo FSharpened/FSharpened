@@ -20,6 +20,8 @@
     "ENVIRONMENT": "production",
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": "",
-    "RETENTION_DAYS": "180"
+    "RETENTION_DAYS": "180",
+    "GITHUB_CLIENT_ID": "Ov23li29lDOLul7bqp2u",
+    "ADMIN_GITHUB_USERS": "FSharpened"
   }
 }

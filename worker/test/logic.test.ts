@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { constantTimeEqual, matrixState, newToken, percentile, safeUrl, sanitizeFlags, sha256Hex, validateIngest, DEFAULT_FLAGS } from "../src/logic";
+import { isAllowed, parseAllowlist, parseCookies, signSession, verifySession, constantTimeEqual, matrixState, newToken, percentile, safeUrl, sanitizeFlags, sha256Hex, validateIngest, DEFAULT_FLAGS } from "../src/logic";
 
 const good = () => ({
   ok: true, profile: "full", rid: "win-x64", started: "20261116-130614", commit: "abc1234", duration_s: 41.8, sdk: "9.0.200",
@@ -51,5 +51,30 @@ describe("helpers", () => {
     const cur = { ...DEFAULT_FLAGS };
     expect(sanitizeFlags({ retentionDays: 1, regressionPct: 9999, ingestEnabled: "no" }, cur)).toEqual({ ...cur, retentionDays: 7, regressionPct: 300 });
     expect(sanitizeFlags(null, cur)).toEqual(cur);
+  });
+});
+
+describe("sessions and allowlist", () => {
+  const secret = "x".repeat(40);
+  it("signs and verifies, rejects tamper, expiry, wrong secret and short secrets", async () => {
+    const tok = await signSession(secret, "FSharpened", 60, 1000);
+    expect(await verifySession(secret, tok, 1030)).toBe("FSharpened");
+    expect(await verifySession(secret, tok, 1061)).toBeNull();
+    expect(await verifySession("y".repeat(40), tok, 1030)).toBeNull();
+    expect(await verifySession("short", tok, 1030)).toBeNull();
+    const [p, s] = tok.split(".");
+    const forged = btoa(JSON.stringify({ u: "mallory", exp: 9e9 })).replace(/=+$/, "");
+    expect(await verifySession(secret, forged + "." + s, 1030)).toBeNull();
+    expect(await verifySession(secret, p + "." + s + ".x", 1030)).toBeNull();
+    expect(await verifySession(secret, "garbage", 1030)).toBeNull();
+  });
+  it("parses cookies and allowlists case-insensitively", () => {
+    expect(parseCookies("a=1; fsh_session=abc.def; b=2")["fsh_session"]).toBe("abc.def");
+    expect(parseCookies(undefined)).toEqual({});
+    const l = parseAllowlist(" FSharpened , bad name!,Loopy-Luci ");
+    expect(l).toEqual(["fsharpened", "loopy-luci"]);
+    expect(isAllowed("FSHARPENED", l)).toBe(true);
+    expect(isAllowed("eve", l)).toBe(false);
+    expect(isAllowed("x", [])).toBe(false);
   });
 });
