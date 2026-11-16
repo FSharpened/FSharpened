@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Effect'T,'E struct and a single effect { } CE covering async, task, result, option and validation with OTel context. Not algebraic effects at runtime.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Effects.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Diagnostics\FSharpened.Diagnostics.fsproj" />
+  </ItemGroup>
+
+</Project>

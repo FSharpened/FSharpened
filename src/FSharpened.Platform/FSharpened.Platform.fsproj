@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Owns every OS-specific behaviour behind interfaces and a capability manifest: file watching, IPC transport, path identity, overlay store, sandboxing, terminal, runtime identity. Nothing else may #if on a platform.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Platform.fs" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Complexity computed from the typed AST (match case = decision point), coverage, CRAP, mutation-score gates, baseline-comparison mode.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.CompilerBridge\FSharpened.CompilerBridge.fsproj" />
+    <ProjectReference Include="..\FSharpened.Analyzers\FSharpened.Analyzers.fsproj" />
+  </ItemGroup>
+
+</Project>

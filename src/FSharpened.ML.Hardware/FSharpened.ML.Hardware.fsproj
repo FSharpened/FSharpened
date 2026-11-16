@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Backend registry (Training/Inference/Kernel), capability negotiation, per-task priority-chain resolver and deterministic fallback. CUDA, ROCm/HIP, DirectML, OpenVINO, CoreML, MPS, oneDNN/oneDAL, ILGPU, CPU.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Hardware.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Platform\FSharpened.Platform.fsproj" />
+    <ProjectReference Include="..\FSharpened.ML.Portability\FSharpened.ML.Portability.fsproj" />
+    <ProjectReference Include="..\FSharpened.Statepoints\FSharpened.Statepoints.fsproj" />
+  </ItemGroup>
+
+</Project>

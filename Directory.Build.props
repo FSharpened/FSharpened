@@ -1,0 +1,20 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
+    <OtherFlags>$(OtherFlags) --warnon:3390</OtherFlags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Authors>The FSharpened contributors</Authors>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <Company>FSharpened</Company>
+    <Product>FSharpened</Product>
+    <Copyright>Copyright 2026 The FSharpened contributors</Copyright>
+    <PackageReadmeFile Condition="Exists('$(MSBuildThisFileDirectory)README.md')">README.md</PackageReadmeFile>
+    <Version>0.0.1-skeleton</Version>
+  </PropertyGroup>
+
+</Project>

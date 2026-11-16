@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Typed frames with provenance DAG, schema and drift validation, reproducible splits seeded from the statepoint graph, streaming.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Data\FSharpened.Data.fsproj" />
+    <ProjectReference Include="..\FSharpened.Statepoints\FSharpened.Statepoints.fsproj" />
+  </ItemGroup>
+
+</Project>

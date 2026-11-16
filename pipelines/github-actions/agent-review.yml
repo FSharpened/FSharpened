@@ -1,0 +1,16 @@
+name: agent-review
+on:
+  pull_request:
+
+# The reviewer agent checks the 14 invariants in MAINTAINER.md and BLOCKS on violation.
+# It has read-only repository permission and can never merge.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Invoke the Reviewer persona with .agents/skills/review-pr.md (runner integration pending)."

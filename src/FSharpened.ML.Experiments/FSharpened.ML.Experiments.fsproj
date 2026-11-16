@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Local-first tracker where every run is a statepoint; typed search { } CE (random, Bayesian, Hyperband, PBT); AutoML wrapper; notebook integration. Genuinely greenfield.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.ML.Authoring\FSharpened.ML.Authoring.fsproj" />
+    <ProjectReference Include="..\FSharpened.ML.Data\FSharpened.ML.Data.fsproj" />
+    <ProjectReference Include="..\FSharpened.Statepoints\FSharpened.Statepoints.fsproj" />
+  </ItemGroup>
+
+</Project>

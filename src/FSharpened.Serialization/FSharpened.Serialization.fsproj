@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>System.Text.Json converter factory using analyzer-generated metadata instead of FSharp.Reflection; build-time AOT validation that fails the build with a suggested fix.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Analyzers\FSharpened.Analyzers.fsproj" />
+    <ProjectReference Include="..\FSharpened.Effects\FSharpened.Effects.fsproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>DiagnosticScope CE, Result-centric error pipeline, ILogger integration, Sentry/OTLP bridges. Every error has a typed shape.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Diagnostics.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Platform\FSharpened.Platform.fsproj" />
+  </ItemGroup>
+
+</Project>

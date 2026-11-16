@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>MVU wrapper over Avalonia and Fabulous.Avalonia, `dotnet fsh new desktop` template, AOT lane for mobile.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Effects\FSharpened.Effects.fsproj" />
+    <ProjectReference Include="..\FSharpened.Telemetry\FSharpened.Telemetry.fsproj" />
+  </ItemGroup>
+
+</Project>

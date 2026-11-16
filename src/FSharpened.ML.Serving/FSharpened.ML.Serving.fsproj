@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>ONNX-first runtime with batching and warm-up, Giraffe integration, drift detection, shadow traffic, automatic rollback to prior artifact.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.ML.Registry\FSharpened.ML.Registry.fsproj" />
+    <ProjectReference Include="..\FSharpened.ML.Hardware\FSharpened.ML.Hardware.fsproj" />
+    <ProjectReference Include="..\FSharpened.Telemetry\FSharpened.Telemetry.fsproj" />
+  </ItemGroup>
+
+</Project>

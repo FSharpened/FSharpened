@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Composes SBOM (dep-scan, SOVA, ShieldedStack), SLSA/Sigstore, lock-file validation (NuGet, CPM and Paket); extends signing and SBOM to model artifacts. Continuous, not release-gate.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Build\FSharpened.Build.fsproj" />
+  </ItemGroup>
+
+</Project>

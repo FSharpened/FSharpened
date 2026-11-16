@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>find / check / types / rename / dead-code plus model-aware queries, exposed as a library and a stdio MCP server. Agents must use it for symbol resolution.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Platform\FSharpened.Platform.fsproj" />
+    <ProjectReference Include="..\FSharpened.CompilerBridge\FSharpened.CompilerBridge.fsproj" />
+  </ItemGroup>
+
+</Project>

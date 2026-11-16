@@ -1,0 +1,22 @@
+name: agent-release
+on:
+  push:
+    tags: ['v*']
+
+# Triggered only by a human-approved tag. Publishing is human-gated (MAINTAINER.md);
+# configure the `release` environment with required reviewers.
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write   # Sigstore keyless signing
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet pack FSharpened.slnx -c Release -p:CI=true
+      - run: echo "TODO: SBOM (CycloneDX), SLSA provenance, Sigstore signing, then push to NuGet via environment-protected secret."

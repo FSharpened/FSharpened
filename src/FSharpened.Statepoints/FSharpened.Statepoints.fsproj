@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Shared statepoint graph used by hot reload, debugging, model canarying, experiment tracking and chaos testing. No component may implement its own checkpointing.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Statepoints.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Platform\FSharpened.Platform.fsproj" />
+  </ItemGroup>
+
+</Project>

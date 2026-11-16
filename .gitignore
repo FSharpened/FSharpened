@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+TestResults/
+artifacts/
+.fsharpened/
+.venv/
+__pycache__/

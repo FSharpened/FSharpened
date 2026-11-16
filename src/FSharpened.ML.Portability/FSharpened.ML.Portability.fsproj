@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Every ML framework declares RIDs, dtypes, ops, training/inference support and a stability tier; fallback to ONNX export or ILGPU; version pinning recorded in artifacts.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Portability.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Platform\FSharpened.Platform.fsproj" />
+  </ItemGroup>
+
+</Project>

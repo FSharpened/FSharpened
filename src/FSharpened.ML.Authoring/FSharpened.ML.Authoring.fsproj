@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>model { } and training { } CEs, DU architectures, nested-AD combinators, elastic distributed training via statepoint rollback.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.ML.Hardware\FSharpened.ML.Hardware.fsproj" />
+    <ProjectReference Include="..\FSharpened.ML.Portability\FSharpened.ML.Portability.fsproj" />
+    <ProjectReference Include="..\FSharpened.Statepoints\FSharpened.Statepoints.fsproj" />
+    <ProjectReference Include="..\FSharpened.Telemetry\FSharpened.Telemetry.fsproj" />
+  </ItemGroup>
+
+</Project>

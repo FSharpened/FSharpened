@@ -1,0 +1,39 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FSharpened.Platform/FSharpened.Platform.fsproj" />
+    <Project Path="src/FSharpened.Statepoints/FSharpened.Statepoints.fsproj" />
+    <Project Path="src/FSharpened.Semantic/FSharpened.Semantic.fsproj" />
+    <Project Path="src/FSharpened.CompilerBridge/FSharpened.CompilerBridge.fsproj" />
+    <Project Path="src/FSharpened.Diagnostics/FSharpened.Diagnostics.fsproj" />
+    <Project Path="src/FSharpened.Telemetry/FSharpened.Telemetry.fsproj" />
+    <Project Path="src/FSharpened.Analyzers/FSharpened.Analyzers.fsproj" />
+    <Project Path="src/FSharpened.Tooling/FSharpened.Tooling.fsproj" />
+    <Project Path="src/FSharpened.Build/FSharpened.Build.fsproj" />
+    <Project Path="src/FSharpened.LanguageExtensions/FSharpened.LanguageExtensions.fsproj" />
+    <Project Path="src/FSharpened.Effects/FSharpened.Effects.fsproj" />
+    <Project Path="src/FSharpened.Serialization/FSharpened.Serialization.fsproj" />
+    <Project Path="src/FSharpened.Quality/FSharpened.Quality.fsproj" />
+    <Project Path="src/FSharpened.Desktop/FSharpened.Desktop.fsproj" />
+    <Project Path="src/FSharpened.Debugging/FSharpened.Debugging.fsproj" />
+    <Project Path="src/FSharpened.Refactoring/FSharpened.Refactoring.fsproj" />
+    <Project Path="src/FSharpened.Testing/FSharpened.Testing.fsproj" />
+    <Project Path="src/FSharpened.Data/FSharpened.Data.fsproj" />
+    <Project Path="src/FSharpened.Security/FSharpened.Security.fsproj" />
+    <Project Path="src/FSharpened.Architecture/FSharpened.Architecture.fsproj" />
+    <Project Path="src/FSharpened.Models/FSharpened.Models.fsproj" />
+    <Project Path="src/FSharpened.ML.Portability/FSharpened.ML.Portability.fsproj" />
+    <Project Path="src/FSharpened.ML.Hardware/FSharpened.ML.Hardware.fsproj" />
+    <Project Path="src/FSharpened.ML.Authoring/FSharpened.ML.Authoring.fsproj" />
+    <Project Path="src/FSharpened.ML.Data/FSharpened.ML.Data.fsproj" />
+    <Project Path="src/FSharpened.ML.Experiments/FSharpened.ML.Experiments.fsproj" />
+    <Project Path="src/FSharpened.ML.Registry/FSharpened.ML.Registry.fsproj" />
+    <Project Path="src/FSharpened.ML.Serving/FSharpened.ML.Serving.fsproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/FSharpened.Cli/FSharpened.Cli.fsproj" />
+    <Project Path="tools/FSharpened.DevLoop/FSharpened.DevLoop.fsproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FSharpened.Skeleton.Tests/FSharpened.Skeleton.Tests.fsproj" />
+  </Folder>
+</Solution>

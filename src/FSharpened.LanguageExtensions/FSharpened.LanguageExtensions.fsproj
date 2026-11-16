@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Collections.Immutable, Option (ValueOption-aware), Async/Task bridge, Pipeline. Library-level only: no compiler patches, no FSharp.Core changes, no HKTs.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+</Project>

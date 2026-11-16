@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Hyper-specific CDM/APM/ECM/SSM/ATRM models, recursive training pipeline with frozen judges, five-layer deterministic fallback stack, atomic hot-swap via statepoints. The symbolic fallback ships first.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Models.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Statepoints\FSharpened.Statepoints.fsproj" />
+    <ProjectReference Include="..\FSharpened.Telemetry\FSharpened.Telemetry.fsproj" />
+    <ProjectReference Include="..\FSharpened.Security\FSharpened.Security.fsproj" />
+    <ProjectReference Include="..\FSharpened.Platform\FSharpened.Platform.fsproj" />
+  </ItemGroup>
+
+</Project>

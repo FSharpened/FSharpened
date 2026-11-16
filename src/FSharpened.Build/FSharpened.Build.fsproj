@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>FAKE / Fun.Build targets, MSBuild cache task integration, `dotnet fsh build --cached`, reference pipelines.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.CompilerBridge\FSharpened.CompilerBridge.fsproj" />
+    <ProjectReference Include="..\FSharpened.Platform\FSharpened.Platform.fsproj" />
+  </ItemGroup>
+
+</Project>

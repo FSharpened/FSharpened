@@ -1,0 +1,5 @@
+# Append-only. One line per decision since the last ADR. Promote to an ADR when structural.
+2026-11-16 | owner | Project named FSharpened (slug fsharpened, packages FSharpened.*, tool fsh, mark F#ened) | ADR-0001
+2026-11-16 | owner | Nothing platform-first; Windows/Linux/macOS peers; mobile non-precluded | ADR-0003
+2026-11-16 | scaffold | net8.0 target, SDK 9.0.200+, .slnx, central package versions | ADR-0005
+2026-11-16 | scaffold | Pasted PLAN/TODO/HANDOVER/STATUS adopted; fabricated "green on six RIDs" state restated as unverified skeleton | HANDOVER.md

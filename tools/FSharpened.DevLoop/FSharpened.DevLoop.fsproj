@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Warm compiler daemon and statepoint-backed hot reload (dotnet fsh watch).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="DevLoop.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FSharpened.Platform\FSharpened.Platform.fsproj" />
+    <ProjectReference Include="..\..\src\FSharpened.Statepoints\FSharpened.Statepoints.fsproj" />
+    <ProjectReference Include="..\..\src\FSharpened.CompilerBridge\FSharpened.CompilerBridge.fsproj" />
+  </ItemGroup>
+
+</Project>
