@@ -43,7 +43,7 @@ jobs:
       - name: fsh-ci (full profile, NativeAOT required)
         env:
           # Optional telemetry (docs/operations/hub.md); empty on forks, in which case publishing is skipped.
-          FSH_HUB_URL: ${{ vars.FSH_HUB_URL }}
+          FSH_HUB_URL: ${{ vars.HUB }}
           FSH_HUB_TOKEN: ${{ secrets.FSH_HUB_TOKEN }}
         run: python tools/ci/fsh_ci.py run --profile full --ci --require-aot --jobs 2
       - name: Job summary

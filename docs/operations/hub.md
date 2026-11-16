@@ -23,7 +23,7 @@ Then in Cloudflare Zero Trust create a **Self-hosted Access application** for th
 
 ## Connect publishers
 1. Console, API tokens, create a token (shown once).
-2. In GitHub: repository variable `FSH_HUB_URL` and secret `FSH_HUB_TOKEN`. `ci.yml` forwards them to `fsh_ci.py`, which publishes after each run.
+2. In GitHub: repository variable `HUB` (value: the hub URL) and secret `FSH_HUB_TOKEN`. `ci.yml` forwards them to `fsh_ci.py`, which publishes after each run.
 3. Locally: set the same two environment variables.
 
 ## Operate
