@@ -1,0 +1,54 @@
+name: ci
+# Same pipeline as a developer runs locally: python tools/ci/fsh_ci.py run --profile full
+# (preflight, docs-drift, runner self-tests, Fantomas, restore, strict build, tests, per-RID NativeAOT publish + run).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,     runner: windows-latest,   experimental: false }
+          - { rid: win-arm64,   runner: windows-11-arm,   experimental: true }   # AOT toolchain on arm64 runners unverified
+          - { rid: linux-x64,   runner: ubuntu-latest,    experimental: false }
+          - { rid: linux-arm64, runner: ubuntu-24.04-arm, experimental: false }
+          - { rid: osx-x64,     runner: macos-15-intel,   experimental: false }
+          - { rid: osx-arm64,   runner: macos-latest,     experimental: false }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: fsh-ci (full profile, NativeAOT required)
+        run: python tools/ci/fsh_ci.py run --profile full --ci --require-aot --jobs 2
+      - name: Job summary
+        if: always()
+        shell: bash
+        run: |
+          latest=$(ls -d .fsharpened/ci/runs/* 2>/dev/null | tail -1)
+          [ -n "$latest" ] && cat "$latest/report.md" >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fsh-ci-${{ matrix.rid }}
+          path: .fsharpened/ci/runs/**
+          retention-days: 14

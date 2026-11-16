@@ -24,6 +24,7 @@ This is a **routing contract**, not a table of contents: given a task, which doc
 | Review a threat-model-relevant change | docs/security/threat-model.md | .agents/skills/review-threat-model.md |
 | Run benchmarks / check budgets | docs/performance/budgets.md | .agents/skills/run-benchmarks.md |
 | Run the platform matrix | docs/platform/README.md | .agents/skills/run-platform-matrix.md |
+| Run the full pipeline locally / in hooks | docs/operations/local-ci.md | .agents/skills/run-local-ci.md |
 | Debug a CI failure | docs/operations/ci.md | pipelines/README.md |
 | Cut a release | docs/operations/release.md | .agents/skills/cut-release.md |
 | Triage an issue | docs/operations/triage.md | .agents/skills/triage-issue.md |

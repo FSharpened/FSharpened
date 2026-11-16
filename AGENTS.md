@@ -1,11 +1,11 @@
 # AGENTS.md - FSharpened
 
 ## Build & test
+- Full local pipeline (same as CI): `python tools/ci/fsh_ci.py run` (`--profile fast` while iterating; `docs/operations/local-ci.md`)
 - Build: `dotnet build FSharpened.slnx` (needs .NET SDK 9.0.200+, see `global.json`)
 - Test all: `dotnet test FSharpened.slnx`
 - Test one: `dotnet test --filter "FullyQualifiedName~<TestName>"`
 - Format check: `dotnet fantomas --check .`
-- Docs drift: `python tools/scripts/check_docs.py`
 - Regenerate skeleton from registry: `python tools/scripts/scaffold.py` (never overwrites)
 
 ## Hard rules

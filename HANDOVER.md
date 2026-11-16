@@ -35,5 +35,8 @@ The repository skeleton, specification, governance, agent operating system and g
 - `.slnx` needs SDK 9.0.200+. `global.json` allows roll-forward.
 - `scaffold.py` never overwrites; use `--force` only on files you have not hand-edited.
 
+## CI status
+`python tools/ci/fsh_ci.py run --profile release` is green on win-x64 (preflight, docs-drift, selftest, Fantomas, strict build, 9 tests, NativeAOT publish + run, 30 packages). `.github/workflows/ci.yml` runs it on the six-RID matrix (win-arm64 experimental); results are recorded below once the first run completes.
+
 ## Exact Next Action
 Run `dotnet fantomas --check .` (after `dotnet tool restore`) and fix formatting; then copy `pipelines/github-actions/ci.yml` to `.github/workflows/`, fix whatever the six-RID matrix and per-RID `PublishAot` publish expose (the CLI may need trimming/AOT fixes), and record per-RID results here. Then start P0.5.2 (thread-safe `StatepointGraph`).

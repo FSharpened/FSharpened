@@ -36,7 +36,8 @@ module StructuredDiagnostic =
           Context = Map.empty }
 
     let withContext key value (d: StructuredDiagnostic) =
-        { d with Context = Map.add key value d.Context }
+        { d with
+            Context = Map.add key value d.Context }
 
     let withFix fix (d: StructuredDiagnostic) = { d with SuggestedFix = Some fix }
 

@@ -10,10 +10,12 @@ type FallbackLayer =
     | StructuredEscalation
 
 type FailureRecord =
-    { Task: string
-      Attempts: (FallbackLayer * string) list
-      /// Deterministic resume token handed to the Orchestrator.
-      ResumeToken: string }
+    {
+        Task: string
+        Attempts: (FallbackLayer * string) list
+        /// Deterministic resume token handed to the Orchestrator.
+        ResumeToken: string
+    }
 
 type Outcome<'T> =
     | Resolved of layer: FallbackLayer * value: 'T
@@ -29,7 +31,7 @@ module Fallback =
                 Deferred
                     { Task = task
                       Attempts = List.rev attempts
-                      ResumeToken = sprintf "%s#%d" task (List.length attempts) }
+                      ResumeToken = task + "#" + string (List.length attempts) }
             | (layer, f) :: rest ->
                 let result =
                     try

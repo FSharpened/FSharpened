@@ -1,0 +1,4 @@
+#!/bin/sh
+# Full local pipeline before anything leaves the machine. Bypass once: git push --no-verify
+PY=$(command -v python3 || command -v python) || { echo "fsh-ci: python not found"; exit 1; }
+exec "$PY" tools/ci/fsh_ci.py run --profile full --hook

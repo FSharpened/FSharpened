@@ -29,10 +29,14 @@ type RuntimeIdentity =
 
 module RuntimeIdentity =
     let private detectOs () =
-        if RuntimeInformation.IsOSPlatform OSPlatform.Windows then Windows
-        elif RuntimeInformation.IsOSPlatform OSPlatform.OSX then MacOs
-        elif RuntimeInformation.IsOSPlatform OSPlatform.Linux then Linux
-        else UnknownOs
+        if RuntimeInformation.IsOSPlatform OSPlatform.Windows then
+            Windows
+        elif RuntimeInformation.IsOSPlatform OSPlatform.OSX then
+            MacOs
+        elif RuntimeInformation.IsOSPlatform OSPlatform.Linux then
+            Linux
+        else
+            UnknownOs
 
     let private detectArch () =
         match RuntimeInformation.ProcessArchitecture with
@@ -135,9 +139,7 @@ type InMemoryOverlay(parent: IOverlayStore option, seed: seq<KeyValuePair<string
             InMemoryOverlay(Some frozen, Seq.empty) :> IOverlayStore
 
 // ---- Sandbox and terminal ---------------------------------------------------------
-type SandboxResult =
-    { ExitCode: int
-      TimedOut: bool }
+type SandboxResult = { ExitCode: int; TimedOut: bool }
 
 type ISandbox =
     /// Windows Job Objects, Linux cgroups/process groups, macOS process groups behind one contract.

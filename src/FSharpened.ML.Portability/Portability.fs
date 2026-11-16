@@ -8,13 +8,15 @@ type StabilityTier =
     | Unavailable
 
 type FrameworkContract =
-    { Framework: string
-      /// RID -> tier. Absent RID means Unavailable.
-      Rids: Map<string, StabilityTier>
-      SupportsTraining: bool
-      SupportsInference: bool
-      /// Exact version used for training; recorded in every artifact.
-      PinnedVersion: string }
+    {
+        Framework: string
+        /// RID -> tier. Absent RID means Unavailable.
+        Rids: Map<string, StabilityTier>
+        SupportsTraining: bool
+        SupportsInference: bool
+        /// Exact version used for training; recorded in every artifact.
+        PinnedVersion: string
+    }
 
 module FrameworkContract =
     let tierFor (rid: string) (c: FrameworkContract) =

@@ -26,3 +26,4 @@ Proposed -> Accepted (human-approved) -> Superseded by ADR-N. Never edit an acce
 | 0013 | License: Apache-2.0 |
 | 0014 | NativeAOT validated per RID |
 | 0015 | Recursive training with frozen judges and recursion budgets |
+| 0016 | One local-first CI pipeline, shared by hooks and GitHub Actions |

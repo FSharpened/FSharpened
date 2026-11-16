@@ -82,6 +82,7 @@ let ``rollback moves head to the target`` () =
 let ``effect map and bind short-circuit on failure`` () =
     let e: Effect<int, string> = Effect.fail "boom"
     let r = e |> Effect.map ((+) 1) |> Effect.bind (fun x -> Effect.succeed (x * 2))
+
     match r with
     | Failure m -> Assert.Equal("boom", m)
     | _ -> failwith "expected failure"
@@ -89,9 +90,11 @@ let ``effect map and bind short-circuit on failure`` () =
 [<Fact>]
 let ``fallback stack resolves at the first layer that succeeds`` () =
     let outcome =
-        Fallback.run "demo" [ SpecialisedModel, (fun () -> Error "model crashed")
-                              SiblingModel, (fun () -> failwith "sibling threw")
-                              SymbolicRules, (fun () -> Ok 42) ]
+        Fallback.run
+            "demo"
+            [ SpecialisedModel, (fun () -> Error "model crashed")
+              SiblingModel, (fun () -> failwith "sibling threw")
+              SymbolicRules, (fun () -> Ok 42) ]
 
     match outcome with
     | Resolved(layer, v) ->
@@ -110,7 +113,12 @@ let ``fallback stack defers with a resume token instead of failing`` () =
 [<Fact>]
 let ``resolver always ends in a cpu backend`` () =
     let id = RuntimeIdentity.detect ()
-    let task = { Class = InferenceBackend; Needs = Set.empty }
+
+    let task =
+        { Class = InferenceBackend
+          Needs = Set.empty }
     // Probe says only the CPU backend is actually available on this machine.
-    let resolved = Resolver.resolve id Resolver.defaultInferenceChain (fun b -> b.Id = "onnx-cpu") task
+    let resolved =
+        Resolver.resolve id Resolver.defaultInferenceChain (fun b -> b.Id = "onnx-cpu") task
+
     Assert.Equal<string list>([ "onnx-cpu" ], resolved |> List.map (fun b -> b.Id))

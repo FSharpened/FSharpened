@@ -1,6 +1,12 @@
 module FSharpened.Cli.Program
 
+open System
 open FSharpened.Platform
+
+// printf-family functions use reflection that NativeAOT cannot compile (see gap K, ADR-0014).
+// Use Console + string concatenation in anything that must run under PublishAot.
+let private out (s: string) = Console.Out.WriteLine s
+let private err (s: string) = Console.Error.WriteLine s
 
 let commands =
     [ "init", "Scaffold a project with analyzers, telemetry, Fantomas and a CI stub"
@@ -17,30 +23,32 @@ let commands =
       "new", "Templates (desktop, solution)" ]
 
 let printHelp () =
-    printfn "fsh (FSharpened) - Sharpen your existing F#."
-    printfn ""
+    out "fsh (FSharpened) - Sharpen your existing F#."
+    out ""
 
     for (name, text) in commands do
-        printfn "  %-13s %s" name text
+        out ("  " + name.PadRight 13 + " " + text)
 
 let doctor () =
     let id = RuntimeIdentity.detect ()
-    printfn "rid:        %s" id.Rid
-    printfn "aot:        %b" id.IsAot
-    printfn "container:  %b" id.IsContainer
-    printfn "wsl:        %b" id.IsWsl
+    out ("rid:        " + id.Rid)
+    out ("aot:        " + string id.IsAot)
+    out ("container:  " + string id.IsContainer)
+    out ("wsl:        " + string id.IsWsl)
     0
 
 [<EntryPoint>]
 let main argv =
     match Array.toList argv with
-    | [] | [ "--help" ] | [ "-h" ] ->
+    | []
+    | [ "--help" ]
+    | [ "-h" ] ->
         printHelp ()
         0
     | "doctor" :: _ -> doctor ()
     | cmd :: _ when commands |> List.exists (fun (n, _) -> n = cmd) ->
-        eprintfn "fsh %s: not implemented yet (skeleton). See docs/packages/." cmd
+        err ("fsh " + cmd + ": not implemented yet (skeleton). See docs/packages/.")
         2
     | cmd :: _ ->
-        eprintfn "fsh: unknown command '%s'" cmd
+        err ("fsh: unknown command '" + cmd + "'")
         1

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fast gate (preflight, docs drift, runner self-tests, Fantomas). Bypass once: git commit --no-verify
+PY=$(command -v python3 || command -v python) || { echo "fsh-ci: python not found"; exit 1; }
+exec "$PY" tools/ci/fsh_ci.py run --profile fast --hook
