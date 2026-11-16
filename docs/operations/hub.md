@@ -5,6 +5,11 @@ The hub collects `fsh-ci` run reports and serves an admin console. It is optiona
 ## What it stores
 Run summaries (RID, profile, result, durations, stage results, short commit, branch, CI run URL), hashed API tokens, an audit log, and feature flags. No personal data.
 
+## Live deployment
+- Site: https://fsharpened.fsharpened.workers.dev (`site/`, `wrangler deploy`)
+- Hub: https://fsharpened-hub.fsharpened.workers.dev (D1 `fsharpened-hub`, KV `SETTINGS`; migration 0001 applied)
+- Status 2026-11-16: deployed but **Cloudflare Access is not configured yet**, so the admin API correctly returns 401 for everyone. Finish the Access step below, then create the first token.
+
 ## First-time deploy (maintainer)
 ```bash
 cd worker && npm ci

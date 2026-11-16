@@ -12,9 +12,9 @@
     "run_worker_first": ["/api/*"]
   },
   "d1_databases": [
-    { "binding": "DB", "database_name": "fsharpened-hub", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+    { "binding": "DB", "database_name": "fsharpened-hub", "database_id": "8ab13015-0bef-49af-896a-df87aee4a2e5", "migrations_dir": "migrations" }
   ],
-  "kv_namespaces": [ { "binding": "SETTINGS", "id": "00000000000000000000000000000000" } ],
+  "kv_namespaces": [ { "binding": "SETTINGS", "id": "669941e0a21d44c0b4e8d4df67e8c17d" } ],
   "triggers": { "crons": ["17 3 * * *"] },
   "vars": {
     "ENVIRONMENT": "production",
