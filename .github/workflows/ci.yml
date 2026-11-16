@@ -48,7 +48,7 @@ jobs:
         run: |
           latest=$(ls -d .fsharpened/ci/runs/* 2>/dev/null | tail -1)
           [ -n "$latest" ] && cat "$latest/report.md" >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: fsh-ci-${{ matrix.rid }}
