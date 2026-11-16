@@ -1,9 +1,11 @@
-// Bundles the Fable output + CodeMirror into the static site (site/public/ide). Run `npm run fable` first.
+// Bundles the Fable output + CodeMirror into site/dist/ide.js. tools/site/build.py fingerprints it into the site.
+// Run `npm run fable` first (or `npm run build`, which does both).
 import { build } from "esbuild";
 import { mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const gateway = process.env.IDE_GATEWAY ?? "https://ide.fsharpened.workers.dev";
-const out = new URL("../../site/public/ide/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+const out = fileURLToPath(new URL("../../site/dist/", import.meta.url));
 mkdirSync(out, { recursive: true });
 
 await build({
@@ -11,9 +13,10 @@ await build({
   bundle: true,
   minify: true,
   sourcemap: false,
-  target: ["es2022"],
+  // Syntax floor: browsers from roughly 2020 (ES modules, optional chaining, BigInt for the Fable core).
+  target: ["es2020", "chrome87", "edge88", "firefox78", "safari14"],
   format: "esm",
-  outfile: out + "/ide.js",
+  outfile: out + "ide.js",
   define: { __GATEWAY__: JSON.stringify(gateway) },
   legalComments: "none",
   logLevel: "info",

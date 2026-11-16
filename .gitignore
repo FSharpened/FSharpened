@@ -11,4 +11,6 @@ __pycache__/
 # Cloudflare tooling state, secrets and generated bundles
 .wrangler/
 .dev.vars
-site/public/ide/ide.js
+# Generated website (tools/site/build.py) and the IDE bundle it fingerprints
+site/public/
+site/dist/

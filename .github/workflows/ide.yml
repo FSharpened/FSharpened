@@ -44,4 +44,4 @@ jobs:
       - run: npm run build
         working-directory: ide/web
       - name: Bundle exists and is not trivially small
-        run: test "$(wc -c < site/public/ide/ide.js)" -gt 100000
+        run: test "$(wc -c < site/dist/ide.js)" -gt 100000

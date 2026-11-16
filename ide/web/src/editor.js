@@ -1,6 +1,6 @@
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, dropCursor } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentMore, indentLess } from "@codemirror/commands";
 import { StreamLanguage, syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
@@ -27,11 +27,11 @@ const theme = EditorView.theme({
   ".cm-scroller": { fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace", lineHeight: "1.55" },
   ".cm-content": { caretColor: "var(--brand)" },
   ".cm-gutters": { backgroundColor: "var(--ed-bg)", color: "var(--mut)", border: "none" },
-  ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--brand) 7%, transparent)" },
+  ".cm-activeLine": { backgroundColor: "var(--brand-7)" },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--fg)" },
   "&.cm-focused": { outline: "none" },
   "&.cm-focused .cm-cursor": { borderLeftColor: "var(--brand)" },
-  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": { backgroundColor: "color-mix(in srgb, var(--brand) 25%, transparent)" },
+  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": { backgroundColor: "var(--brand-25)" },
   ".cm-tooltip": { backgroundColor: "var(--card)", color: "var(--fg)", border: "1px solid var(--line)", borderRadius: "8px" },
   ".cm-tooltip-autocomplete ul li[aria-selected]": { backgroundColor: "var(--brand)", color: "var(--brand-fg)" },
   ".cm-diagnostic-error": { borderLeft: "3px solid var(--bad)" },
@@ -53,6 +53,8 @@ function complete(lang) {
   };
 }
 
+let tabTraps = true;
+
 export function createEditor(parent, { onChange, onRun }) {
   const states = {};
   const makeState = (lang, doc) => EditorState.create({
@@ -61,7 +63,10 @@ export function createEditor(parent, { onChange, onRun }) {
       lineNumbers(), highlightActiveLineGutter(), foldGutter(), history(), drawSelection(), dropCursor(), indentOnInput(), bracketMatching(),
       closeBrackets(), autocompletion({ override: [complete(lang)] }), highlightActiveLine(), highlightSelectionMatches(), lintGutter(),
       StreamLanguage.define(modes[lang]), syntaxHighlighting(highlight), theme, EditorState.tabSize.of(4),
-      keymap.of([{ key: "Mod-Enter", run: () => { onRun(); return true; } }, indentWithTab, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, ...completionKeymap, ...lintKeymap]),
+      // Tab indents, but Escape releases it so keyboard users can leave the editor (WCAG 2.1.2).
+      keymap.of([{ key: "Escape", run: () => { tabTraps = false; return false; } }, { key: "Tab", run: (v) => (tabTraps ? indentMore(v) : false), shift: (v) => (tabTraps ? indentLess(v) : false) },
+        { key: "Mod-Enter", run: () => { onRun(); return true; } }, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, ...completionKeymap, ...lintKeymap]),
+      EditorView.domEventHandlers({ keydown: (e) => { if (e.key !== "Escape" && e.key !== "Tab") tabTraps = true; return false; }, focus: () => { tabTraps = true; return false; } }),
       EditorView.updateListener.of((u) => { if (u.docChanged) onChange(u.state.doc.toString()); }),
       EditorView.contentAttributes.of({ "aria-label": lang + " source code editor" }),
     ],

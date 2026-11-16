@@ -25,7 +25,7 @@ The repository skeleton, specification, governance, agent operating system and g
 - `FSharpened.Semantic`, `CompilerBridge`, `Analyzers`, `Debugging` etc. contain no behaviour yet.
 
 ## Browser IDE (added 2026-11-16)
-Live at https://fsharpened.pages.dev/ide/ (ADR-0018, `docs/operations/ide.md`). F# core in `tools/FSharpened.Ide` compiled by Fable; CodeMirror shell in `ide/web`; gateway Worker in `gateway/`. Rebuild before deploying the site: `cd ide/web && npm run build`, then `python tools/site/build.py`, then `wrangler pages deploy`. The bundle is generated and git-ignored.
+Live at https://fsharpened.pages.dev/ide/ (ADR-0018, `docs/operations/ide.md`). F# core in `tools/FSharpened.Ide` compiled by Fable; CodeMirror shell in `ide/web`; gateway Worker in `gateway/`. Rebuild before deploying the site: `cd ide/web && npm run build` (writes `site/dist/ide.js`), then `python tools/site/build.py --require-ide`, `python tools/site/check.py`, then `wrangler pages deploy site/public`. `site/public` and `site/dist` are generated and git-ignored. The site and the hub console are installable PWAs (`docs/operations/site.md`); their service workers are tested in `site/test` but real-browser install and offline behaviour must be confirmed once per release (checklist in that doc).
 
 ## Open TODOs
 - [x] First build and test (P0.7) - fixed: FSharp.Core must be referenced explicitly under central package management; `RollForward=LatestMajor` so net8.0 tests run on SDK-only 9.x machines.

@@ -64,14 +64,33 @@ let lastProblems = [];
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2200); }
 function setStatus(text) { ui.status.textContent = text; }
 function showPanel(name) {
-  ui.tabs.forEach((b) => b.setAttribute("aria-selected", String(b.dataset.p === name)));
+  ui.tabs.forEach((b) => { const on = b.dataset.p === name; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; });
   ui.panels.forEach((p) => { p.hidden = p.dataset.p !== name; });
 }
 ui.tabs.forEach((b) => b.addEventListener("click", () => showPanel(b.dataset.p)));
 
+// WAI-ARIA tabs: one tab stop per list, arrow keys / Home / End move between tabs.
+function bindTabKeys(container, activate) {
+  container.addEventListener("keydown", (e) => {
+    const tabs = [...container.querySelectorAll('[role="tab"], button')];
+    const i = tabs.indexOf(document.activeElement);
+    if (i < 0) return;
+    let n = -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") n = (i + 1) % tabs.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") n = (i - 1 + tabs.length) % tabs.length;
+    else if (e.key === "Home") n = 0;
+    else if (e.key === "End") n = tabs.length - 1;
+    if (n < 0) return;
+    e.preventDefault();
+    tabs[n].focus();
+    activate(tabs[n]);
+  });
+}
+bindTabKeys($(".ptabs"), (b) => showPanel(b.dataset.p));
+
 function renderLangs() {
   ui.langs.replaceChildren(...languages.map((l) => {
-    const b = el("button", { role: "tab", "aria-selected": String(ws.active === l.id), "data-lang": l.id, title: l.file }, l.name);
+    const b = el("button", { type: "button", role: "tab", "aria-selected": String(ws.active === l.id), tabindex: ws.active === l.id ? "0" : "-1", "data-lang": l.id, title: l.file }, l.name);
     b.addEventListener("click", () => setLanguage(l.id));
     return b;
   }));
@@ -300,6 +319,65 @@ async function init() {
   setLanguage(ws.active, true);
   showPanel("output");
   ui.summary.textContent = "Press Ctrl+Enter (or ▶ Run) to compile and run.";
+
+  bindTabKeys(ui.langs, (b) => { setLanguage(b.dataset.lang); ui.langs.querySelector('[aria-selected="true"]')?.focus(); });
+  bindOptions();
+  bindSplitter();
+  bindConnectivity();
+  window.__ideReady = true; // read by the load watchdog in site.js
   $("#ide").classList.add("ready");
+}
+
+// ---------------------------------------------------------------- adaptive layout
+/** Narrow screens keep tabs and Run in view and tuck the rest behind an Options button. */
+function bindOptions() {
+  const bar = $("#bar"), btn = $("#btn-opts");
+  btn.addEventListener("click", () => { const open = !bar.classList.contains("open"); bar.classList.toggle("open", open); btn.setAttribute("aria-expanded", String(open)); });
+}
+
+/** Draggable and keyboard-operable divider between the editor and the output panels. */
+function bindSplitter() {
+  const split = $("#split"), sep = $("#sep"), KEY = "fsharpened.ide.split";
+  const stacked = () => matchMedia("(max-width: 56.25em)").matches;
+  const orient = () => sep.setAttribute("aria-orientation", stacked() ? "horizontal" : "vertical");
+  let share = 0.58; // share of the space given to the editor
+  const apply = (p, persist) => {
+    share = Math.min(0.8, Math.max(0.2, p));
+    const fr = (share / (1 - share)).toFixed(3) + "fr";
+    split.style.setProperty("--ed", fr);
+    split.style.setProperty("--edv", fr);
+    sep.setAttribute("aria-valuemin", "20"); sep.setAttribute("aria-valuemax", "80"); sep.setAttribute("aria-valuenow", String(Math.round(share * 100)));
+    if (persist) safe(() => localStorage.setItem(KEY, String(share)));
+  };
+  const saved = Number(safe(() => localStorage.getItem(KEY), null));
+  if (saved >= 0.2 && saved <= 0.8) apply(saved, false); else { sep.setAttribute("aria-valuemin", "20"); sep.setAttribute("aria-valuemax", "80"); sep.setAttribute("aria-valuenow", "58"); }
+  orient();
+  matchMedia("(max-width: 56.25em)").addEventListener?.("change", orient);
+
+  sep.addEventListener("pointerdown", (e) => { sep.setPointerCapture(e.pointerId); sep.classList.add("drag"); e.preventDefault(); });
+  sep.addEventListener("pointermove", (e) => {
+    if (!sep.hasPointerCapture(e.pointerId)) return;
+    const r = split.getBoundingClientRect();
+    apply(stacked() ? (e.clientY - r.top) / r.height : (e.clientX - r.left) / r.width, false);
+  });
+  const end = () => { if (sep.classList.contains("drag")) { sep.classList.remove("drag"); apply(share, true); } };
+  sep.addEventListener("pointerup", end); sep.addEventListener("pointercancel", end);
+  sep.addEventListener("dblclick", () => apply(0.58, true));
+  sep.addEventListener("keydown", (e) => {
+    const grow = stacked() ? "ArrowDown" : "ArrowRight", shrink = stacked() ? "ArrowUp" : "ArrowLeft";
+    if (e.key === grow) apply(share + 0.03, true);
+    else if (e.key === shrink) apply(share - 0.03, true);
+    else if (e.key === "Home") apply(0.2, true);
+    else if (e.key === "End") apply(0.8, true);
+    else return;
+    e.preventDefault();
+  });
+}
+
+/** The IDE keeps working offline (editing, snapshots, local checks); say so instead of failing silently. */
+function bindConnectivity() {
+  addEventListener("offline", () => { setStatus("Offline: Run is limited to offline checks"); toast("You are offline. Editing and snapshots still work."); });
+  addEventListener("online", () => { setStatus("Back online"); toast("Back online"); });
+  if (!navigator.onLine) setStatus("Offline: Run is limited to offline checks");
 }
 init();

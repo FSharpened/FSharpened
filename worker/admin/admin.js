@@ -22,17 +22,23 @@ const fmtT = (t) => (t ? new Date(t * 1000).toLocaleString() : "never");
 const ago = (t) => { const d = Math.max(0, Date.now() / 1000 - t); return d < 90 ? "just now" : d < 5400 ? Math.round(d / 60) + " min ago" : d < 129600 ? Math.round(d / 3600) + " h ago" : Math.round(d / 86400) + " d ago"; };
 const httpsOnly = (u) => { try { return new URL(u).protocol === "https:" ? u : null; } catch { return null; } };
 
+/** A failed fetch (no network, DNS, captive portal) is reported as `offline` so views can say so plainly. */
 async function api(path, opts = {}) {
-  const res = await fetch("/api/admin" + path, { ...opts, headers: { "x-fsh-admin": "1", ...(opts.body ? { "content-type": "application/json" } : {}) } });
-  if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || res.statusText); }
+  let res;
+  try { res = await fetch("/api/admin" + path, { ...opts, headers: { "x-fsh-admin": "1", ...(opts.body ? { "content-type": "application/json" } : {}) } }); }
+  catch { throw Object.assign(new Error("Cannot reach the hub. Check your connection."), { offline: true }); }
+  if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || res.statusText || "HTTP " + res.status); }
   return res.json();
 }
-function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2400); }
+let toastTimer;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600); }
 const badge = (ok) => el("span", {}, el("span", { class: "dot " + (ok ? "pass" : "fail") }), ok ? "pass" : "fail");
 
 // ---------- charts
-function dailyChart(rows) {
-  const W = 640, H = 220, pad = { l: 34, r: 40, t: 12, b: 26 };
+/** Drawn at the container's real pixel width, so labels stay 11px on a phone instead of shrinking with a fixed viewBox. */
+function dailyChart(rows, W = 640) {
+  W = Math.max(260, Math.round(W));
+  const H = Math.round(Math.min(240, Math.max(170, W * 0.36))), pad = { l: 34, r: 40, t: 12, b: 26 }, every = W < 420 ? 3 : 2;
   const days = []; const today = Math.floor(Date.now() / 86400000);
   for (let i = 13; i >= 0; i--) { const d = today - i; const r = rows.find((x) => x.d === d); days.push({ d, pass: r?.pass || 0, fail: r?.fail || 0, avg: r?.avg_s || 0 }); }
   const max = Math.max(1, ...days.map((x) => x.pass + x.fail)), maxS = Math.max(1, ...days.map((x) => x.avg));
@@ -43,12 +49,14 @@ function dailyChart(rows) {
     const bx = pad.l + i * bw + bw * 0.18, w = bw * 0.64;
     s.append(svg("rect", { x: bx, y: y(x.pass), width: w, height: y(0) - y(x.pass), fill: "var(--ok)", rx: 2 }, svg("title", {}, `${x.pass} passed`)));
     s.append(svg("rect", { x: bx, y: y(x.pass + x.fail), width: w, height: y(x.pass) - y(x.pass + x.fail), fill: "var(--bad)", rx: 2 }, svg("title", {}, `${x.fail} failed`)));
-    if (i % 2 === 0) s.append(svg("text", { x: bx + w / 2, y: H - 8, "text-anchor": "middle" }, new Date(x.d * 86400000).toLocaleDateString(undefined, { month: "short", day: "numeric" })));
+    if (i % every === 0) s.append(svg("text", { x: bx + w / 2, y: H - 8, "text-anchor": "middle" }, new Date(x.d * 86400000).toLocaleDateString(undefined, { month: "short", day: "numeric" })));
   });
   const pts = days.filter((x) => x.avg > 0).map((x) => { const i = days.indexOf(x); return `${pad.l + i * bw + bw / 2},${pad.t + (H - pad.t - pad.b) * (1 - x.avg / maxS)}`; });
   if (pts.length > 1) s.append(svg("polyline", { points: pts.join(" "), fill: "none", stroke: "var(--brand)", "stroke-width": 2 }), svg("text", { x: W - pad.r + 4, y: pad.t + 10 }, fmtS(maxS)));
   return s;
 }
+function chartBox(rows) { const b = el("div", { class: "chartbox" }); b.rows = rows; return b; }
+function drawCharts(root) { root.querySelectorAll(".chartbox").forEach((b) => { const w = Math.round(b.clientWidth); if (w && w !== b.drawnW) { b.drawnW = w; b.replaceChildren(dailyChart(b.rows, w)); } }); }
 function bars(items, labelFn, valFn, maxV, cls = () => "") {
   return el("div", {}, items.map((it) => el("div", { class: "bar" }, el("span", { title: labelFn(it) }, labelFn(it)),
     el("div", { class: "track" }, el("div", { class: "fill " + cls(it), style: null, "data-w": Math.max(2, (valFn(it) / maxV) * 100) })), el("span", { class: "muted" }, fmtS(valFn(it))))));
@@ -72,7 +80,7 @@ const views = {
     const recent = el("div", { class: "panel tw" }, el("h2", {}, "Recent runs"), runsTable(o.recent));
     const root = el("div", {}, el("h1", {}, "Overview"), el("p", { class: "sub" }, "Live view of the local-first CI pipeline across the six tier-1 RIDs."), stats,
       el("h2", { class: "pad" }, "Platform matrix"), matrix,
-      el("div", { class: "grid g2 pad" }, el("div", { class: "panel" }, el("h2", {}, "Last 14 days"), dailyChart(o.daily), el("p", { class: "muted" }, "Bars: passed (green) and failed (red). Line: average duration.")), recent));
+      el("div", { class: "grid g2 pad" }, el("div", { class: "panel" }, el("h2", {}, "Last 14 days"), chartBox(o.daily), el("p", { class: "muted" }, "Bars: passed (green) and failed (red). Line: average duration.")), recent));
     return root;
   },
   async runs() {
@@ -141,27 +149,53 @@ function runsTable(rows) {
 }
 
 const NAV = [["#/", "Overview"], ["#/runs", "Runs"], ["#/stages", "Stage performance"], ["#/settings", "Settings"], ["#/tokens", "API tokens"], ["#/audit", "Audit log"]];
+let showingError = false; // true while the view is an offline/error panel, so coming back online can retry it
+let lastPath = null;      // focus moves to the new view only when the page changes, not on a filter change, refresh or retry
+
+/** Scrollable tables must be reachable and named for keyboard and screen-reader users. */
+function enhance(main) {
+  main.querySelectorAll(".tw").forEach((n) => { n.tabIndex = 0; n.setAttribute("role", "region"); n.setAttribute("aria-label", n.querySelector("h2")?.textContent || "Data table"); });
+}
+function retryPanel(title, text) {
+  const b = el("button", { class: "btn", type: "button" }, "Try again");
+  b.addEventListener("click", () => route());
+  return el("div", { class: "panel signin" }, el("h1", {}, title), el("p", { class: "sub" }, text), b);
+}
 async function route() {
   const h = location.hash.replace(/\?.*/, "") || "#/", main = $("#view");
-  $("#nav").replaceChildren(...NAV.map(([href, label]) => el("a", { href, "aria-current": (href === "#/" ? h === "#/" : h.startsWith(href)) ? "page" : false }, label)));
+  const label = (NAV.find(([href]) => (href === "#/" ? h === "#/" : h.startsWith(href))) || NAV[0])[1];
+  $("#nav").replaceChildren(...NAV.map(([href, l]) => el("a", { href, "aria-current": l === label && (href === "#/" ? h === "#/" : h.startsWith(href)) ? "page" : false }, l)));
+  $("#nav [aria-current]")?.scrollIntoView?.({ inline: "nearest", block: "nearest" }); // keep the current tab visible in the phone top bar
+  document.title = label + " · FSharpened Hub";
+  const moved = lastPath !== null && lastPath !== h; lastPath = h;
   try {
     const m = h.match(/^#\/runs\/(.+)$/);
     const v = m ? await views.run(decodeURIComponent(m[1])) : await (views[{ "#/": "overview", "#/runs": "runs", "#/stages": "stages", "#/settings": "settings", "#/tokens": "tokens", "#/audit": "audit" }[h] || "overview"])();
-    main.replaceChildren(v); applyWidths(main);
+    showingError = false;
+    main.replaceChildren(v); applyWidths(main); drawCharts(main); enhance(main);
   } catch (e) {
-    if (e.message === "unauthorized") return showSignIn(main);
-    main.replaceChildren(el("h1", {}, "Something went wrong"), el("p", { class: "muted" }, e.message));
+    if (e.message === "unauthorized") { showingError = false; return showSignIn(main); }
+    showingError = true;
+    main.replaceChildren(e.offline ? retryPanel("You are offline", "The console is open, but run data lives on the hub. It reloads by itself when your connection returns.") : retryPanel("Something went wrong", e.message));
   }
+  if (moved) { scrollTo(0, 0); main.focus({ preventScroll: true }); }
 }
 function showSignIn(main) {
   $("#nav").replaceChildren();
+  document.title = "Sign in · FSharpened Hub";
   main.replaceChildren(el("div", { class: "panel signin" }, el("img", { src: "/mark.svg", alt: "", width: 56, height: 56 }), el("h1", {}, "FSharpened Hub"),
     el("p", { class: "sub" }, "Sign in with an authorised GitHub account to manage CI telemetry, tokens and settings."),
     el("a", { class: "btn", href: "/api/auth/login" }, "Sign in with GitHub")));
 }
+function loadWho() {
+  return api("/me").then((m) => {
+    const who = $("#who"); who.textContent = m.email + (m.environment === "dev" ? " (dev) " : " ");
+    if (m.environment !== "dev") { const b = el("button", { class: "btn ghost", type: "button" }, "Sign out"); b.addEventListener("click", async () => { await fetch("/api/auth/logout", { method: "POST", headers: { "x-fsh-admin": "1" } }); location.hash = "#/"; location.reload(); }); who.append(el("div", {}, b)); }
+  }).catch(() => {});
+}
 addEventListener("hashchange", route);
-api("/me").then((m) => {
-  const who = $("#who"); who.textContent = m.email + (m.environment === "dev" ? " (dev) " : " ");
-  if (m.environment !== "dev") { const b = el("button", { class: "btn ghost" }, "Sign out"); b.addEventListener("click", async () => { await fetch("/api/auth/logout", { method: "POST", headers: { "x-fsh-admin": "1" } }); location.hash = "#/"; location.reload(); }); who.append(el("div", {}, b)); }
-}).catch(() => {});
+addEventListener("online", () => { if (!$("#who").textContent) loadWho(); if (showingError) route(); });
+if ("ResizeObserver" in window) new ResizeObserver(() => requestAnimationFrame(() => drawCharts($("#view")))).observe($("#view"));
+else addEventListener("resize", () => drawCharts($("#view")));
+loadWho();
 route();
