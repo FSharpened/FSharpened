@@ -32,8 +32,11 @@
   <Folder Name="/tools/">
     <Project Path="tools/FSharpened.Cli/FSharpened.Cli.fsproj" />
     <Project Path="tools/FSharpened.DevLoop/FSharpened.DevLoop.fsproj" />
+    <Project Path="tools/FSharpened.Ide/FSharpened.Ide.fsproj" />
+    <Project Path="tools/FSharpened.Ide.Web/FSharpened.Ide.Web.fsproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/FSharpened.Skeleton.Tests/FSharpened.Skeleton.Tests.fsproj" />
+    <Project Path="tests/FSharpened.Ide.Tests/FSharpened.Ide.Tests.fsproj" />
   </Folder>
 </Solution>

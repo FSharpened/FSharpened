@@ -28,3 +28,4 @@ Proposed -> Accepted (human-approved) -> Superseded by ADR-N. Never edit an acce
 | 0015 | Recursive training with frozen judges and recursion budgets |
 | 0016 | One local-first CI pipeline, shared by hooks and GitHub Actions |
 | 0017 | A Cloudflare Worker hub for CI telemetry and operations |
+| 0018 | A browser IDE: an F# core compiled with Fable, executing through an allowlisting gateway |

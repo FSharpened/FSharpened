@@ -24,6 +24,9 @@ The repository skeleton, specification, governance, agent operating system and g
 - CI workflows exist but have never run. No release, no packages, no baselines.
 - `FSharpened.Semantic`, `CompilerBridge`, `Analyzers`, `Debugging` etc. contain no behaviour yet.
 
+## Browser IDE (added 2026-11-16)
+Live at https://fsharpened.pages.dev/ide/ (ADR-0018, `docs/operations/ide.md`). F# core in `tools/FSharpened.Ide` compiled by Fable; CodeMirror shell in `ide/web`; gateway Worker in `gateway/`. Rebuild before deploying the site: `cd ide/web && npm run build`, then `python tools/site/build.py`, then `wrangler pages deploy`. The bundle is generated and git-ignored.
+
 ## Open TODOs
 - [x] First build and test (P0.7) - fixed: FSharp.Core must be referenced explicitly under central package management; `RollForward=LatestMajor` so net8.0 tests run on SDK-only 9.x machines.
 - [ ] **P0** - Fill `LICENSE` with full Apache-2.0 text (human).

@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Overlay.fs" />
     <Compile Include="Platform.fs" />
   </ItemGroup>
 

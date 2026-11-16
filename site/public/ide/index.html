@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IDE · FSharpened</title><meta name="description" content="A browser IDE for F#, C, C# and C++ built on FSharpened: edit, compile, run, and time-travel with statepoints.">
+<meta property="og:title" content="IDE · FSharpened"><meta property="og:description" content="A browser IDE for F#, C, C# and C++ built on FSharpened: edit, compile, run, and time-travel with statepoints."><meta property="og:type" content="website">
+<meta property="og:image" content="/assets/og.png"><meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#4338ca"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/site.css"><link rel="stylesheet" href="/ide/ide.css"></head><body class="ide-page">
+<a class="skip" href="#main">Skip to content</a>
+<header class="site"><div class="wrap"><a class="brand" href="/"><img src="/assets/mark.svg" alt="" width="30" height="30">FSharpened</a>
+<nav class="main" aria-label="Main"><a href="/">Home</a><a href="/ide/" aria-current=page>IDE</a><a href="/why.html">Why</a><a href="/how-it-works.html">How it works</a><a href="/pillars.html">Pillars</a><a href="/platforms.html">Platforms</a><a href="/status.html">Status</a><a href="/contribute.html">Contribute</a><a class="btn" href="https://github.com/FSharpened/FSharpened">GitHub</a></nav></div></header>
+<main id="main"><div class="ide" id="ide">
+<div class="bar">
+  <div class="tabs" id="langs" role="tablist" aria-label="Language"></div>
+  <label>Compiler <select id="compiler" aria-label="Compiler"></select></label>
+  <label id="options-wrap">Flags <input id="options" type="text" spellcheck="false" aria-label="Compiler flags"></label>
+  <label>Examples <select id="template" aria-label="Load an example"></select></label>
+  <span class="grow"></span>
+  <button id="btn-reset" class="ghost" title="Reset all buffers to the starter examples">Reset</button>
+  <button id="btn-snap" class="ghost" title="Save a statepoint (Ctrl+S)">Snapshot</button>
+  <button id="btn-share" class="ghost" title="Copy a link containing this program">Share</button>
+  <button id="btn-run" class="primary" title="Compile and run (Ctrl+Enter)">&#9654; Run</button>
+</div>
+<div class="split">
+  <div id="editor" class="editor"></div>
+  <div class="bottom">
+    <div class="ptabs" role="tablist" aria-label="Panels">
+      <button data-p="output" aria-selected="true" role="tab">Output</button>
+      <button data-p="problems" aria-selected="false" role="tab">Problems <span id="pcount" class="badge"></span></button>
+      <button data-p="timeline" aria-selected="false" role="tab">Timeline <span id="tcount" class="badge"></span></button>
+      <button data-p="stdin" aria-selected="false" role="tab">Input</button>
+    </div>
+    <div class="panel" data-p="output"><div id="summary" role="status"></div><pre id="stdout"></pre><pre id="stderr" class="err"></pre></div>
+    <div class="panel" data-p="problems" hidden><div id="problems"></div></div>
+    <div class="panel" data-p="timeline" hidden><p class="muted">Every run and snapshot is a <strong>statepoint</strong> from FSharpened.Statepoints. Restore rolls back; Fork branches without touching the source.</p><ul id="timeline"></ul><div id="diff" hidden></div></div>
+    <div class="panel" data-p="stdin" hidden><label for="stdin">Standard input for your program</label><textarea id="stdin" rows="6" spellcheck="false"></textarea></div>
+  </div>
+</div>
+<div class="statusbar"><span id="status">Loading…</span><span class="grow"></span><span class="muted">Runs on <a href="https://godbolt.org" rel="noopener">Compiler Explorer</a> sandboxes. Your code is sent there when you press Run; do not paste secrets.</span></div>
+</div><div id="toast" role="status" aria-live="polite"></div>
+<noscript><p class="wrap">The IDE needs JavaScript.</p></noscript></main>
+<footer class="site"><div class="wrap"><div><strong>FSharpened</strong><br>Sharpen your existing F#. Not a fork. An extension.</div>
+<div><a href="https://github.com/FSharpened/FSharpened">Source</a> · <a href="https://github.com/FSharpened/FSharpened/blob/main/docs/spec/SPEC.md">Specification</a> · <a href="https://github.com/FSharpened/FSharpened/tree/main/docs/adr">ADRs</a> · <a href="https://github.com/FSharpened/FSharpened/blob/main/SECURITY.md">Security</a></div>
+<div>Apache-2.0. Maintained by humans and agents together.</div></div></footer>
+<script src="/assets/site.js" defer></script><script type="module" src="/ide/ide.js"></script></body></html>

@@ -9,13 +9,13 @@ REPO = "https://github.com/FSharpened/FSharpened"
 reg = json.loads((ROOT / "registry/pillars.json").read_text(encoding="utf-8"))
 e = html.escape
 
-NAV = [("index.html", "Home"), ("why.html", "Why"), ("how-it-works.html", "How it works"),
+NAV = [("index.html", "Home"), ("ide/index.html", "IDE"), ("why.html", "Why"), ("how-it-works.html", "How it works"),
        ("pillars.html", "Pillars"), ("platforms.html", "Platforms"), ("status.html", "Status"),
        ("contribute.html", "Contribute")]
 
 
-def page(fname, title, desc, body, head=""):
-    nav = "".join(f'<a href="/{f if f!="index.html" else ""}"{" aria-current=page" if f==fname else ""}>{t}</a>' for f, t in NAV)
+def page(fname, title, desc, body, head="", foot="", bodyclass=""):
+    nav = "".join(f'<a href="/{f.replace("index.html", "")}"{" aria-current=page" if f==fname else ""}>{t}</a>' for f, t in NAV)
     t = "FSharpened: Sharpen your existing F#" if fname == "index.html" else f"{title} · FSharpened"
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -23,7 +23,7 @@ def page(fname, title, desc, body, head=""):
 <meta property="og:title" content="{e(t)}"><meta property="og:description" content="{e(desc)}"><meta property="og:type" content="website">
 <meta property="og:image" content="/assets/og.png"><meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#4338ca"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
-<link rel="stylesheet" href="/assets/site.css">{head}</head><body>
+<link rel="stylesheet" href="/assets/site.css">{head}</head><body class="{bodyclass}">
 <a class="skip" href="#main">Skip to content</a>
 <header class="site"><div class="wrap"><a class="brand" href="/"><img src="/assets/mark.svg" alt="" width="30" height="30">FSharpened</a>
 <nav class="main" aria-label="Main">{nav}<a class="btn" href="{REPO}">GitHub</a></nav></div></header>
@@ -31,7 +31,7 @@ def page(fname, title, desc, body, head=""):
 <footer class="site"><div class="wrap"><div><strong>FSharpened</strong><br>Sharpen your existing F#. Not a fork. An extension.</div>
 <div><a href="{REPO}">Source</a> · <a href="{REPO}/blob/main/docs/spec/SPEC.md">Specification</a> · <a href="{REPO}/tree/main/docs/adr">ADRs</a> · <a href="{REPO}/blob/main/SECURITY.md">Security</a></div>
 <div>Apache-2.0. Maintained by humans and agents together.</div></div></footer>
-<script src="/assets/site.js" defer></script></body></html>"""
+<script src="/assets/site.js" defer></script>{foot}</body></html>"""
 
 
 def head(h, p):
@@ -54,7 +54,7 @@ home = f"""<section class="hero"><div class="wrap">
 <span class="pill">Open source · Apache-2.0 · Early skeleton</span>
 <h1>Sharpen your existing <em>F#</em>.</h1>
 <p class="lead">A suite of libraries, analyzers, tools and pipelines that plug into the F# compiler services, the .NET SDK and your editor. Not a fork. An extension.</p>
-<div class="cta"><a class="btn" href="/how-it-works.html">How it works</a><a class="btn ghost" href="/why.html">Why it exists</a><a class="btn ghost" href="{REPO}">View on GitHub</a></div>
+<div class="cta"><a class="btn" href="/ide/">Open the IDE</a><a class="btn ghost" href="/how-it-works.html">How it works</a><a class="btn ghost" href="/why.html">Why it exists</a><a class="btn ghost" href="{REPO}">View on GitHub</a></div>
 </div></section>
 <section><div class="wrap"><h2>What you get</h2><p class="sub">Six principles shape every pillar.</p>
 <div class="grid">{''.join(f'<div class="card"><h3>{e(a)}</h3><p>{e(b)}</p></div>' for a, b in cards)}</div></div></section>
@@ -144,7 +144,45 @@ pages = {"index.html": ("Home", "A satellite suite of libraries, analyzers and t
          "status.html": ("Status", "What works today and what is next.", status),
          "contribute.html": ("Contribute", "How to contribute to FSharpened.", contrib),
          "404.html": ("Not found", "Page not found.", notfound)}
+
+# ---------------- IDE
+ide_body = """<div class="ide" id="ide">
+<div class="bar">
+  <div class="tabs" id="langs" role="tablist" aria-label="Language"></div>
+  <label>Compiler <select id="compiler" aria-label="Compiler"></select></label>
+  <label id="options-wrap">Flags <input id="options" type="text" spellcheck="false" aria-label="Compiler flags"></label>
+  <label>Examples <select id="template" aria-label="Load an example"></select></label>
+  <span class="grow"></span>
+  <button id="btn-reset" class="ghost" title="Reset all buffers to the starter examples">Reset</button>
+  <button id="btn-snap" class="ghost" title="Save a statepoint (Ctrl+S)">Snapshot</button>
+  <button id="btn-share" class="ghost" title="Copy a link containing this program">Share</button>
+  <button id="btn-run" class="primary" title="Compile and run (Ctrl+Enter)">&#9654; Run</button>
+</div>
+<div class="split">
+  <div id="editor" class="editor"></div>
+  <div class="bottom">
+    <div class="ptabs" role="tablist" aria-label="Panels">
+      <button data-p="output" aria-selected="true" role="tab">Output</button>
+      <button data-p="problems" aria-selected="false" role="tab">Problems <span id="pcount" class="badge"></span></button>
+      <button data-p="timeline" aria-selected="false" role="tab">Timeline <span id="tcount" class="badge"></span></button>
+      <button data-p="stdin" aria-selected="false" role="tab">Input</button>
+    </div>
+    <div class="panel" data-p="output"><div id="summary" role="status"></div><pre id="stdout"></pre><pre id="stderr" class="err"></pre></div>
+    <div class="panel" data-p="problems" hidden><div id="problems"></div></div>
+    <div class="panel" data-p="timeline" hidden><p class="muted">Every run and snapshot is a <strong>statepoint</strong> from FSharpened.Statepoints. Restore rolls back; Fork branches without touching the source.</p><ul id="timeline"></ul><div id="diff" hidden></div></div>
+    <div class="panel" data-p="stdin" hidden><label for="stdin">Standard input for your program</label><textarea id="stdin" rows="6" spellcheck="false"></textarea></div>
+  </div>
+</div>
+<div class="statusbar"><span id="status">Loading…</span><span class="grow"></span><span class="muted">Runs on <a href="https://godbolt.org" rel="noopener">Compiler Explorer</a> sandboxes. Your code is sent there when you press Run; do not paste secrets.</span></div>
+</div><div id="toast" role="status" aria-live="polite"></div>
+<noscript><p class="wrap">The IDE needs JavaScript.</p></noscript>"""
+pages["ide/index.html"] = ("IDE", "A browser IDE for F#, C, C# and C++ built on FSharpened: edit, compile, run, and time-travel with statepoints.", ide_body)
+
 for f, (t, d, b) in pages.items():
-    (OUT / f).write_text(page(f, t, d, b), encoding="utf-8", newline="\n")
+    extra = {"head": '<link rel="stylesheet" href="/ide/ide.css">', "foot": '<script type="module" src="/ide/ide.js"></script>', "bodyclass": "ide-page"} if f == "ide/index.html" else {}
+    (OUT / f).parent.mkdir(parents=True, exist_ok=True)
+    (OUT / f).write_text(page(f, t, d, b, **extra), encoding="utf-8", newline="\n")
 (OUT / "robots.txt").write_text("User-agent: *\nAllow: /\n", encoding="utf-8")
+if not (OUT / "ide" / "ide.js").exists():
+    print("warning: site/public/ide/ide.js is missing; build it first: cd ide/web && npm ci && npm run build (docs/operations/ide.md)")
 print(f"site: {len(pages)} pages -> {OUT}")

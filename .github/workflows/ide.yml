@@ -1,0 +1,47 @@
+name: ide
+on:
+  pull_request:
+    paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**', 'tools/site/**', '.github/workflows/ide.yml']
+  push:
+    branches: [main]
+    paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**']
+permissions:
+  contents: read
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: gateway/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npx tsc --noEmit
+      - run: npm test
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ide/web/package-lock.json
+      - run: dotnet tool restore
+      - run: dotnet test tests/FSharpened.Ide.Tests
+      - run: npm ci --ignore-scripts
+        working-directory: ide/web
+      - run: npm run build
+        working-directory: ide/web
+      - name: Bundle exists and is not trivially small
+        run: test "$(wc -c < site/public/ide/ide.js)" -gt 100000

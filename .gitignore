@@ -8,3 +8,7 @@ artifacts/
 .fsharpened/
 .venv/
 __pycache__/
+# Cloudflare tooling state, secrets and generated bundles
+.wrangler/
+.dev.vars
+site/public/ide/ide.js

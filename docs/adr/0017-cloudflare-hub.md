@@ -1,6 +1,6 @@
 # ADR-0017: A Cloudflare Worker hub for CI telemetry and operations
 
-- Status: Proposed (human approval required)
+- Status: Accepted (maintainer approval given in chat, 2026-11-16: "Approve all others")
 - Date: 2026-11-16
 
 ## Context
