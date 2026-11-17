@@ -11,6 +11,7 @@
   ],
   "vars": {
     "ALLOWED_ORIGINS": "https://fsharpened.pages.dev,https://fsharpened.fsharpened.workers.dev",
-    "UPSTREAM": "https://godbolt.org"
+    "UPSTREAM": "https://godbolt.org",
+    "WANDBOX": "https://wandbox.org"
   }
 }

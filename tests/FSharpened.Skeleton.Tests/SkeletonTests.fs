@@ -30,6 +30,7 @@ let pillarIds =
       FSharpened.Security.Pillar.Id
       FSharpened.Architecture.Pillar.Id
       FSharpened.Models.Pillar.Id
+      FSharpened.Interop.Rust.Pillar.Id
       FSharpened.ML.Portability.Pillar.Id
       FSharpened.ML.Hardware.Pillar.Id
       FSharpened.ML.Authoring.Pillar.Id

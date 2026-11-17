@@ -24,5 +24,7 @@ Licenses below are the project's current understanding and **must be verified ag
 | esbuild (build tool) | MIT | Compatible | Not shipped | C |
 | Wrangler, Workers types (dev tools) | Apache-2.0 / MIT (verify) | Compatible | Not shipped | C |
 | Compiler Explorer public API (service, not code) | Service terms apply (verify) | Pending | Attribution on the IDE page; keep rate limit; no abuse; plan self-hosting if usage grows | C |
+| Wandbox public API (service, not code) | Service terms apply (verify) | Pending | Named on the IDE page next to Compiler Explorer; the gateway rate-limits and caches; plan self-hosting if usage grows (ADR-0020) | C |
+| Rust toolchain (`cargo`, `rustc`; build tool) | MIT OR Apache-2.0 | Compatible | Not shipped; the reference crate has no dependencies (ADR-0019) | C |
 
 Copyleft or commercial-restricted dependencies are rejected unless isolated by an ADR.

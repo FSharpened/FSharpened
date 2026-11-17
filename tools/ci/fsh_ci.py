@@ -5,7 +5,7 @@ One entrypoint used identically on a developer machine, in a git hook, and in Gi
 (Invariant: local and remote CI must not diverge). Standard library only; Windows, Linux, macOS.
 
   python tools/ci/fsh_ci.py run [--profile fast|full|release] [--only S ...] [--skip S ...]
-                                [--no-cache] [--keep-going] [--jobs N] [--rid RID] [--require-aot]
+                                [--no-cache] [--keep-going] [--jobs N] [--rid RID] [--require-aot] [--require-rust]
   python tools/ci/fsh_ci.py preflight      # checks only
   python tools/ci/fsh_ci.py list           # stages and profiles
   python tools/ci/fsh_ci.py history        # recent runs and stage timings
@@ -68,6 +68,7 @@ def augment_path(env: dict) -> dict:
         extra += [os.path.join(pf, "dotnet"), os.path.join(pfx86, "Microsoft Visual Studio", "Installer")]
     else:
         extra += [os.path.expanduser("~/.dotnet"), "/usr/share/dotnet", "/usr/local/share/dotnet"]
+    extra.append(os.path.join(os.path.expanduser("~"), ".cargo", "bin"))
     sep = os.pathsep
     current = env.get("PATH", "")
     for p in extra:
@@ -168,17 +169,19 @@ class Ctx:
     require_aot: bool
     no_cache: bool
     sdk_version: str = ""
+    require_rust: bool = False
     results: dict = field(default_factory=dict)
 
     def log(self, stage: str) -> pathlib.Path:
         return self.run_dir / f"{stage}.log"
 
 
-def run_cmd(ctx: Ctx, stage: str, cmd: list[str], timeout: int = 900, cwd=None, append=False) -> tuple[int, str]:
+def run_cmd(ctx: Ctx, stage: str, cmd: list[str], timeout: int = 900, cwd=None, append=False, env=None) -> tuple[int, str]:
     """Run a command, stream to the stage log, return (rc, combined output)."""
     mode = "ab" if append else "wb"
     resolved = cmd[:]
-    exe = which(cmd[0], ctx.env)
+    env = env or ctx.env
+    exe = which(cmd[0], env)
     if exe:
         resolved[0] = exe
     with open(ctx.log(stage), mode) as f:
@@ -186,7 +189,7 @@ def run_cmd(ctx: Ctx, stage: str, cmd: list[str], timeout: int = 900, cwd=None, 
         f.flush()
         try:
             proc = subprocess.run(
-                resolved, cwd=cwd or ROOT, env=ctx.env, stdout=f, stderr=subprocess.STDOUT, timeout=timeout
+                resolved, cwd=cwd or ROOT, env=env, stdout=f, stderr=subprocess.STDOUT, timeout=timeout
             )
             rc = proc.returncode
         except subprocess.TimeoutExpired:
@@ -335,6 +338,15 @@ def check_aot_toolchain(ctx):
     return (FAIL if ctx.require_aot else WARN), f"NativeAOT toolchain: {msg} (aot stage will be skipped)"
 
 
+def check_rust_toolchain(ctx):
+    cargo = which("cargo", ctx.env)
+    if not cargo:
+        msg = "cargo not found (install with rustup; the rust stage and the Interop.Rust integration tests need it)"
+        return (FAIL if ctx.require_rust else WARN), msg
+    out = subprocess.run([cargo, "--version"], capture_output=True, text=True, env=ctx.env).stdout.strip()
+    return PASS, out or cargo
+
+
 PREFLIGHT_CHECKS: list[tuple[str, Callable]] = [
     ("python", check_python),
     ("git", check_git),
@@ -345,6 +357,7 @@ PREFLIGHT_CHECKS: list[tuple[str, Callable]] = [
     ("conflict-markers", check_markers),
     ("large-files", check_large),
     ("aot-toolchain", check_aot_toolchain),
+    ("rust-toolchain", check_rust_toolchain),
     ("network", check_network),
 ]
 
@@ -453,6 +466,39 @@ def stage_aot(ctx: Ctx) -> Result:
     return Result(PASS, f"{ctx.rid} binary {size:.1f} MB runs", metrics={"binary_mb": round(size, 2)})
 
 
+RUST_CRATE = "native/rust/fsh-interop-example/Cargo.toml"
+
+
+def stage_rust(ctx: Ctx) -> Result:
+    """The reference Rust crate for Interop.Rust (ADR-0019): unit tests, plus rustfmt and clippy when installed.
+    The F# side is exercised by the Interop.Rust tests in the test stage, which fail instead of passing quietly
+    when FSH_REQUIRE_RUST=1 (set by --require-rust)."""
+    if not which("cargo", ctx.env):
+        if ctx.require_rust:
+            return Result(FAIL, "cargo not found (--require-rust)")
+        return Result(SKIP, "cargo not found; install Rust with rustup to run the Interop.Rust stage")
+    env = dict(ctx.env)
+    env["CARGO_TARGET_DIR"] = str(ctx.run_dir / "rust-target")
+    manifest = ["--manifest-path", RUST_CRATE]
+    rc, out = run_cmd(ctx, "rust", ["cargo", "test", "--locked", *manifest], timeout=900, env=env)
+    if rc != 0:
+        return Result(FAIL, tail(out, 15))
+    passed = sum(int(m.group(1)) for m in re.finditer(r"test result: ok\. (\d+) passed", out))
+    if passed == 0:
+        return Result(FAIL, "zero Rust tests executed (a green run with no tests is a failure)")
+    notes = []
+    for component, args in (("fmt", ["cargo", "fmt", "--check", *manifest]),
+                            ("clippy", ["cargo", "clippy", "--locked", *manifest, "--all-targets", "--", "-D", "warnings"])):
+        probe, _ = run_cmd(ctx, "rust", ["cargo", component, "--version"], timeout=60, append=True, env=env)
+        if probe != 0:
+            notes.append(f"{component} not installed (skipped)")
+            continue
+        rc, out = run_cmd(ctx, "rust", args, timeout=900, append=True, env=env)
+        if rc != 0:
+            return Result(FAIL, f"cargo {component} failed:\n" + tail(out, 12))
+    return Result(PASS, f"{passed} Rust tests passed" + ("; " + "; ".join(notes) if notes else ""), metrics={"rust_tests": passed})
+
+
 def stage_benchmarks(ctx: Ctx) -> Result:
     harness = ROOT / "pipelines" / "benchmarks"
     if not any(harness.glob("*.fsproj")) and not any(harness.glob("**/*.fsproj")):
@@ -472,7 +518,8 @@ def stage_pack(ctx: Ctx) -> Result:
 
 # stage name -> (function, deps, input globs for the cache key, exclusive dotnet lock, cacheable)
 CODE = ["src/**/*.fs", "src/**/*.fsproj", "tools/**/*.fs", "tools/**/*.fsproj", "tests/**/*.fs", "tests/**/*.fsproj",
-        "Directory.Build.props", "Directory.Packages.props", "global.json", "FSharpened.slnx"]
+        "Directory.Build.props", "Directory.Packages.props", "global.json", "FSharpened.slnx",
+        "native/rust/**/*.rs", "native/rust/**/Cargo.toml", "native/rust/**/Cargo.lock"]
 STAGES: dict[str, dict] = {
     "preflight": dict(fn=stage_preflight, deps=[], inputs=None, excl=False),
     "docs-drift": dict(fn=stage_docs_drift, deps=["preflight"], inputs=["**/*.md", "registry/**", "src/**/*.fsproj", ".agents/**", "tools/scripts/*.py"], excl=False),
@@ -483,13 +530,14 @@ STAGES: dict[str, dict] = {
     "build": dict(fn=stage_build, deps=["restore"], inputs=CODE, excl=True),
     "test": dict(fn=stage_test, deps=["build"], inputs=CODE, excl=True),
     "aot": dict(fn=stage_aot, deps=["build"], inputs=CODE, excl=True),
+    "rust": dict(fn=stage_rust, deps=["preflight"], inputs=None, excl=False),
     "benchmarks": dict(fn=stage_benchmarks, deps=["build"], inputs=None, excl=True),
     "pack": dict(fn=stage_pack, deps=["build", "test"], inputs=CODE, excl=True),
 }
 PROFILES = {
     "fast": ["preflight", "docs-drift", "selftest", "tools-restore", "format"],
-    "full": ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build", "test", "aot", "benchmarks"],
-    "release": ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build", "test", "aot", "benchmarks", "pack"],
+    "full": ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build", "test", "aot", "rust", "benchmarks"],
+    "release": ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build", "test", "aot", "rust", "benchmarks", "pack"],
 }
 # A cache hit is only trusted for stages whose outputs are not consumed by a later stage in the same run.
 CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot"}
@@ -736,7 +784,10 @@ def cmd_run(args) -> int:
         run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         run_dir = STATE / "runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        ctx = Ctx(run_dir=run_dir, env=base_env(), rid=args.rid or host_rid(), require_aot=args.require_aot, no_cache=args.no_cache or args.ci)
+        ctx = Ctx(run_dir=run_dir, env=base_env(), rid=args.rid or host_rid(), require_aot=args.require_aot, no_cache=args.no_cache or args.ci,
+                  require_rust=args.require_rust)
+        if ctx.require_rust:
+            ctx.env["FSH_REQUIRE_RUST"] = "1"  # the Interop.Rust tests then fail, not pass quietly, without cargo
         cache = Cache()
         print(f"fsh-ci profile={args.profile} rid={ctx.rid} jobs={args.jobs} cache={'off' if ctx.no_cache else 'on'}")
         print(f"logs: {run_dir}")
@@ -779,7 +830,8 @@ def cmd_run(args) -> int:
 
 
 def cmd_preflight(args) -> int:
-    ctx = Ctx(run_dir=STATE / "preflight", env=base_env(), rid=host_rid(), require_aot=args.require_aot, no_cache=True)
+    ctx = Ctx(run_dir=STATE / "preflight", env=base_env(), rid=host_rid(), require_aot=args.require_aot, no_cache=True,
+              require_rust=args.require_rust)
     ctx.run_dir.mkdir(parents=True, exist_ok=True)
     r = stage_preflight(ctx)
     for n in r.notes:
@@ -846,10 +898,12 @@ def main(argv=None) -> int:
     r.add_argument("--jobs", type=int, default=min(4, os.cpu_count() or 2))
     r.add_argument("--rid", help="override host RID for the AOT stage")
     r.add_argument("--require-aot", action="store_true", help="fail (not skip) when the NativeAOT toolchain is missing")
+    r.add_argument("--require-rust", action="store_true", help="fail (not skip) when cargo is missing; also makes the Interop.Rust tests fail without it")
     r.add_argument("--ci", action="store_true", help="CI mode: cache off")
     r.add_argument("--hook", action="store_true", help="invoked from a git hook")
     p = sub.add_parser("preflight")
     p.add_argument("--require-aot", action="store_true")
+    p.add_argument("--require-rust", action="store_true")
     for name in ("list", "history", "clean", "install-hooks", "uninstall-hooks"):
         sub.add_parser(name)
     args = ap.parse_args(argv)

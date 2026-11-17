@@ -16,7 +16,16 @@
     <Compile Include="Templates.fs" />
     <Compile Include="Diff.fs" />
     <Compile Include="Workspace.fs" />
+    <Compile Include="Project.fs" />
     <Compile Include="Timeline.fs" />
+    <Compile Include="ProjectState.fs" />
+    <Compile Include="Fuzzy.fs" />
+    <Compile Include="Search.fs" />
+    <Compile Include="Symbols.fs" />
+    <Compile Include="Snippets.fs" />
+    <Compile Include="Themes.fs" />
+    <Compile Include="Settings.fs" />
+    <Compile Include="VsCode.fs" />
     <Compile Include="Problems.fs" />
     <Compile Include="Engines.fs" />
     <Compile Include="Protocol.fs" />

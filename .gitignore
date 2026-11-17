@@ -14,3 +14,6 @@ __pycache__/
 # Generated website (tools/site/build.py) and the IDE bundle it fingerprints
 site/public/
 site/dist/
+
+# Rust interop example (native/rust): cargo build output
+native/rust/**/target/

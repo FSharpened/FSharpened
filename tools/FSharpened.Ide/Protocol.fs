@@ -66,11 +66,18 @@ module Protocol =
     let interpret (lang: Language) (raw: RawResult) : Report =
         let buildDiags = Problems.parse lang raw.BuildOutput
 
+        // PHP reports its errors on stdout, not stderr, so the run output is read as a whole for it.
+        let runOutput =
+            if lang = Php then
+                raw.Stdout + "\n" + raw.Stderr
+            else
+                raw.Stderr
+
         let runDiags =
             if raw.BuildFailed then
                 []
             else
-                Problems.parse lang raw.Stderr
+                Problems.parse lang runOutput
 
         let errors = Problems.countOf Severity.Error buildDiags
         let warnings = Problems.countOf Severity.Warning buildDiags

@@ -6,7 +6,8 @@
   "scripts": {
     "fable": "dotnet fable ../../tools/FSharpened.Ide.Web --outDir fable_out",
     "bundle": "node build.mjs",
-    "build": "npm run fable && npm run bundle"
+    "build": "npm run fable && npm run bundle",
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.18.4",

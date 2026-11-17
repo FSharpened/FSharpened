@@ -1,0 +1,17 @@
+[package]
+name = "fsh-interop-example"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "Apache-2.0"
+description = "Reference Rust library for FSharpened.Interop.Rust: the C-ABI conventions an F# caller binds to."
+
+[lib]
+# cdylib: the shared library .NET loads with DllImport / NativeLibrary. Rust has no stable ABI, so the C ABI is the contract.
+crate-type = ["cdylib"]
+
+[profile.release]
+# The boundary relies on catch_unwind turning a panic into a status code.
+# panic = "abort" would turn every panic into a process abort, so it must stay "unwind".
+panic = "unwind"

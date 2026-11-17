@@ -1,6 +1,7 @@
 name: ci
 # Same pipeline as a developer runs locally: python tools/ci/fsh_ci.py run --profile full
-# (preflight, docs-drift, runner self-tests, Fantomas, restore, strict build, tests, per-RID NativeAOT publish + run).
+# (preflight, docs-drift, runner self-tests, Fantomas, restore, strict build, tests, per-RID NativeAOT publish + run,
+# Rust reference crate).
 on:
   pull_request:
   push:
@@ -40,12 +41,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: fsh-ci (full profile, NativeAOT required)
+      - name: Rust toolchain (stable, with rustfmt and clippy)
+        # Interop.Rust (ADR-0019) needs cargo on every RID. GitHub's runner images ship rustup; this pins the
+        # channel and components without a third-party action. A runner with no rustup fails here, loudly.
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup default stable
+          cargo --version
+          rustc -vV
+      - name: fsh-ci (full profile, NativeAOT and Rust required)
         env:
           # Optional telemetry (docs/operations/hub.md); empty on forks, in which case publishing is skipped.
           FSH_HUB_URL: ${{ vars.HUB }}
           FSH_HUB_TOKEN: ${{ secrets.FSH_HUB_TOKEN }}
-        run: python tools/ci/fsh_ci.py run --profile full --ci --require-aot --jobs 2
+        run: python tools/ci/fsh_ci.py run --profile full --ci --require-aot --require-rust --jobs 2
       - name: Job summary
         if: always()
         shell: bash

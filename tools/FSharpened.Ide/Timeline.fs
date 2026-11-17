@@ -12,8 +12,10 @@ type TimelineEntry =
       IsHead: bool }
 
 /// Editor history on top of the shared statepoint graph: snapshots on run/save, restore = rollback, branch = fork.
-/// No private checkpointing (Invariant 5): everything here is FSharpened.Statepoints.
-type Timeline(start: Workspace) =
+/// No private checkpointing (Invariant 5): everything here is FSharpened.Statepoints. The history is generic over the
+/// state it keeps: the caller says how that state is written to and read from an overlay, so a single-language workspace
+/// and a whole project share one implementation.
+type StateTimeline<'S>(start: 'S, write: IOverlayStore -> 'S -> unit, read: IOverlayStore -> 'S) =
     let graph = StatepointGraph()
     let branches = System.Collections.Generic.Dictionary<string, string>()
     let order = ResizeArray<StatepointId>()
@@ -30,7 +32,7 @@ type Timeline(start: Workspace) =
         sp
 
     do
-        Workspace.write root start
+        write root start
         record (graph.Snapshot("Start", root)) "main" |> ignore
 
     member _.Count = graph.Count
@@ -41,7 +43,7 @@ type Timeline(start: Workspace) =
         | None -> ""
 
     /// New statepoint on the current branch holding `w`.
-    member _.Snapshot(label: string, w: Workspace) : string =
+    member _.Snapshot(label: string, w: 'S) : string =
         let parentBranch =
             match graph.Head with
             | Some h -> branches.[idText h]
@@ -52,16 +54,16 @@ type Timeline(start: Workspace) =
             | Some h -> (graph.Get h).Value.Overlay.Fork()
             | None -> InMemoryOverlay() :> IOverlayStore
 
-        Workspace.write overlay w
+        write overlay w
         idText (record (graph.Snapshot(label, overlay)) parentBranch).Id
 
     /// Moves head back to a statepoint and returns the workspace it holds.
-    member _.Restore(id: string) : Workspace option =
+    member _.Restore(id: string) : 'S option =
         match find id with
         | None -> None
         | Some sid ->
             let sp = graph.Rollback sid
-            Some(Workspace.read sp.Overlay)
+            Some(read sp.Overlay)
 
     /// Isolated branch from a statepoint (source is never mutated).
     member _.Fork(id: string, branchName: string) : string option =
@@ -76,10 +78,8 @@ type Timeline(start: Workspace) =
 
             Some(idText (record (graph.Fork(sid, "Fork: " + name)) name).Id)
 
-    member _.Read(id: string) : Workspace option =
-        find id
-        |> Option.bind graph.Get
-        |> Option.map (fun sp -> Workspace.read sp.Overlay)
+    member _.Read(id: string) : 'S option =
+        find id |> Option.bind graph.Get |> Option.map (fun sp -> read sp.Overlay)
 
     member _.Entries: TimelineEntry list =
         let head = graph.Head
@@ -95,3 +95,7 @@ type Timeline(start: Workspace) =
                         CreatedMs = float (sp.Created.ToUnixTimeMilliseconds())
                         IsHead = (head = Some sid) }
               | None -> () ]
+
+/// The single-language workspace history the IDE had before projects.
+type Timeline(start: Workspace) =
+    inherit StateTimeline<Workspace>(start, Workspace.write, Workspace.read)

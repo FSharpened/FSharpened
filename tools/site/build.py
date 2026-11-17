@@ -196,7 +196,7 @@ plat = head("Platforms", "Nothing is Linux-first. Everything must work on every 
 
 status = head("Status", "Honest and current: this is an early skeleton, not a finished product.") + f"""
 <section><div class="wrap prose"><p class="notice">All {len(pillars)} pillars exist as buildable projects. Platform, Statepoints, Effects, Diagnostics, ML.Portability, ML.Hardware and Models contain real code; the rest are typed markers awaiting implementation.</p>
-<h2>What works today</h2><ul><li>Solution builds and the contract and IDE tests pass</li><li><code>fsh doctor</code> runs, including as a NativeAOT binary</li><li>A browser <a href="/ide/">IDE</a> for F#, C, C# and C++ built on the F# core and Statepoints</li><li>Local CI pipeline with preflight, caching, reports and git hooks</li><li>Six-RID GitHub matrix</li><li>Docs-drift checks keep the registry, docs and skills consistent</li></ul>
+<h2>What works today</h2><ul><li>Solution builds and the contract and IDE tests pass</li><li><code>fsh doctor</code> runs, including as a NativeAOT binary</li><li>A browser <a href="/ide/">IDE</a> for 18 languages (F#, C#, VB.NET, every Fable target and more) built on the F# core and Statepoints</li><li>Local CI pipeline with preflight, caching, reports and git hooks</li><li>Six-RID GitHub matrix</li><li>Docs-drift checks keep the registry, docs and skills consistent</li></ul>
 <h2>What is next</h2><p>See the <a href="{REPO}/blob/main/PLAN.md">plan</a> and <a href="{REPO}/blob/main/TODO.md">todo</a>. The canonical status lives in <a href="{REPO}/blob/main/docs/STATUS.md">docs/STATUS.md</a>.</p></div></section>"""
 
 contrib = head("Contribute", "Built by humans and agents together, governed by written rules.") + f"""
@@ -215,25 +215,115 @@ offline = """<section class="offline-page"><div class="wrap"><h1>You are offline
 <div class="cta"><button class="btn" type="button" data-retry>Try again</button><a class="btn ghost" href="/">Home</a><a class="btn ghost" href="/ide/">IDE</a><a class="btn ghost" href="/pillars">Pillars</a></div></div></section>"""
 
 ide_body = """<div class="ide" id="ide">
-<h1 class="sr-only">FSharpened IDE: edit, compile and run F#, C, C# and C++</h1>
+<h1 class="sr-only">FSharpened IDE: edit, compile and run F# and 17 other languages in polyglot projects</h1>
 <div class="bar" id="bar">
-  <div class="tabs" id="langs" role="tablist" aria-label="Language"></div>
+  <button id="btn-side" class="ghost side-toggle" type="button" aria-expanded="true" aria-controls="side" title="Show or hide the files and projects (Ctrl+B)">Files</button>
+  <div class="tabs" id="ftabs" role="tablist" aria-label="Open files"></div>
   <div class="opts" id="opts">
-    <label>Compiler <select id="compiler" aria-label="Compiler"></select></label>
+    <label id="compiler-wrap">Compiler <select id="compiler" aria-label="Compiler"></select></label>
     <label id="options-wrap">Flags <input id="options" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Compiler flags"></label>
-    <label>Examples <select id="template" aria-label="Load an example"></select></label>
+    <label id="template-wrap">Examples <select id="template" aria-label="Load an example"></select></label>
   </div>
   <span class="grow"></span>
   <div class="acts" id="acts">
-    <button id="btn-reset" class="ghost" type="button" title="Reset all buffers to the starter examples (undoable from the Timeline)">Reset</button>
-    <button id="btn-snap" class="ghost" type="button" title="Save a statepoint (Ctrl+S)">Snapshot</button>
-    <button id="btn-share" class="ghost" type="button" title="Copy a link containing this program">Share</button>
+    <button id="btn-palette" class="ghost" type="button" aria-haspopup="dialog" title="Command palette: every command by name (F1 or Ctrl+Shift+P)">Commands</button>
+    <button id="btn-snap" class="ghost" type="button" title="Save a statepoint of the whole project (Ctrl+S)">Snapshot</button>
+    <button id="btn-share" class="ghost" type="button" title="Copy a link containing this project">Share</button>
+    <button id="btn-settings" class="ghost" type="button" aria-haspopup="dialog" title="Settings, colour theme and keyboard shortcuts (Ctrl+,)">Settings</button>
   </div>
   <button id="btn-opts" class="ghost opts-toggle" type="button" aria-expanded="false" aria-controls="opts acts">Options</button>
   <button id="btn-run" class="primary" type="button" title="Compile and run (Ctrl+Enter)">&#9654; Run</button>
 </div>
+<div class="work" id="work">
+<aside class="side" id="side" aria-label="Project">
+  <div class="stabs" role="tablist" aria-label="Sidebar">
+    <button role="tab" type="button" data-s="files" aria-selected="true">Files</button>
+    <button role="tab" type="button" data-s="search" aria-selected="false" tabindex="-1" title="Search in the project (Ctrl+Shift+F)">Search</button>
+    <button role="tab" type="button" data-s="outline" aria-selected="false" tabindex="-1" title="Declarations in the open file (Ctrl+Shift+O)">Outline</button>
+    <button role="tab" type="button" data-s="projects" aria-selected="false" tabindex="-1">Projects</button>
+    <button role="tab" type="button" data-s="extensions" aria-selected="false" tabindex="-1" title="VS Code themes, snippets and settings; using VS Code with this project">VS Code</button>
+    <button id="btn-side-close" class="x side-close" type="button" aria-label="Close the sidebar">&times;</button>
+  </div>
+  <form id="askbar" class="askbar" role="group" aria-labelledby="ask-label" hidden><label id="ask-label" for="ask-input"></label><input id="ask-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" maxlength="200"><span class="ask-btns"><button type="submit" class="mini" id="ask-ok">OK</button><button type="button" class="mini" id="ask-cancel">Cancel</button></span><p id="ask-error" class="ask-error" role="alert" hidden></p></form>
+  <div class="spanel" data-s="files">
+    <div class="shead"><strong id="proj-name" class="pname"></strong><span id="proj-meta" class="muted"></span></div>
+    <div class="toolbar" role="toolbar" aria-label="File actions">
+      <button id="f-new" class="mini" type="button" title="Create a file; folders in its path are made as needed">New file</button>
+      <button id="f-rename" class="mini" type="button" title="Rename or move the selected file or folder (F2)">Rename</button>
+      <button id="f-delete" class="mini" type="button" title="Delete the selected file or folder (undo from the Timeline)">Delete</button>
+      <button id="f-entry" class="mini" type="button" title="Make the selected file the one Run starts from">Set entry</button>
+      <button id="f-copy" class="mini" type="button" title="Copy the open file to the clipboard">Copy</button>
+      <button id="f-download" class="mini" type="button" title="Download the selected file, or the selected folder as a .zip">Download</button>
+    </div>
+    <p class="muted hint">Right-click a file, a folder or a tab for more.</p>
+    <div id="tree" class="tree"></div>
+  </div>
+  <div class="spanel" data-s="search" hidden>
+    <form id="sr-form" class="srform" role="search" aria-label="Search the project">
+      <div class="srrow"><input id="sr-q" type="text" placeholder="Search" aria-label="Search the project for" spellcheck="false" autocapitalize="off" autocomplete="off" maxlength="500">
+        <span class="srtoggles"><button id="sr-case" type="button" aria-pressed="false" title="Match case (Alt+C)" aria-label="Match case">Aa</button><button id="sr-word" type="button" aria-pressed="false" title="Whole word (Alt+W)" aria-label="Whole word">ab</button><button id="sr-re" type="button" aria-pressed="false" title="Regular expression (Alt+R)" aria-label="Regular expression">.*</button></span></div>
+      <div class="srrow"><input id="sr-r" type="text" placeholder="Replace" aria-label="Replace with" spellcheck="false" autocapitalize="off" autocomplete="off" maxlength="500"><button id="sr-replace-all" class="mini" type="button" disabled title="Replace every match in the project">Replace all</button></div>
+      <details id="sr-more" class="srmore"><summary>Files to include or exclude</summary>
+        <label>Include <input id="sr-inc" type="text" placeholder="src/**, *.rs" spellcheck="false" autocapitalize="off" autocomplete="off"></label>
+        <label>Exclude <input id="sr-exc" type="text" placeholder="**/test/**, *.md" spellcheck="false" autocapitalize="off" autocomplete="off"></label>
+      </details>
+    </form>
+    <p id="sr-sum" class="muted hint" role="status" aria-live="polite"></p>
+    <div id="sr-results" class="srresults"></div>
+  </div>
+  <div class="spanel" data-s="outline" hidden>
+    <div class="shead"><strong class="pname">Outline</strong><span id="ol-note" class="muted">A quick index of declarations, not a full parse.</span></div>
+    <div class="srrow olrow"><input id="ol-filter" type="text" placeholder="Filter symbols" aria-label="Filter the symbols of the open file" spellcheck="false" autocapitalize="off" autocomplete="off"></div>
+    <ul id="ol-list" class="ollist"></ul>
+  </div>
+  <div class="spanel" data-s="projects" hidden>
+    <div class="toolbar" role="toolbar" aria-label="Project actions">
+      <button id="p-new" class="mini" type="button">New project</button>
+      <button id="p-starter" class="mini" type="button" title="A new project with one starter program per language">Examples</button>
+      <button id="p-dup" class="mini" type="button">Duplicate</button>
+      <button id="p-rename" class="mini" type="button">Rename</button>
+      <button id="p-delete" class="mini" type="button">Delete</button>
+      <button id="p-zip" class="mini" type="button" title="Download the whole project as a .zip you can import again">Download .zip</button>
+    </div>
+    <div class="toolbar" role="toolbar" aria-label="Import">
+      <button id="p-import-zip" class="mini" type="button" title="Open a .zip as a new project">Import .zip</button>
+      <button id="p-import-folder" class="mini" type="button" title="Open a folder from your computer as a new project">Import folder</button>
+      <button id="p-add" class="mini" type="button" title="Add files to the open project">Add files</button>
+    </div>
+    <p class="muted hint">Drop a .zip, files or a folder anywhere on the editor to import it.</p>
+    <ul id="plist" class="plist"></ul>
+    <div id="report" class="report" hidden></div>
+  </div>
+  <div class="spanel xpanel" data-s="extensions" hidden>
+    <div class="shead"><strong class="pname">VS Code and this IDE</strong></div>
+    <div class="xtext">
+      <p><strong>Works here:</strong> colour themes, snippets and settings from VS Code, read as plain data. Drop or pick a <code>.vsix</code>, a theme <code>.json</code>, a snippets file or <code>settings.json</code>.</p>
+      <p><strong>Works in VS Code:</strong> download this project with its VS Code settings and recommended extensions, including <strong>GitHub Copilot</strong> and Copilot Chat.</p>
+      <details class="xwhy"><summary>Why Copilot and other extensions do not run in this page</summary>
+        <p>A VS Code extension is a program written against VS Code's own API, and it runs inside VS Code's extension host. GitHub Copilot is one: it is GitHub's proprietary extension, it needs your GitHub sign-in, and its suggestions come from GitHub's service. A web page cannot host that API, and this page deliberately refuses to run code it did not ship (its content security policy), which is also what keeps your projects safe from a bad extension.</p>
+        <p>So the IDE does not pretend. It takes what is data, and for everything else it hands you a project that VS Code opens correctly, with the extensions to install already recommended. Planned and not built yet: a language-server bridge and an AI completion provider (ADR-0022, proposed).</p>
+      </details>
+    </div>
+    <div class="toolbar" role="toolbar" aria-label="VS Code import and export">
+      <button id="x-import" class="mini" type="button" title="Import a .vsix, a colour theme, a snippets file or settings.json">Import…</button>
+      <button id="x-download" class="mini" type="button" title="Download the project as a .zip with .vscode/extensions.json, settings and a .code-workspace file">Download for VS Code</button>
+    </div>
+    <div id="x-report" class="report" hidden></div>
+    <h3 class="xh">Imported</h3>
+    <ul id="x-list" class="xlist"></ul>
+    <h3 class="xh">Recommended for this project in VS Code</h3>
+    <ul id="x-recs" class="xlist xrecs"></ul>
+  </div>
+  <input id="pick-zip" type="file" accept=".zip,application/zip" hidden>
+  <input id="pick-folder" type="file" webkitdirectory hidden>
+  <input id="pick-files" type="file" multiple hidden>
+  <input id="pick-ext" type="file" accept=".vsix,.json,.code-snippets,application/json" multiple hidden>
+</aside>
 <div class="split" id="split">
-  <div id="editor" class="editor" role="group" aria-label="Code editor. Press Escape, then Tab, to leave the editor."></div>
+  <div class="edcol">
+    <nav id="crumbs" class="crumbs" aria-label="Breadcrumbs: file path and the symbols around the caret" hidden></nav>
+    <div id="editor" class="editor" role="group" aria-label="Code editor. Press Escape, then Tab, to leave the editor."><div id="empty" class="empty" hidden><p><strong>This project has no files.</strong></p><p class="muted">Create one with New file, or drop a .zip or a folder here.</p></div></div>
+  </div>
   <div id="sep" class="sep" role="separator" aria-orientation="vertical" aria-label="Resize the editor and output panels" tabindex="0"></div>
   <div class="bottom">
     <div class="ptabs" role="tablist" aria-label="Panels">
@@ -244,17 +334,59 @@ ide_body = """<div class="ide" id="ide">
     </div>
     <div class="panel" data-p="output"><div id="summary" role="status"></div><pre id="stdout" tabindex="0"></pre><pre id="stderr" class="err" tabindex="0"></pre></div>
     <div class="panel" data-p="problems" hidden><div id="problems"></div></div>
-    <div class="panel" data-p="timeline" hidden><p class="muted">Every run and snapshot is a <strong>statepoint</strong> from FSharpened.Statepoints. Restore rolls back; Fork branches without touching the source.</p><ul id="timeline"></ul><div id="diff" hidden></div></div>
+    <div class="panel" data-p="timeline" hidden><p class="muted">Every run and snapshot is a <strong>statepoint</strong> of the whole project, from FSharpened.Statepoints. Restore rolls back; Fork branches without touching the source.</p><ul id="timeline"></ul><div id="diff" hidden></div></div>
     <div class="panel" data-p="stdin" hidden><label for="stdin">Standard input for your program</label><textarea id="stdin" rows="6" spellcheck="false"></textarea></div>
   </div>
 </div>
-<div class="statusbar"><a class="home-link" href="/">&larr; FSharpened</a><span id="status" role="status" aria-live="polite">Loading…</span><span class="grow"></span><span class="muted note">Runs on <a href="https://godbolt.org" rel="noopener">Compiler Explorer</a> sandboxes. Your code is sent there when you press Run; do not paste secrets.</span></div>
+</div>
+<div class="statusbar"><a class="home-link" href="/">&larr; FSharpened</a><span id="status" role="status" aria-live="polite">Loading…</span><span class="grow"></span>
+  <span class="stitems" id="stitems" role="group" aria-label="Editor status" hidden>
+    <button id="st-pos" class="stbtn" type="button" title="Go to line (Ctrl+G)">Ln 1, Col 1</button>
+    <span id="st-sel" class="stsel"></span>
+    <button id="st-indent" class="stbtn" type="button" title="Change indentation">Spaces: 4</button>
+    <span id="st-lang" class="stlang"></span>
+    <button id="st-eol" class="stbtn" type="button" title="Change the end-of-line sequence of this file">LF</button>
+    <span class="stenc">UTF-8</span>
+  </span>
+  <span class="muted note">Runs on <a href="https://godbolt.org" rel="noopener">Compiler Explorer</a> and <a href="https://wandbox.org" rel="noopener">Wandbox</a> sandboxes. Your code is sent to the one that serves your language when you press Run; do not paste secrets.</span></div>
+<dialog id="palette" class="pal" aria-labelledby="pal-title">
+  <h2 id="pal-title" class="sr-only">Command palette</h2>
+  <input id="pal-input" type="text" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Type to search">
+  <p id="pal-hint" class="pal-hint muted"></p>
+  <ul id="pal-list" role="listbox" aria-label="Results"></ul>
+</dialog>
+<dialog id="settings" class="dlg" aria-labelledby="set-title">
+  <form method="dialog" class="dlgform">
+    <div class="dlghead"><h2 id="set-title">Settings</h2><button class="x" value="close" aria-label="Close settings">&times;</button></div>
+    <div class="dlgbody">
+      <label class="setrow">Colour theme <select id="set-theme" autofocus></select></label>
+      <p id="set-theme-note" class="muted hint"></p>
+      <label class="setrow">Editor font size <input id="set-font" type="number" inputmode="numeric" step="1"></label>
+      <label class="setrow">Tab size <input id="set-tab" type="number" inputmode="numeric" step="1"></label>
+      <label class="setcheck"><input id="set-spaces" type="checkbox"> Indent with spaces (otherwise with tabs)</label>
+      <label class="setcheck"><input id="set-wrap" type="checkbox"> Word wrap</label>
+      <label class="setcheck"><input id="set-lines" type="checkbox"> Line numbers</label>
+      <label class="setcheck"><input id="set-ws" type="checkbox"> Show whitespace</label>
+      <label class="setcheck"><input id="set-close" type="checkbox"> Close brackets and quotes automatically</label>
+      <label class="setcheck"><input id="set-crumbs" type="checkbox"> Breadcrumbs above the editor</label>
+      <p class="muted hint">Settings stay in this browser. Colour themes from VS Code can be added in the VS Code tab.</p>
+    </div>
+    <div class="dlgfoot"><button type="button" id="set-reset" class="mini">Reset to defaults</button><button type="button" id="set-shortcuts" class="mini">Keyboard shortcuts</button><button value="close" class="mini">Close</button></div>
+  </form>
+</dialog>
+<dialog id="shortcuts" class="dlg wide" aria-labelledby="sc-title">
+  <form method="dialog" class="dlgform">
+    <div class="dlghead"><h2 id="sc-title">Keyboard shortcuts</h2><button class="x" value="close" aria-label="Close the shortcut list">&times;</button></div>
+    <div class="dlgbody" id="sc-body"></div>
+    <div class="dlgfoot"><span class="muted hint">Hold Shift while right-clicking to get the browser's own menu.</span><button value="close" class="mini">Close</button></div>
+  </form>
+</dialog>
 </div><div id="toast" role="status" aria-live="polite"></div>
 <noscript><p class="wrap">The IDE needs JavaScript.</p></noscript>"""
 
 PAGES = {  # path -> (file, title, description, body, options)
     "/": ("index.html", "Home", "A satellite suite of libraries, analyzers and tools that extend F# without forking the compiler.", home, {}),
-    "/ide/": ("ide/index.html", "IDE", "A browser IDE for F#, C, C# and C++ built on FSharpened: edit, compile, run, and time-travel with statepoints.", ide_body, {"ide": True}),
+    "/ide/": ("ide/index.html", "IDE", "A browser IDE for F# and 17 other languages, built on FSharpened: edit, compile, run, and time-travel with statepoints.", ide_body, {"ide": True}),
     "/why": ("why.html", "Why", "Why F# needs FSharpened: one state model, grounded agents, true cross-platform parity.", why, {}),
     "/how-it-works": ("how-it-works.html", "How it works", "A layered satellite architecture around FCS, analyzers, NuGet and LSP.", how, {}),
     "/pillars": ("pillars.html", "Pillars", "Every FSharpened pillar and tool, generated from the registry.", pil, {}),
@@ -302,7 +434,7 @@ def build(require_ide):
         "id": "/",
         "name": "FSharpened",
         "short_name": "FSharpened",
-        "description": "Sharpen your existing F#. Docs and a browser IDE for F#, C, C# and C++. Works offline.",
+        "description": "Sharpen your existing F#. Docs and a browser IDE for F# and 17 other languages. Works offline.",
         "start_url": "/?source=pwa",
         "scope": "/",
         "display": "standalone",
@@ -322,7 +454,7 @@ def build(require_ide):
             {"src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
         ],
         "shortcuts": [
-            {"name": "Open the IDE", "short_name": "IDE", "description": "Write and run F#, C, C# or C++", "url": "/ide/?source=shortcut", "icons": [{"src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png"}]},
+            {"name": "Open the IDE", "short_name": "IDE", "description": "Write and run F#, C#, VB.NET, JavaScript, Python, Rust and more", "url": "/ide/?source=shortcut", "icons": [{"src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png"}]},
             {"name": "Pillars", "short_name": "Pillars", "description": "Every package in the suite", "url": "/pillars?source=shortcut", "icons": [{"src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png"}]},
             {"name": "Project status", "short_name": "Status", "description": "What works today", "url": "/status?source=shortcut", "icons": [{"src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png"}]},
         ],

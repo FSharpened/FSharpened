@@ -21,6 +21,7 @@
     <Project Path="src/FSharpened.Security/FSharpened.Security.fsproj" />
     <Project Path="src/FSharpened.Architecture/FSharpened.Architecture.fsproj" />
     <Project Path="src/FSharpened.Models/FSharpened.Models.fsproj" />
+    <Project Path="src/FSharpened.Interop.Rust/FSharpened.Interop.Rust.fsproj" />
     <Project Path="src/FSharpened.ML.Portability/FSharpened.ML.Portability.fsproj" />
     <Project Path="src/FSharpened.ML.Hardware/FSharpened.ML.Hardware.fsproj" />
     <Project Path="src/FSharpened.ML.Authoring/FSharpened.ML.Authoring.fsproj" />
@@ -38,5 +39,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/FSharpened.Skeleton.Tests/FSharpened.Skeleton.Tests.fsproj" />
     <Project Path="tests/FSharpened.Ide.Tests/FSharpened.Ide.Tests.fsproj" />
+    <Project Path="tests/FSharpened.Interop.Rust.Tests/FSharpened.Interop.Rust.Tests.fsproj" />
   </Folder>
 </Solution>

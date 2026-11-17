@@ -104,5 +104,36 @@ class ProfileTests(unittest.TestCase):
                     self.assertIn(d, stages, f"{name}: {s} needs {d}")
 
 
+class RustStageTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def ctx(self, require_rust):
+        # an empty PATH means cargo cannot be found, whatever is installed on this machine
+        return ci.Ctx(run_dir=pathlib.Path(self.tmp.name), env={"PATH": ""}, rid="linux-x64", require_aot=False,
+                      no_cache=True, require_rust=require_rust)
+
+    def test_missing_cargo_skips_by_default(self):
+        self.assertEqual(ci.stage_rust(self.ctx(False)).status, ci.SKIP)
+
+    def test_missing_cargo_fails_when_required(self):
+        self.assertEqual(ci.stage_rust(self.ctx(True)).status, ci.FAIL)
+
+    def test_preflight_warns_or_fails_without_cargo(self):
+        self.assertEqual(ci.check_rust_toolchain(self.ctx(False))[0], ci.WARN)
+        self.assertEqual(ci.check_rust_toolchain(self.ctx(True))[0], ci.FAIL)
+
+    def test_the_reference_crate_is_an_input_of_the_test_stage(self):
+        self.assertTrue(any(p.startswith("native/rust") for p in ci.CODE))
+        self.assertTrue((ci.ROOT / ci.RUST_CRATE).is_file())
+
+    def test_rust_is_in_the_full_profile_but_not_the_fast_one(self):
+        self.assertIn("rust", ci.PROFILES["full"])
+        self.assertNotIn("rust", ci.PROFILES["fast"])
+
+
 if __name__ == "__main__":
     unittest.main()

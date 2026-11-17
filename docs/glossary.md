@@ -17,4 +17,6 @@
 - **EP** - ONNX Runtime execution provider.
 - **Satellite** - consumes upstream surfaces; not a fork.
 - **Wrap-not-rebuild** - compose existing tools by default (Invariant 11).
+- **IDE backend** - the third-party service that actually runs a language for the browser IDE: Compiler Explorer or Wandbox, chosen per compiler id by the gateway (ADR-0020).
+- **C ABI** - the one stable binary interface F# and Rust share in `Interop.Rust`: `extern "C"` functions over plain integers, pointers and UTF-8 strings, with status codes and a thread-local last error (ADR-0019).
 - **Orchestrator / Architect / Pillar Builder / Tooling Builder / Reviewer / QA-Release / Documentation** - agent personas.

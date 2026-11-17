@@ -4,7 +4,8 @@ The pipeline is **one program**, `tools/ci/fsh_ci.py`, used identically locally,
 
 | Workflow | Purpose |
 |---|---|
-| `ci.yml` (live) | six-RID matrix running `fsh_ci.py run --profile full --ci --require-aot` (win-arm64 is `experimental`) |
+| `ci.yml` (live) | six-RID matrix running `fsh_ci.py run --profile full --ci --require-aot --require-rust` (win-arm64 is `experimental`); installs the Rust toolchain first |
+| `ide.yml` (live) | gateway typecheck and tests; the IDE core's xunit tests; the Fable build; the compiled core run against captured compiler output (`ide/web/test`) |
 | `docs-drift.yml` (live) | `check_docs.py`: routing targets exist, skills cover tasks, registry matches projects and invariants |
 | `agent-review.yml` | independent reviewer checks invariants; cannot merge |
 | `agent-triage.yml` | triage per `.github/repo-policy.md` |

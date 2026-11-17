@@ -37,6 +37,7 @@
     <ProjectReference Include="..\..\src\FSharpened.Security\FSharpened.Security.fsproj" />
     <ProjectReference Include="..\..\src\FSharpened.Architecture\FSharpened.Architecture.fsproj" />
     <ProjectReference Include="..\..\src\FSharpened.Models\FSharpened.Models.fsproj" />
+    <ProjectReference Include="..\..\src\FSharpened.Interop.Rust\FSharpened.Interop.Rust.fsproj" />
     <ProjectReference Include="..\..\src\FSharpened.ML.Portability\FSharpened.ML.Portability.fsproj" />
     <ProjectReference Include="..\..\src\FSharpened.ML.Hardware\FSharpened.ML.Hardware.fsproj" />
     <ProjectReference Include="..\..\src\FSharpened.ML.Authoring\FSharpened.ML.Authoring.fsproj" />

@@ -60,3 +60,31 @@
 - [ ] P5.2 - Publish governance charter; first community RFC for analyzer rules. **Owner:** Orchestrator
 - [ ] P5.3 - AOT-only lane for `android-arm64` and `ios-arm64`. **Owner:** QA/Release
 - [ ] P5.4 - License inventory and SBOM coverage for every dependency. **Owner:** Documentation + Security
+
+## Phase 6 - The IDE as a platform (ADR-0021, Proposed)
+Order matters: every later item needs the project model of 6.A.
+- [x] P6.A1 - Project model in `FSharpened.Ide` (`Project.fs`): files, folders, move and rename with references following, entry, pipeline, import sanitising, 36 tests; exported to JavaScript by `Api.fs`. **Owner:** Pillar Builder *(done 2026-11-16, not yet used by the page)*
+- [x] P6.A2 - Save and manage several projects in the browser (new, examples, duplicate, rename, delete, switch; one storage record per project; the pre-project workspace migrates into a project and stays as a backup); the timeline snapshots a whole project (`ProjectTimeline`, `ProjectState.fs`). **Owner:** Pillar Builder *(done and deployed 2026-11-16)*
+- [ ] P6.A3 - Copy, download file, download folder and project as `.zip`, import `.zip`, folder, files and a public GitHub repository. **Owner:** Pillar Builder *(done except the GitHub import: copy, download file, folder and project, import of a `.zip`, a picked or dropped folder and loose files with a report of what was left out and why; `archive.js`, `projectio.js`, `transfer.js`)*
+- [x] P6.A4 - File tree, tabs and project manager UI: accessible tree (arrow keys, Home/End, Left/Right), open-file tabs, New file, Rename or move, Delete, Set entry, Copy, Download, a Projects list, a drawer on narrow screens. **Owner:** Tooling Builder *(done and deployed 2026-11-16; no empty folders yet, folders exist through the files in them)*
+- [ ] P6.A5 - `fsh-pipe/1` pipelines and the gateway pipeline endpoint. **Owner:** Pillar Builder
+- [ ] P6.A6 - Default polyglot chess project across all eighteen languages. **Owner:** Pillar Builder
+- [ ] P6.A7 - Live code view (structure, output, compiled; resizable, minimise, maximise). **Owner:** Tooling Builder
+- [ ] P6.B1 - Cross-language rule engine and project-level rules. **Owner:** Pillar Builder
+- [ ] P6.B2 - Pipelines framework (build, test, lint, run) declared in the manifest. **Owner:** Tooling Builder
+- [ ] P6.C1 - Community Projects: submission API, D1 schema, scanner, approval queue in the hub console, public gallery (own ADR). **Owner:** Tooling Builder
+- [ ] P6.D1 - Workers AI module with an allowlist, budgets, cache and a static fallback (own ADR). **Owner:** Tooling Builder
+- [ ] P6.E1 - rust-rtpc wire-protocol adapter *(blocked: licence for rust-rtpc; repository creation needs maintainer approval)*. **Owner:** Pillar Builder
+- [ ] P6.E2 - `fsharpened-rtpc` repository: language-neutral pre-compile daemon contract and adapters. **Owner:** Architect
+- [ ] P6.F1 - Atomicity contract and test kit; audit all pillars one by one. **Owner:** QA/Release
+- [ ] P6.G1 - Agent harness: router, specialist registry, scope guard, evaluation suite, first specialists with symbolic fallbacks (own ADR). **Owner:** Pillar Builder
+- [ ] P6.G2 - Training desktop GUI with telemetry and the stream-of-thought trace (own ADR for the UI toolkit). **Owner:** Tooling Builder
+
+## Phase 7 - VS Code parity and extensions (ADR-0022, Proposed)
+- [x] P7.1 - Native parity: command palette, quick open, search and replace in files, outline and breadcrumbs, settings, themes, multi-cursor, snippets, status bar, right-click menus. **Owner:** Tooling Builder *(done 2026-11-16 in the working tree, not deployed; verified in the browser pane and by tests, see `docs/STATUS.md`. Not done: type-aware definitions and hover (needs P7.4), a minimap, split editors)*
+- [x] P7.2 - Declarative VS Code content: import a `.vsix` or a theme or snippet file, and `settings.json`; no extension code runs. **Owner:** Tooling Builder *(done 2026-11-16, not deployed; themes, snippets and settings only: a `.vsix`'s language configuration is not read)*
+- [x] P7.3 - Download for VS Code: `.vscode/extensions.json` (language extensions and Copilot), settings, `.code-workspace`. **Owner:** Tooling Builder *(done 2026-11-16, not deployed; Copilot is recommended to VS Code, it cannot run in the page)*
+- [ ] P7.4 - Language servers: `fsh lsp-bridge` (loopback WebSocket to an allowlist of stdio servers) and a minimal LSP client in the page; CSP change. **Owner:** Pillar Builder
+- [ ] P7.5 - FSharpened as a VS Code extension (language client for the F# core, Fantomas and FsAutoComplete integration). **Owner:** Pillar Builder
+- [ ] P7.6 - AI completion provider interface; Workers AI as the first provider *(depends on P6.D1)*. **Owner:** Tooling Builder
+

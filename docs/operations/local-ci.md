@@ -16,7 +16,7 @@ python tools/ci/fsh_ci.py install-hooks        # pre-commit = fast, pre-push = f
 | Profile | Stages | Typical time (win-x64) |
 |---|---|---|
 | `fast` | preflight, docs-drift, selftest, tools-restore, format | ~3 s |
-| `full` | fast + restore, build (strict), test, aot, benchmarks | ~50 s cold, ~30 s warm |
+| `full` | fast + restore, build (strict), test, aot, rust, benchmarks | ~50 s cold, ~30 s warm (plus the Rust stage when `cargo` is installed) |
 | `release` | full + pack (requires NativeAOT) | ~70 s |
 
 ## Preflight (nothing else runs if it fails)
@@ -32,6 +32,7 @@ Python >= 3.10; git state; `dotnet` found and SDK >= the `global.json` pin (the 
 | `build` | Release build with `CI=true` (warnings are errors) |
 | `test` | `dotnet test` with trx results; **zero tests executed counts as failure** |
 | `aot` | `PublishAot` for the host RID, then **runs the binary** and asserts it reports `aot: True`. This catches run-time AOT failures that a successful publish hides (the first run found `printf` crashing under NativeAOT; ADR-0014) |
+| `rust` | the reference Rust crate for `Interop.Rust`: `cargo test --locked`, then `cargo fmt --check` and `cargo clippy -D warnings` when those components are installed. Zero Rust tests executed counts as failure. Skipped when `cargo` is missing; with `--require-rust` a missing `cargo` fails and the Interop.Rust tests fail instead of passing without calling the library ([Rust](rust.md), ADR-0019) |
 | `benchmarks` | skipped until `pipelines/benchmarks/` has a harness |
 | `pack` | NuGet packages for every project (release) |
 

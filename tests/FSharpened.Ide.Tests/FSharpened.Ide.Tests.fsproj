@@ -7,6 +7,9 @@
 
   <ItemGroup>
     <Compile Include="IdeTests.fs" />
+    <Compile Include="ProjectTests.fs" />
+    <Compile Include="EditorTests.fs" />
+    <Compile Include="VsCodeTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

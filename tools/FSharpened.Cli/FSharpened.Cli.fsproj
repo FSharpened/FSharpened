@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FSharpened.Platform\FSharpened.Platform.fsproj" />
+    <ProjectReference Include="..\..\src\FSharpened.Interop.Rust\FSharpened.Interop.Rust.fsproj" />
   </ItemGroup>
 
 </Project>
