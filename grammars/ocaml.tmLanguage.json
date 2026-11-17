@@ -1,0 +1,63 @@
+{
+  "name": "OCaml",
+  "scopeName": "source.ocaml",
+  "fileTypes": ["ml", "mli"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#char" },
+    { "include": "#number" },
+    { "include": "#attribute" },
+    { "include": "#keyword" },
+    { "include": "#constant" },
+    { "include": "#type-variable" },
+    { "include": "#module" },
+    { "include": "#operator" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.block.ocaml",
+      "begin": "\\(\\*",
+      "end": "\\*\\)",
+      "patterns": [{ "include": "#comment" }, { "match": "\"([^\"\\\\]|\\\\.)*\"" }]
+    },
+    "string": {
+      "name": "string.quoted.double.ocaml",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.ocaml", "match": "\\\\(.|$)" }]
+    },
+    "char": {
+      "name": "string.quoted.single.ocaml",
+      "match": "'(\\\\(.|[0-9]{3}|x[0-9a-fA-F]{2})|[^'\\\\])'"
+    },
+    "number": {
+      "name": "constant.numeric.ocaml",
+      "match": "\\b(0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|[0-9][0-9_]*(\\.[0-9_]*)?([eE][+-]?[0-9_]+)?[lLn]?)\\b"
+    },
+    "attribute": {
+      "name": "meta.preprocessor.ocaml",
+      "match": "\\[@{1,3}[^\\]]*\\]"
+    },
+    "keyword": {
+      "name": "keyword.control.ocaml",
+      "match": "\\b(and|as|assert|begin|class|constraint|do|done|downto|else|end|exception|external|for|fun|function|functor|if|in|include|inherit|initializer|lazy|let|match|method|module|mutable|new|nonrec|object|of|open|private|rec|sig|struct|then|to|try|type|val|virtual|when|while|with|mod|land|lor|lxor|lsl|lsr|asr)\\b"
+    },
+    "constant": {
+      "name": "constant.language.ocaml",
+      "match": "\\b(true|false|None|Some|Ok|Error)\\b|\\(\\)"
+    },
+    "type-variable": {
+      "name": "entity.name.type.ocaml",
+      "match": "'[a-z_][A-Za-z0-9_']*"
+    },
+    "module": {
+      "name": "entity.name.type.module.ocaml",
+      "match": "\\b[A-Z][A-Za-z0-9_']*\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.ocaml",
+      "match": "[-!$%&*+./:<=>?@^|~#]+"
+    }
+  }
+}

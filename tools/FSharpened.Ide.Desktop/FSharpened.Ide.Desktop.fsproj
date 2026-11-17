@@ -14,6 +14,8 @@
     <Compile Include="Ext.fs" />
     <Compile Include="Palette.fs" />
     <Compile Include="Session.fs" />
+    <Compile Include="Hover.fs" />
+    <Compile Include="Grammars.fs" />
     <Compile Include="Dialogs.fs" />
     <Compile Include="MainWindow.fs" />
     <Compile Include="Program.fs" />
@@ -36,6 +38,7 @@
   <ItemGroup>
     <!-- Language packs ship next to the program; the user's own go in the app data folder. -->
     <Content Include="..\..\languages\*.json" Link="languages\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\grammars\*.json" Link="grammars\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

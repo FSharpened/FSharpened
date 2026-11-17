@@ -1,0 +1,85 @@
+{
+  "name": "Scala",
+  "scopeName": "source.scala",
+  "fileTypes": ["scala", "sc"],
+  "patterns": [
+    { "include": "#block-comment" },
+    { "include": "#line-comment" },
+    { "include": "#raw-string" },
+    { "include": "#interpolated" },
+    { "include": "#string" },
+    { "include": "#char" },
+    { "include": "#annotation" },
+    { "include": "#number" },
+    { "include": "#keyword" },
+    { "include": "#constant" },
+    { "include": "#type" },
+    { "include": "#operator" }
+  ],
+  "repository": {
+    "block-comment": {
+      "name": "comment.block.scala",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "patterns": [{ "include": "#block-comment" }]
+    },
+    "line-comment": {
+      "name": "comment.line.double-slash.scala",
+      "match": "//.*$"
+    },
+    "raw-string": {
+      "name": "string.quoted.triple.scala",
+      "begin": "(?:[A-Za-z_][A-Za-z0-9_]*)?\"\"\"",
+      "end": "\"\"\"(?!\")"
+    },
+    "interpolated": {
+      "name": "string.quoted.double.scala",
+      "begin": "\\b[sfr]\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.scala", "match": "\\\\." },
+        {
+          "name": "meta.template.expression.scala",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "$self" }]
+        },
+        { "name": "variable.other.scala", "match": "\\$[A-Za-z_][A-Za-z0-9_]*" }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.scala",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.scala", "match": "\\\\." }]
+    },
+    "char": {
+      "name": "string.quoted.single.scala",
+      "match": "'(\\\\(.|u[0-9a-fA-F]{4})|[^'\\\\])'"
+    },
+    "annotation": {
+      "name": "storage.type.annotation.scala",
+      "match": "@[A-Za-z_][A-Za-z0-9_.]*"
+    },
+    "number": {
+      "name": "constant.numeric.scala",
+      "match": "\\b(0[xX][0-9a-fA-F_]+|[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?[fFdDlL]?)\\b"
+    },
+    "keyword": {
+      "name": "keyword.control.scala",
+      "match": "\\b(abstract|case|catch|class|def|do|else|end|enum|export|extends|extension|final|finally|for|forSome|given|if|implicit|import|inline|lazy|match|new|object|opaque|override|package|private|protected|return|sealed|super|then|this|throw|trait|transparent|try|type|using|val|var|while|with|yield)\\b"
+    },
+    "constant": {
+      "name": "constant.language.scala",
+      "match": "\\b(true|false|null|None|Some|Nil)\\b"
+    },
+    "type": {
+      "name": "entity.name.type.scala",
+      "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.scala",
+      "match": "=>|<-|->|<:|>:|::|:::|&&|\\|\\||[-+*/%=<>!&|^~?:#@]"
+    }
+  }
+}

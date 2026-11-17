@@ -1,0 +1,81 @@
+{
+  "name": "Kotlin",
+  "scopeName": "source.kotlin",
+  "fileTypes": ["kt", "kts"],
+  "patterns": [
+    { "include": "#block-comment" },
+    { "include": "#line-comment" },
+    { "include": "#raw-string" },
+    { "include": "#string" },
+    { "include": "#char" },
+    { "include": "#annotation" },
+    { "include": "#number" },
+    { "include": "#keyword" },
+    { "include": "#constant" },
+    { "include": "#type" },
+    { "include": "#operator" }
+  ],
+  "repository": {
+    "block-comment": {
+      "name": "comment.block.kotlin",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "patterns": [{ "include": "#block-comment" }]
+    },
+    "line-comment": {
+      "name": "comment.line.double-slash.kotlin",
+      "match": "//.*$"
+    },
+    "raw-string": {
+      "name": "string.quoted.triple.kotlin",
+      "begin": "\"\"\"",
+      "end": "\"\"\"(?!\")",
+      "patterns": [{ "include": "#template" }]
+    },
+    "string": {
+      "name": "string.quoted.double.kotlin",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.kotlin", "match": "\\\\." }, { "include": "#template" }]
+    },
+    "template": {
+      "patterns": [
+        {
+          "name": "meta.template.expression.kotlin",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "$self" }]
+        },
+        { "name": "variable.other.kotlin", "match": "\\$[A-Za-z_][A-Za-z0-9_]*" }
+      ]
+    },
+    "char": {
+      "name": "string.quoted.single.kotlin",
+      "match": "'(\\\\(.|u[0-9a-fA-F]{4})|[^'\\\\])'"
+    },
+    "annotation": {
+      "name": "storage.type.annotation.kotlin",
+      "match": "@[A-Za-z_][A-Za-z0-9_.]*"
+    },
+    "number": {
+      "name": "constant.numeric.kotlin",
+      "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?[fFlLuU]*)\\b"
+    },
+    "keyword": {
+      "name": "keyword.control.kotlin",
+      "match": "\\b(abstract|actual|annotation|as|break|by|catch|class|companion|const|constructor|continue|crossinline|data|do|dynamic|else|enum|expect|external|final|finally|for|fun|get|if|import|in|infix|init|inline|inner|interface|internal|is|lateinit|noinline|object|open|operator|out|override|package|private|protected|public|reified|return|sealed|set|super|suspend|tailrec|this|throw|try|typealias|typeof|val|var|vararg|when|where|while)\\b"
+    },
+    "constant": {
+      "name": "constant.language.kotlin",
+      "match": "\\b(true|false|null)\\b"
+    },
+    "type": {
+      "name": "entity.name.type.kotlin",
+      "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.kotlin",
+      "match": "\\?\\.|\\?:|!!|->|::|\\.\\.<?|&&|\\|\\||[-+*/%=<>!&|^~?]"
+    }
+  }
+}

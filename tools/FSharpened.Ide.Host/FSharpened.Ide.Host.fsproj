@@ -12,6 +12,8 @@
     <Compile Include="Plans.fs" />
     <Compile Include="Trust.fs" />
     <Compile Include="DiskWorkspace.fs" />
+    <Compile Include="Replace.fs" />
+    <Compile Include="Terminal.fs" />
     <Compile Include="Git.fs" />
     <Compile Include="Lsp.fs" />
     <Compile Include="Interpret.fs" />

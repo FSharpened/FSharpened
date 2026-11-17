@@ -1,0 +1,64 @@
+{
+  "name": "Haskell",
+  "scopeName": "source.haskell",
+  "fileTypes": ["hs", "lhs"],
+  "patterns": [
+    { "include": "#pragma" },
+    { "include": "#block-comment" },
+    { "include": "#line-comment" },
+    { "include": "#string" },
+    { "include": "#char" },
+    { "include": "#number" },
+    { "include": "#keyword" },
+    { "include": "#constant" },
+    { "include": "#type" },
+    { "include": "#operator" }
+  ],
+  "repository": {
+    "pragma": {
+      "name": "meta.preprocessor.haskell",
+      "begin": "\\{-#",
+      "end": "#-\\}"
+    },
+    "block-comment": {
+      "name": "comment.block.haskell",
+      "begin": "\\{-",
+      "end": "-\\}",
+      "patterns": [{ "include": "#block-comment" }]
+    },
+    "line-comment": {
+      "name": "comment.line.double-dash.haskell",
+      "match": "--+(?![!#$%&*+./<=>?@\\\\^|~:]).*$"
+    },
+    "string": {
+      "name": "string.quoted.double.haskell",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.haskell", "match": "\\\\(.|$)" }]
+    },
+    "char": {
+      "name": "string.quoted.single.haskell",
+      "match": "'(\\\\(.|[0-9]+|x[0-9a-fA-F]+)|[^'\\\\])'"
+    },
+    "number": {
+      "name": "constant.numeric.haskell",
+      "match": "\\b(0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?)\\b"
+    },
+    "keyword": {
+      "name": "keyword.control.haskell",
+      "match": "\\b(case|class|data|default|deriving|do|else|family|forall|foreign|hiding|if|import|in|infix|infixl|infixr|instance|let|mdo|module|newtype|of|pattern|proc|qualified|rec|then|type|where|as)\\b"
+    },
+    "constant": {
+      "name": "constant.language.haskell",
+      "match": "\\b(True|False|Nothing|Just|Left|Right|LT|EQ|GT)\\b"
+    },
+    "type": {
+      "name": "entity.name.type.haskell",
+      "match": "\\b[A-Z][A-Za-z0-9_']*\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.haskell",
+      "match": "[-!#$%&*+./<=>?@\\\\^|~:]+"
+    }
+  }
+}

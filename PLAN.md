@@ -86,7 +86,7 @@ Order matters: every later item needs the project model of 6.A.
 - [x] P7.3 - Download for VS Code: `.vscode/extensions.json` (language extensions and Copilot), settings, `.code-workspace`. **Owner:** Tooling Builder *(done 2026-11-16, not deployed; Copilot is recommended to VS Code, it cannot run in the page)*
 - [ ] P7.4 - Language servers: `fsh lsp-bridge` (loopback WebSocket to an allowlist of stdio servers) and a minimal LSP client in the page; CSP change. **Owner:** Pillar Builder
 - [x] P7.7 - Native desktop IDE (ADR-0023, Proposed): Avalonia + AvaloniaEdit in F#, the website's layout and themes, language packs for 37 languages, trusted local runs, problems from any language's output, a minimal language-server client, Git status. **Owner:** Tooling Builder *(done 2026-11-17 in the working tree, not committed or released; see `docs/operations/desktop.md` for what is and is not in it)*
-- [ ] P7.8 - Desktop: integrated terminal (Rust pseudo-terminal behind `FSharpened.Interop.Rust`), file watching and fast search in Rust, debugging through DAP, hover and rename in the UI, a bundled grammar for the languages TextMateSharp lacks. **Owner:** Tooling Builder
+- [ ] P7.8 - Desktop: a real pseudo-terminal (Rust, behind `FSharpened.Interop.Rust`; the line-based terminal is done), file watching and fast search in Rust, debugging through DAP, rename in the UI (hover and search-and-replace are done). **Owner:** Tooling Builder
 - [ ] P7.5 - FSharpened as a VS Code extension (language client for the F# core, Fantomas and FsAutoComplete integration). **Owner:** Pillar Builder
 - [ ] P7.6 - AI completion provider interface; Workers AI as the first provider *(depends on P6.D1)*. **Owner:** Tooling Builder
 

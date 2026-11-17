@@ -19,6 +19,7 @@ open Avalonia.Platform.Storage
 open Avalonia.Styling
 open Avalonia.Threading
 open AvaloniaEdit.CodeCompletion
+open AvaloniaEdit
 open AvaloniaEdit.Document
 open AvaloniaEdit.Rendering
 open AvaloniaEdit.Search
@@ -203,7 +204,18 @@ type Shell(env: HostEnv) =
         )
 
     let registryOptions = RegistryOptions(ThemeName.DarkPlus)
-    let textMate = editor.InstallTextMate(registryOptions)
+
+    // grammars from the app's `grammars` folder, then the user's (which win), in front of TextMateSharp's own
+    let grammarFiles =
+        Grammars.index
+            [ Path.Combine(AppContext.BaseDirectory, "grammars")
+              Path.Combine(env.DataDir, "grammars") ]
+
+    let packRegistry = Grammars.PackRegistry(registryOptions, grammarFiles)
+
+    let textMate =
+        editor.InstallTextMate(packRegistry :> TextMateSharp.Registry.IRegistryOptions)
+
     let searchPanel = SearchPanel.Install(editor)
 
     let textMateTheme (t: ThemeSpec) =
@@ -278,6 +290,28 @@ type Shell(env: HostEnv) =
             FontSize = 12.0
         )
 
+    // the terminal panel: the user's shell on pipes (no pseudo-terminal), output above, one input line below
+    let termOutput =
+        TextBox(
+            IsReadOnly = true,
+            FontFamily = monoFont,
+            AcceptsReturn = true,
+            BorderThickness = Thickness 0.0,
+            TextWrapping = TextWrapping.NoWrap
+        )
+
+    let termInput =
+        TextBox(
+            FontFamily = monoFont,
+            BorderThickness = Thickness(0.0, 1.0, 0.0, 0.0),
+            PlaceholderText = "Type a command and press Enter"
+        )
+
+    let mutable term: TermSession option = None
+    let termHistory = List<string>()
+    let mutable termHistoryAt = 0
+    let mutable terminalShownFn: unit -> unit = ignore
+
     let paletteInput =
         TextBox(
             PlaceholderText = "Type to open a file, > for commands, : for a line, @ for a symbol",
@@ -322,6 +356,9 @@ type Shell(env: HostEnv) =
 
     let showPanel (name: string) =
         currentPanel <- name
+
+        if name = "terminal" then
+            terminalShownFn ()
 
         for (n, button, content) in panelTabs do
             content.IsVisible <- (n = name)
@@ -644,9 +681,115 @@ type Shell(env: HostEnv) =
                     |> ignore
         | _ -> ()
 
+    // ---- terminal ---------------------------------------------------------------------------------
+    let termMaxChars = 200000
+
+    /// Appends text to the terminal view from any thread, keeping the last part when it grows large.
+    let termAppend (text: string) =
+        Dispatcher.UIThread.Post(fun () ->
+            let current = termOutput.Text |> Option.ofObj |> Option.defaultValue ""
+            let joined = current + text
+
+            termOutput.Text <-
+                if joined.Length > termMaxChars then
+                    joined.Substring(joined.Length - termMaxChars)
+                else
+                    joined
+
+            termOutput.CaretIndex <- termOutput.Text.Length)
+
+    let stopTerminal () =
+        match term with
+        | Some t ->
+            t.Stop()
+            term <- None
+        | None -> ()
+
+    /// Starts the shell in the opened folder, after the same trust question Run asks: a terminal runs whatever is typed.
+    let startTerminal () =
+        match root, term with
+        | None, _ -> termAppend "Open a folder first: the terminal starts in it.\n"
+        | Some _, Some t when t.IsRunning -> ()
+        | Some r, _ ->
+            task {
+                let! allowed =
+                    task {
+                        if env.Trust.IsTrusted r then
+                            return true
+                        else
+                            let! yes =
+                                Dialogs.confirm
+                                    window
+                                    roles
+                                    "Trust this folder?"
+                                    (sprintf
+                                        "A terminal starts your shell on this computer, with your permissions, in:\n\n%s\n\nAnything typed into it runs. Only trust folders whose code you would run anyway. You can revoke this from the command palette."
+                                        r)
+                                    "Trust and open terminal"
+
+                            if yes then
+                                env.Trust.Trust r
+
+                            return yes
+                    }
+
+                if allowed then
+                    let shell = Terminal.defaultShell ()
+
+                    let session =
+                        TermSession(
+                            shell,
+                            r,
+                            termAppend,
+                            (fun code ->
+                                termAppend (sprintf "\n[%s ended with code %d]\n" shell.Name code)
+                                Dispatcher.UIThread.Post(fun () -> term <- None))
+                        )
+
+                    match session.Start() with
+                    | Ok() ->
+                        term <- Some session
+
+                        termAppend (
+                            sprintf
+                                "%s in %s (no pseudo-terminal: full-screen programs and Ctrl+C do not work)\n"
+                                shell.Name
+                                r
+                        )
+                    | Error e -> termAppend (e + "\n")
+            }
+            |> ignore
+
+    let restartTerminal () =
+        stopTerminal ()
+        termOutput.Text <- ""
+        startTerminal ()
+
+    let sendTerminalLine (line: string) =
+        match term with
+        | Some t when t.IsRunning ->
+            if
+                line.Trim() <> ""
+                && (termHistory.Count = 0 || termHistory[termHistory.Count - 1] <> line)
+            then
+                termHistory.Add line
+
+            termHistoryAt <- termHistory.Count
+            termAppend ("> " + line + "\n")
+            t.Send line
+        | _ -> termAppend "The shell is not running. Use Terminal: Restart.\n"
+
+    do
+        terminalShownFn <-
+            (fun () ->
+                if term.IsNone then
+                    startTerminal ())
+
     let stopServers () =
         for kv in lspSessions do
             kv.Value.Stop()
+
+        stopTerminal ()
 
         lspSessions.Clear()
         lspFailed.Clear()
@@ -721,6 +864,90 @@ type Shell(env: HostEnv) =
                             openFileFn rel (loc.Range.Start.Line + 1) (loc.Range.Start.Character + 1)
                 }
                 |> ignore
+        | _ -> ()
+
+    // ---- hover ------------------------------------------------------------------------------------
+    let hoverText =
+        TextBlock(TextWrapping = TextWrapping.Wrap, FontFamily = monoFont, FontSize = 12.0)
+
+    let hoverBox =
+        Border(
+            Child = hoverText,
+            IsVisible = false,
+            IsHitTestVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            MaxWidth = 560.0,
+            Padding = Thickness(10.0, 6.0),
+            CornerRadius = CornerRadius 4.0,
+            BorderThickness = Thickness 1.0
+        )
+
+    do
+        themed (fun r ->
+            hoverBox.Background <- r.Card
+            hoverBox.BorderBrush <- r.Line
+            hoverText.Foreground <- r.Fg)
+
+    let hoverTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds 500.0)
+    let mutable hoverPoint = Point(0.0, 0.0)
+    let mutable hoverSeq = 0
+
+    let hideHover () =
+        hoverTimer.Stop()
+        hoverSeq <- hoverSeq + 1
+        hoverBox.IsVisible <- false
+
+    /// The problems under a position and what the language server says about it, in a box beside it.
+    let showHoverAt (line: int) (col: int) (at: Point) =
+        match root, active with
+        | Some r, Some d ->
+            hoverSeq <- hoverSeq + 1
+            let mine = hoverSeq
+            let rel = d.Rel
+
+            let own =
+                [ match lspDiagnostics.TryGetValue rel with
+                  | true, l -> yield! l
+                  | _ -> ()
+                  yield!
+                      runDiagnostics
+                      |> List.filter (fun x ->
+                          match x.Range with
+                          | Some rg -> relOfDiagnosticFile rg.File = Some rel
+                          | None -> false) ]
+
+            let problems = Hover.problemsAt own line col
+
+            task {
+                let! server =
+                    match sessionOf d with
+                    | Some s when d.LspOpen ->
+                        syncLsp d
+                        let full = Path.Combine(r, rel.Replace('/', Path.DirectorySeparatorChar))
+                        s.Client.Hover(full, { Line = line - 1; Character = col - 1 })
+                    | _ -> Task.FromResult(None: string option)
+
+                if mine = hoverSeq then
+                    match Hover.compose problems server with
+                    | Some text ->
+                        hoverText.Text <- text
+                        hoverBox.Margin <- Thickness(max 0.0 at.X, max 0.0 at.Y, 0.0, 0.0)
+                        hoverBox.IsVisible <- true
+                    | None -> hoverBox.IsVisible <- false
+            }
+            |> ignore
+        | _ -> ()
+
+    let showHoverAtCaret () =
+        let c = editor.TextArea.Caret
+        let tv = editor.TextArea.TextView
+
+        let v =
+            tv.GetVisualPosition(TextViewPosition(c.Line, c.Column), VisualYPosition.LineBottom)
+
+        match tv.TranslatePoint(Point(v.X - tv.ScrollOffset.X, v.Y - tv.ScrollOffset.Y), editor) with
+        | p when p.HasValue -> showHoverAt c.Line c.Column p.Value
         | _ -> ()
 
     let refreshGit () =
@@ -833,6 +1060,7 @@ type Shell(env: HostEnv) =
 
     and activate (d: OpenDoc option) =
         active <- d
+        hideHover ()
 
         match d with
         | Some doc ->
@@ -1377,6 +1605,9 @@ type Shell(env: HostEnv) =
 
     // ---- sidebar views ----------------------------------------------------------------------------
     let searchBox = textBox "Find in files"
+    let replaceBox = textBox "Replace with"
+    let includeBox = textBox "Files to include, e.g. src/**, *.go"
+    let excludeBox = textBox "Files to exclude, e.g. **/test/**"
     let searchResults = ListBox(Background = Brushes.Transparent)
     let caseToggle = ToggleButton(Content = "Aa", Padding = Thickness(6.0, 2.0))
     let wordToggle = ToggleButton(Content = "ab", Padding = Thickness(6.0, 2.0))
@@ -1385,30 +1616,26 @@ type Shell(env: HostEnv) =
     let outlineList = ListBox(Background = Brushes.Transparent)
     let toolsPanel = StackPanel(Spacing = 6.0, Margin = Thickness(12.0, 4.0))
 
+    let textOf (b: TextBox) =
+        b.Text |> Option.ofObj |> Option.defaultValue ""
+
+    let searchOptions () : SearchOptions =
+        { Query = searchBox.Text
+          CaseSensitive = caseToggle.IsChecked = Nullable true
+          WholeWord = wordToggle.IsChecked = Nullable true
+          Regex = regexToggle.IsChecked = Nullable true }
+
     let runSearch () =
         match root with
-        | Some r when (searchBox.Text |> Option.ofObj |> Option.defaultValue "") <> "" ->
-            let opts: SearchOptions =
-                { Query = searchBox.Text
-                  CaseSensitive = caseToggle.IsChecked = Nullable true
-                  WholeWord = wordToggle.IsChecked = Nullable true
-                  Regex = regexToggle.IsChecked = Nullable true }
+        | Some r when textOf searchBox <> "" ->
+            let opts = searchOptions ()
+            let inc, exc = textOf includeBox, textOf excludeBox
+            let openText = [ for d in docs -> d.Rel, d.Text ]
 
             searchSummary.Text <- "Searching…"
 
             task {
-                let! result =
-                    Task.Run(fun () ->
-                        let entries, _ = DiskWorkspace.allFiles r 4000
-
-                        let files =
-                            entries
-                            |> List.choose (fun e ->
-                                match DiskWorkspace.readText r e.Rel with
-                                | Ok t -> Some(e.Rel, t)
-                                | Error _ -> None)
-
-                        Search.run opts "" "" files)
+                let! result = Task.Run(fun () -> Search.run opts inc exc (Replace.gather r openText))
 
                 searchResults.Items.Clear()
 
@@ -1444,6 +1671,77 @@ type Shell(env: HostEnv) =
                                 )
 
                             searchResults.Items.Push row
+            }
+            |> ignore
+        | _ -> ()
+
+    /// Applies a replace that has been confirmed: files open in the editor are changed there (one edit, so Undo works, and
+    /// they stay unsaved); any other file is written to disk straight away.
+    let applyReplace
+        (r: string)
+        (opts: SearchOptions)
+        (replacement: string)
+        (files: FileHits list)
+        (openText: (string * string) list)
+        =
+        let outcome = Replace.apply r opts replacement files openText
+
+        for rel, text in outcome.Editor do
+            match docs |> Seq.tryFind (fun d -> d.Rel = rel) with
+            | Some d ->
+                d.Doc.Text <- text
+                d.LspDirty <- true
+            | None -> ()
+
+        searchSummary.Text <-
+            sprintf
+                "Replaced %d matches in %d files%s"
+                outcome.Matches
+                outcome.Files
+                (if outcome.Failed.IsEmpty then
+                     ""
+                 else
+                     sprintf ", %d failed (see Output)" outcome.Failed.Length)
+
+        if not outcome.Failed.IsEmpty then
+            setOutput (String.concat "\n" outcome.Failed)
+            showPanel "output"
+
+        searchResults.Items.Clear()
+        rebuildTabs ()
+        refreshGit ()
+
+    /// Replace every match, after saying how many there are and asking.
+    let replaceAll () =
+        match root with
+        | Some r when textOf searchBox <> "" ->
+            let opts = searchOptions ()
+            let replacement = textOf replaceBox
+            let inc, exc = textOf includeBox, textOf excludeBox
+            let openText = [ for d in docs -> d.Rel, d.Text ]
+
+            task {
+                let! result = Task.Run(fun () -> Search.run opts inc exc (Replace.gather r openText))
+
+                if result.Error <> "" then
+                    searchSummary.Text <- result.Error
+                elif result.Files.IsEmpty then
+                    searchSummary.Text <- "Nothing to replace"
+                else
+                    let! ok =
+                        Dialogs.confirm
+                            window
+                            roles
+                            "Replace in files"
+                            (sprintf
+                                "Replace %d matches in %d files with “%s”?\n\nFiles open in the editor are changed there and left unsaved, so Undo works. Other files are written to disk now and cannot be undone."
+                                result.Total
+                                result.Files.Length
+                                replacement)
+                            "Replace all"
+
+                    if ok then
+                        applyReplace r opts replacement result.Files openText
             }
             |> ignore
         | _ -> ()
@@ -1515,11 +1813,15 @@ type Shell(env: HostEnv) =
     let searchView () : Control =
         let s = StackPanel(Spacing = 6.0, Margin = Thickness(10.0, 0.0))
         s.Children.Add searchBox
+        s.Children.Add replaceBox
         let toggles = StackPanel(Orientation = Orientation.Horizontal, Spacing = 4.0)
         toggles.Children.Add caseToggle
         toggles.Children.Add wordToggle
         toggles.Children.Add regexToggle
+        toggles.Children.Add(flat "Replace all" "Replace every match in the files listed" replaceAll)
         s.Children.Add toggles
+        s.Children.Add includeBox
+        s.Children.Add excludeBox
         s.Children.Add searchSummary
         let d = DockPanel()
         DockPanel.SetDock(s, Dock.Top)
@@ -1727,6 +2029,10 @@ type Shell(env: HostEnv) =
             Title = "Run: Run This File (120 s limit)"
             Keys = ""
             Run = (fun () -> runCurrent Runner.maxTimeoutSec) }
+          { Id = "show-hover"
+            Title = "Editor: Show Hover"
+            Keys = ""
+            Run = showHoverAtCaret }
           { Id = "format"
             Title = "Format Document"
             Keys = "Shift+Alt+F"
@@ -1766,6 +2072,40 @@ type Shell(env: HostEnv) =
             Title = "Search: Find in Files"
             Keys = "Ctrl+Shift+F"
             Run = (fun () -> showSidebar "search") }
+          { Id = "replace-in-file"
+            Title = "Edit: Replace in This File"
+            Keys = "Ctrl+H"
+            Run =
+              (fun () ->
+                  searchPanel.IsReplaceMode <- true
+                  searchPanel.Open()) }
+          { Id = "replace-in-files"
+            Title = "Search: Replace in Files"
+            Keys = "Ctrl+Shift+H"
+            Run =
+              (fun () ->
+                  showSidebar "search"
+                  replaceBox.Focus() |> ignore) }
+          { Id = "terminal"
+            Title = "Terminal: Open"
+            Keys = "Ctrl+`"
+            Run =
+              (fun () ->
+                  setPanelVisible true
+                  showPanel "terminal"
+                  termInput.Focus() |> ignore) }
+          { Id = "terminal-restart"
+            Title = "Terminal: Restart"
+            Keys = ""
+            Run =
+              (fun () ->
+                  setPanelVisible true
+                  showPanel "terminal"
+                  restartTerminal ()) }
+          { Id = "terminal-clear"
+            Title = "Terminal: Clear"
+            Keys = ""
+            Run = (fun () -> termOutput.Text <- "") }
           { Id = "explorer"
             Title = "View: Show Explorer"
             Keys = "Ctrl+Shift+E"
@@ -2215,6 +2555,7 @@ type Shell(env: HostEnv) =
         let editorHost = Grid()
         editorHost.Children.Add welcome
         editorHost.Children.Add editor
+        editorHost.Children.Add hoverBox
         editor.IsVisible <- false
         themed (fun r -> editorHost.Background <- r.EditorBg)
 
@@ -2246,17 +2587,27 @@ type Shell(env: HostEnv) =
         problemsHost.Children.Add problemsBox
         let inputHost = Grid()
         inputHost.Children.Add inputBox
+        let termHost = DockPanel()
+        DockPanel.SetDock(termInput, Dock.Bottom)
+        termHost.Children.Add termInput
+        termHost.Children.Add termOutput
 
         themed (fun r ->
             outputBox.Background <- r.EditorBg
             outputBox.Foreground <- r.Fg
             inputBox.Background <- r.EditorBg
-            inputBox.Foreground <- r.Fg)
+            inputBox.Foreground <- r.Fg
+            termOutput.Background <- r.EditorBg
+            termOutput.Foreground <- r.Fg
+            termInput.Background <- r.EditorBg
+            termInput.Foreground <- r.Fg
+            termInput.BorderBrush <- r.Line)
 
         let headerButtons = StackPanel(Orientation = Orientation.Horizontal)
         headerButtons.Children.Add(tabButton "output" "OUTPUT" outputHost)
         headerButtons.Children.Add(tabButton "problems" "PROBLEMS" problemsHost)
         headerButtons.Children.Add(tabButton "input" "INPUT" inputHost)
+        headerButtons.Children.Add(tabButton "terminal" "TERMINAL" termHost)
 
         let closePanel = flat "✕" "Close panel (Ctrl+J)" (fun () -> setPanelVisible false)
         DockPanel.SetDock(closePanel, Dock.Right)
@@ -2284,6 +2635,7 @@ type Shell(env: HostEnv) =
         panelContent.Children.Add outputHost
         panelContent.Children.Add problemsHost
         panelContent.Children.Add inputHost
+        panelContent.Children.Add termHost
         let panelBody = DockPanel()
         DockPanel.SetDock(headerBorder, Dock.Top)
         panelBody.Children.Add headerBorder
@@ -2376,19 +2728,29 @@ type Shell(env: HostEnv) =
             if i >= 0 && i < paletteActions.Length then
                 paletteActions[i]())
 
-        // status bar
-        let status = DockPanel(Margin = Thickness(10.0, 0.0), LastChildFill = false)
+        // status bar: folder, branch and the latest message on the left (the message is cut with an ellipsis when it is
+        // too long), problems, position and language on the right
+        let status = Grid(Margin = Thickness(10.0, 0.0))
+        status.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength.Star))
+        status.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength.Auto))
         let right = StackPanel(Orientation = Orientation.Horizontal, Spacing = 18.0)
         right.Children.Add statusProblems
         right.Children.Add statusPos
         right.Children.Add statusLang
-        DockPanel.SetDock(right, Dock.Right)
-        let left = StackPanel(Orientation = Orientation.Horizontal, Spacing = 18.0)
+        Grid.SetColumn(right, 1)
+        let left = DockPanel(LastChildFill = true)
+        statusFolder.Margin <- Thickness(0.0, 0.0, 18.0, 0.0)
+        statusGit.Margin <- Thickness(0.0, 0.0, 18.0, 0.0)
+        statusRun.TextTrimming <- TextTrimming.CharacterEllipsis
+        statusRun.Margin <- Thickness(0.0, 0.0, 18.0, 0.0)
+        DockPanel.SetDock(statusFolder, Dock.Left)
+        DockPanel.SetDock(statusGit, Dock.Left)
         left.Children.Add statusFolder
         left.Children.Add statusGit
         left.Children.Add statusRun
-        status.Children.Add right
+        Grid.SetColumn(left, 0)
         status.Children.Add left
+        status.Children.Add right
         let statusBorder = Border(Child = status, Height = 24.0)
 
         themed (fun r ->
@@ -2449,6 +2811,56 @@ type Shell(env: HostEnv) =
             syncOpenFiles ())
 
         editor.TextArea.Caret.PositionChanged.Add(fun _ -> updateStatus ())
+
+        termInput.KeyDown.Add(fun e ->
+            match e.Key with
+            | Key.Enter ->
+                e.Handled <- true
+                let line = termInput.Text |> Option.ofObj |> Option.defaultValue ""
+                termInput.Text <- ""
+                sendTerminalLine line
+            | Key.Up when termHistory.Count > 0 ->
+                e.Handled <- true
+                termHistoryAt <- max 0 (termHistoryAt - 1)
+                termInput.Text <- termHistory[termHistoryAt]
+                termInput.CaretIndex <- termInput.Text.Length
+            | Key.Down when termHistory.Count > 0 ->
+                e.Handled <- true
+                termHistoryAt <- min termHistory.Count (termHistoryAt + 1)
+
+                termInput.Text <-
+                    if termHistoryAt >= termHistory.Count then
+                        ""
+                    else
+                        termHistory[termHistoryAt]
+
+                termInput.CaretIndex <- termInput.Text.Length
+            | _ -> ())
+
+        // hover: rest the pointer on code for a moment and a box appears; moving, typing or leaving hides it
+        hoverTimer.Tick.Add(fun _ ->
+            hoverTimer.Stop()
+            let pos = editor.GetPositionFromPoint hoverPoint
+
+            if pos.HasValue then
+                showHoverAt pos.Value.Line pos.Value.Column (Point(hoverPoint.X + 12.0, hoverPoint.Y + 20.0)))
+
+        editor.PointerMoved.Add(fun e ->
+            let p = e.GetPosition editor
+
+            if hoverBox.IsVisible then
+                if abs (p.X - hoverPoint.X) > 4.0 || abs (p.Y - hoverPoint.Y) > 4.0 then
+                    hideHover ()
+                    hoverPoint <- p
+                    hoverTimer.Start()
+            else
+                hoverPoint <- p
+                hoverTimer.Stop()
+                hoverTimer.Start())
+
+        editor.PointerExited.Add(fun _ -> hideHover ())
+        editor.TextArea.TextEntered.Add(fun _ -> hideHover ())
+        editor.TextArea.TextView.ScrollOffsetChanged.Add(fun _ -> hideHover ())
 
         // type a closing bracket after an opening one, and step over it when it is typed again
         editor.TextArea.TextEntered.Add(fun e ->
@@ -2549,6 +2961,9 @@ type Shell(env: HostEnv) =
                 | Key.J when ctrl -> pick "toggle-panel"
                 | Key.E when ctrl && shift -> pick "explorer"
                 | Key.F when ctrl && shift -> pick "find-files"
+                | Key.OemTilde when ctrl -> pick "terminal"
+                | Key.H when ctrl && shift -> pick "replace-in-files"
+                | Key.H when ctrl -> pick "replace-in-file"
                 | Key.M when ctrl && shift -> pick "problems"
                 | Key.Space when ctrl -> pick "complete"
                 | Key.F12 -> pick "definition"
@@ -2591,6 +3006,16 @@ type Shell(env: HostEnv) =
     member _.OpenFile(rel: string, line: int, col: int) = openFile rel line col
     member _.Run(id: string) = (command id).Run()
     member _.Palette(text: string) = showPaletteFn text
+    /// Sends a line to the terminal's shell (for the screenshot switches).
+    member _.TerminalSend(line: string) = sendTerminalLine line
+
+    /// Fills the search panel and runs the search (for the screenshot switches and the tests).
+    member _.Search(query: string, replacement: string) =
+        showSidebar "search"
+        searchBox.Text <- query
+        replaceBox.Text <- replacement
+        runSearch ()
+
     member _.Say = say
     member _.TextMateReady = registryOptions
     member _.ThemeName = theme.Id

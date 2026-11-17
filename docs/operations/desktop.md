@@ -6,26 +6,28 @@ A native window written in F# (Avalonia 12, AvaloniaEdit, TextMateSharp). It loo
 ```bash
 dotnet run --project tools/FSharpened.Ide.Desktop -- path/to/folder
 ```
-Switches: `--folder DIR`, `--file REL`, `--theme ID`, `--command ID` (a palette command, repeatable), `--palette TEXT`, `--screenshot FILE.png [--delay SECONDS] [--size WxH]` (draws the real window to a PNG and quits; used to check the app without a person). The environment variable `FSHARPENED_DATA` moves the settings, trust list and your language packs to another folder (portable use, clean tests).
+Switches: `--folder DIR`, `--file REL`, `--theme ID`, `--command ID` (a palette command, repeatable), `--palette TEXT`, `--search TEXT` and `--replace-with TEXT` (fill the search panel and run it), `--late-command ID` (a command run just before the screenshot, once language servers are up), `--terminal-line TEXT` (a line sent to the terminal), `--screenshot FILE.png [--delay SECONDS] [--size WxH]` (draws the real window to a PNG and quits; used to check the app without a person). The environment variable `FSHARPENED_DATA` moves the settings, trust list and your language packs to another folder (portable use, clean tests).
 
 ## What is in it
 | Area | Web IDE | Desktop IDE |
 |---|---|---|
 | Layout, colour roles, nine themes (two high-contrast), settings | yes | yes (same F# `Themes` module; syntax colours come from the nearest bundled TextMate theme) |
 | Command palette, quick open, go to line and symbol, ranking | yes | yes (same `Fuzzy` and `Symbols` modules) |
-| Search in files, outline, breadcrumbs, status bar | yes | yes (search finds, it does not replace yet) |
+| Search in files, outline, breadcrumbs, status bar | yes | yes, and **replace in files** (include and exclude patterns, case, whole word, regex; a file open in the editor is searched and changed as it is there, so Undo works) |
+| Find and replace in the open file | yes | yes (Ctrl+F, Ctrl+H) |
 | Right-click menus (editor, tree, tabs) | yes | yes |
 | Files | browser storage | **real folders**: open with the native dialog, save, create, rename, delete (permanent, asks first), file watching |
 | Run | remote compilers (18 languages) | **local toolchain**, any language with a pack and an installed tool |
 | Problems | from compiler output | from compiler output (core parsers for the 18, generic `file:line:col` parsers for the rest) **and** from language servers |
 | Git | no | branch, changed-file count, coloured tree |
-| Language servers | no (PLAN P7.4) | minimal client: problems as underlines, completion (Ctrl+Space), go to definition (F12); hover exists in the client library, not yet in the UI |
+| Language servers | no (PLAN P7.4) | minimal client: problems as underlines, completion (Ctrl+Space), go to definition (F12); hover box: rest the pointer on code (or *Editor: Show Hover*) and it shows the problems at that spot and what the server says |
 | Multi-cursor, snippets, import of VS Code themes/snippets/settings/.vsix, Download for VS Code | yes | **not yet** |
-| Terminal, debugger, split editors, minimap, search and replace | no / no / no / no / yes | **not yet** |
+| Terminal | no | **line-based**: your own shell on pipes in the opened folder (Ctrl+`), history with Up and Down. **Not a pseudo-terminal**: full-screen programs (vim, top), colours and Ctrl+C do not work |
+| Debugger, split editors, minimap | no | **not yet** |
 | VS Code extensions, GitHub Copilot | no | **no** (ADR-0022 stands: extension code is not hosted) |
 
 ## Trust and limits
-- Opening a folder runs nothing. The first **Run** (and the first language server start) in a folder asks for trust; the answer is remembered per folder in the data folder (`trust.json`). *Run → Revoke Trust for This Folder* withdraws it.
+- Opening a folder runs nothing. The first **Run**, the first language server start and the first **terminal** in a folder ask for trust (the terminal runs whatever is typed into it). The answer is remembered per folder in the data folder (`trust.json`). *Run → Revoke Trust for This Folder* withdraws it.
 - Programs start as an argument list, never through a shell. Time limit 30 s (palette: 120 s), 1 MiB of output per stream, the whole process tree is killed on timeout, build output goes to a fresh temporary folder that is removed afterwards.
 - **Local runs are not sandboxed.** A trusted folder's program has your permissions. Only trust code you would run anyway.
 - The host refuses paths that leave the opened folder (`..`, absolute paths, links, reserved names), reads text files up to 5 MB and refuses binary or non-UTF-8 files.
@@ -43,8 +45,12 @@ Put a `.json` file in `languages/` (shipped) or in `FSharpened/languages` under 
 ```
 Placeholders: `{entry}` `{out}` `{dir}` `{root}` `{name}` and `{flags}` (an argument that is exactly `{flags}` becomes the flags box). Programs must be bare names declared under `tools`; `"tool": "built"` runs the output of an earlier `build` step. The first plan whose `files` patterns match and whose `entryExtensions` fit wins.
 
+## Grammars
+Highlighting uses TextMate grammars. TextMateSharp brings most; the app adds the ones it lacks from `grammars/*.tmLanguage.json` (shipped: Haskell, OCaml, Elixir, Kotlin, Scala, Zig, TOML). A grammar's `scopeName` is what a language pack's `scope` names. Put a `.tmLanguage.json` file in `FSharpened/grammars` under the data folder to add a language or replace a shipped grammar (yours wins); files starting with `_`, files that are not JSON and files with no `scopeName` are ignored. Restart the app after adding one.
+
 ## Known limits (checked, not guessed)
-- **No bundled highlighting grammar** for Haskell, OCaml, Elixir, Kotlin, Scala, Zig and TOML in TextMateSharp: those files open and run without colour. (A pack's own `grammar` file is read and validated but not loaded yet.)
+- Haskell, OCaml, Elixir, Kotlin, Scala, Zig and TOML have no grammar in TextMateSharp, so the app ships its own small ones (`grammars/`). They colour comments, strings, numbers, keywords and types, not every construct of the language; a better grammar dropped into `FSharpened/grammars` replaces them.
+- The terminal has no pseudo-terminal, so a program that needs a real terminal behaves badly in it, and Ctrl+C cannot interrupt a running command (use *Terminal: Restart*). That needs the Rust work in PLAN P7.8.
 - On Windows a language server installed as a `.cmd` shim (typical for npm packages) cannot be started; it needs an `.exe`.
 - The language-server client is checked against a scripted server and a fake in tests, and against a scripted Python server in the real window. It has **not** been run against gopls, rust-analyzer or others on this machine (none was installed).
 - Only a Windows build was run here; the six-RID matrix (CI) is the check for Linux and macOS. The window has no automated UI test; `--screenshot` was used by hand.

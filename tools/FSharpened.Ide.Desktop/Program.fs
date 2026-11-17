@@ -16,8 +16,12 @@ type Options =
     { Folder: string option
       File: string option
       Commands: string list
+      LateCommands: string list
+      TerminalLines: string list
       Theme: string option
       Palette: string option
+      Search: string option
+      ReplaceWith: string
       Screenshot: string option
       Width: int
       Height: int
@@ -29,6 +33,18 @@ let parse (argv: string[]) : Options =
         | "--folder" :: v :: t -> go { o with Folder = Some v } t
         | "--file" :: v :: t -> go { o with File = Some v } t
         | "--command" :: v :: t -> go { o with Commands = o.Commands @ [ v ] } t
+        | "--late-command" :: v :: t ->
+            go
+                { o with
+                    LateCommands = o.LateCommands @ [ v ] }
+                t
+        | "--search" :: v :: t -> go { o with Search = Some v } t
+        | "--replace-with" :: v :: t -> go { o with ReplaceWith = v } t
+        | "--terminal-line" :: v :: t ->
+            go
+                { o with
+                    TerminalLines = o.TerminalLines @ [ v ] }
+                t
         | "--theme" :: v :: t -> go { o with Theme = Some v } t
         | "--palette" :: v :: t -> go { o with Palette = Some v } t
         | "--screenshot" :: v :: t -> go { o with Screenshot = Some v } t
@@ -46,8 +62,12 @@ let parse (argv: string[]) : Options =
         { Folder = None
           File = None
           Commands = []
+          LateCommands = []
+          TerminalLines = []
           Theme = None
           Palette = None
+          Search = None
+          ReplaceWith = ""
           Screenshot = None
           Width = 1320
           Height = 820
@@ -85,6 +105,32 @@ type App() =
                     shell.Run c
 
                 o.Palette |> Option.iter shell.Palette
+                o.Search |> Option.iter (fun q -> shell.Search(q, o.ReplaceWith))
+
+                if not o.TerminalLines.IsEmpty then
+                    let typed =
+                        DispatcherTimer(Interval = TimeSpan.FromSeconds(float (max 1 (o.Delay - 3))))
+
+                    typed.Tick.Add(fun _ ->
+                        typed.Stop()
+
+                        for l in o.TerminalLines do
+                            shell.TerminalSend l)
+
+                    typed.Start()
+
+                // commands that need the language server to be up first (a hover box, for one) run a little later
+                if not o.LateCommands.IsEmpty then
+                    let late =
+                        DispatcherTimer(Interval = TimeSpan.FromSeconds(float (max 1 (o.Delay - 2))))
+
+                    late.Tick.Add(fun _ ->
+                        late.Stop()
+
+                        for c in o.LateCommands do
+                            shell.Run c)
+
+                    late.Start()
 
                 match o.Screenshot with
                 | Some path ->
