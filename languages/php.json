@@ -1,0 +1,55 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "php",
+  "name": "PHP",
+  "extensions": [
+    ".php"
+  ],
+  "scope": "source.php",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "intelephense",
+    "args": [
+      "--stdio"
+    ],
+    "install": "npm install -g intelephense"
+  },
+  "tools": [
+    {
+      "id": "php",
+      "label": "PHP",
+      "candidates": [
+        [
+          "php"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://www.php.net/downloads"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "php",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

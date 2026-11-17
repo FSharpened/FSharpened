@@ -1,0 +1,26 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "dockerfile",
+  "name": "Dockerfile",
+  "extensions": [
+    ".dockerfile"
+  ],
+  "filenames": [
+    "Dockerfile"
+  ],
+  "scope": "source.dockerfile",
+  "comments": {
+    "line": "#"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "docker-langserver",
+    "args": [
+      "--stdio"
+    ],
+    "install": "npm install -g dockerfile-language-server-nodejs"
+  }
+}

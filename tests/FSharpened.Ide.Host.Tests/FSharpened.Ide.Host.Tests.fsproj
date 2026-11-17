@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="PackTests.fs" />
+    <Compile Include="DiskTests.fs" />
+    <Compile Include="ReplaceTests.fs" />
+    <Compile Include="TerminalTests.fs" />
+    <Compile Include="RunTests.fs" />
+    <Compile Include="ToolingTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\tools\FSharpened.Ide.Host\FSharpened.Ide.Host.fsproj" />
+  </ItemGroup>
+
+</Project>

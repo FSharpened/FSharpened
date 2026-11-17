@@ -8,3 +8,12 @@ artifacts/
 .fsharpened/
 .venv/
 __pycache__/
+# Cloudflare tooling state, secrets and generated bundles
+.wrangler/
+.dev.vars
+# Generated website (tools/site/build.py) and the IDE bundle it fingerprints
+site/public/
+site/dist/
+
+# Rust interop example (native/rust): cargo build output
+native/rust/**/target/

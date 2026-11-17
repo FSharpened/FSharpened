@@ -1,0 +1,66 @@
+{
+  "name": "Zig",
+  "scopeName": "source.zig",
+  "fileTypes": ["zig"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#multiline-string" },
+    { "include": "#string" },
+    { "include": "#char" },
+    { "include": "#builtin" },
+    { "include": "#number" },
+    { "include": "#keyword" },
+    { "include": "#constant" },
+    { "include": "#primitive-type" },
+    { "include": "#type" },
+    { "include": "#operator" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.zig",
+      "match": "//.*$"
+    },
+    "multiline-string": {
+      "name": "string.quoted.other.zig",
+      "match": "\\\\\\\\.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.zig",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.zig", "match": "\\\\(.|x[0-9a-fA-F]{2}|u\\{[0-9a-fA-F]+\\})" }]
+    },
+    "char": {
+      "name": "string.quoted.single.zig",
+      "match": "'(\\\\(.|x[0-9a-fA-F]{2}|u\\{[0-9a-fA-F]+\\})|[^'\\\\])'"
+    },
+    "builtin": {
+      "name": "support.function.builtin.zig",
+      "match": "@[A-Za-z_][A-Za-z0-9_]*"
+    },
+    "number": {
+      "name": "constant.numeric.zig",
+      "match": "\\b(0x[0-9a-fA-F_]+(\\.[0-9a-fA-F_]+)?([pP][+-]?[0-9]+)?|0o[0-7_]+|0b[01_]+|[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?)\\b"
+    },
+    "keyword": {
+      "name": "keyword.control.zig",
+      "match": "\\b(addrspace|align|allowzero|and|anyframe|anytype|asm|async|await|break|callconv|catch|comptime|const|continue|defer|else|enum|errdefer|error|export|extern|fn|for|if|inline|linksection|noalias|nosuspend|opaque|or|orelse|packed|pub|resume|return|struct|suspend|switch|test|threadlocal|try|union|unreachable|usingnamespace|var|volatile|while)\\b"
+    },
+    "constant": {
+      "name": "constant.language.zig",
+      "match": "\\b(true|false|null|undefined)\\b"
+    },
+    "primitive-type": {
+      "name": "storage.type.zig",
+      "match": "\\b([iu][0-9]+|isize|usize|c_(short|ushort|int|uint|long|ulong|longlong|ulonglong|longdouble)|f16|f32|f64|f80|f128|bool|void|noreturn|type|anyerror|comptime_int|comptime_float)\\b"
+    },
+    "type": {
+      "name": "entity.name.type.zig",
+      "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.zig",
+      "match": "\\.\\.\\.|\\.\\.|\\.\\*|\\.\\?|=>|\\+\\+|\\*\\*|[-+*/%=<>!&|^~?]"
+    }
+  }
+}

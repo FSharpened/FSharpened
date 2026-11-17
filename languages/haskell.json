@@ -1,0 +1,56 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "haskell",
+  "name": "Haskell",
+  "extensions": [
+    ".hs",
+    ".lhs"
+  ],
+  "scope": "source.haskell",
+  "comments": {
+    "line": "--",
+    "block": [
+      "{-",
+      "-}"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "haskell-language-server-wrapper",
+    "args": [
+      "--lsp"
+    ],
+    "install": "https://www.haskell.org/ghcup/"
+  },
+  "tools": [
+    {
+      "id": "runghc",
+      "label": "Haskell (runghc)",
+      "candidates": [
+        [
+          "runghc"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://www.haskell.org/ghcup/"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "runghc",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

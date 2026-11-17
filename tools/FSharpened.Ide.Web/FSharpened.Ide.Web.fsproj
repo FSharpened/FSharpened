@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Declared here on purpose: Fable 4 hangs when TargetFramework only comes from Directory.Build.props. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Description>Fable entry point exposing the IDE core to the browser. Compiled to JavaScript by `dotnet fable`; it is also a normal net8.0 library so the six-RID matrix builds it.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Api.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Core" />
+    <ProjectReference Include="..\FSharpened.Ide\FSharpened.Ide.fsproj" />
+  </ItemGroup>
+
+</Project>

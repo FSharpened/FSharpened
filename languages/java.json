@@ -1,0 +1,53 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "java",
+  "name": "Java",
+  "extensions": [
+    ".java"
+  ],
+  "scope": "source.java",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "jdtls",
+    "args": [],
+    "install": "https://github.com/eclipse-jdtls/eclipse.jdt.ls"
+  },
+  "tools": [
+    {
+      "id": "java",
+      "label": "Java",
+      "candidates": [
+        [
+          "java"
+        ]
+      ],
+      "version": [
+        "-version"
+      ],
+      "install": "https://adoptium.net"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "java",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

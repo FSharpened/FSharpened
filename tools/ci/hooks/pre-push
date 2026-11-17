@@ -1,4 +1,14 @@
 #!/bin/sh
 # Full local pipeline before anything leaves the machine. Bypass once: git push --no-verify
+# Deleting a remote branch sends no code, so it runs nothing.
+only_deletes=1
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    0000000000000000000000000000000000000000) ;;
+    *) only_deletes=0 ;;
+  esac
+done
+[ "$only_deletes" = 1 ] && exit 0
+cd "$(git rev-parse --show-toplevel)" || exit 1
 PY=$(command -v python3 || command -v python) || { echo "fsh-ci: python not found"; exit 1; }
 exec "$PY" tools/ci/fsh_ci.py run --profile full --hook

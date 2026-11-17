@@ -2,6 +2,7 @@ module FSharpened.Cli.Program
 
 open System
 open FSharpened.Platform
+open FSharpened.Interop.Rust
 
 // printf-family functions use reflection that NativeAOT cannot compile (see gap K, ADR-0014).
 // Use Console + string concatenation in anything that must run under PublishAot.
@@ -29,12 +30,33 @@ let printHelp () =
     for (name, text) in commands do
         out ("  " + name.PadRight 13 + " " + text)
 
+/// Rust is optional: only the Interop.Rust pillar needs it, so a missing toolchain is information, not a failure.
+let private rustLine () =
+    match Toolchain.probe (Command.run 10000) with
+    | Ok tc ->
+        let target =
+            match tc.Host with
+            | Some t -> t.Rid
+            | None -> "no FSharpened target"
+
+        "cargo "
+        + tc.CargoVersion
+        + ", rustc "
+        + tc.RustcVersion
+        + ", host "
+        + tc.HostTriple
+        + " ("
+        + target
+        + ")"
+    | Error _ -> "not found (optional; only the Interop.Rust pillar needs it)"
+
 let doctor () =
     let id = RuntimeIdentity.detect ()
     out ("rid:        " + id.Rid)
     out ("aot:        " + string id.IsAot)
     out ("container:  " + string id.IsContainer)
     out ("wsl:        " + string id.IsWsl)
+    out ("rust:       " + rustLine ())
     0
 
 [<EntryPoint>]

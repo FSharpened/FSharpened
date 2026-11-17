@@ -1,9 +1,9 @@
 # One named owner per pillar once maintainers exist. Until then the owner is the project owner;
 # agent personas act under MAINTAINER.md and never merge.
-*                    @LoopyLuci
-/src/FSharpened.Platform/      @LoopyLuci
-/src/FSharpened.Statepoints/   @LoopyLuci
-/MAINTAINER.md       @LoopyLuci
-/registry/           @LoopyLuci
-/docs/adr/           @LoopyLuci
-/docs/governance/    @LoopyLuci
+*                    @FSharpened
+/src/FSharpened.Platform/      @FSharpened
+/src/FSharpened.Statepoints/   @FSharpened
+/MAINTAINER.md       @FSharpened
+/registry/           @FSharpened
+/docs/adr/           @FSharpened
+/docs/governance/    @FSharpened

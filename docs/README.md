@@ -26,6 +26,11 @@ This is a **routing contract**, not a table of contents: given a task, which doc
 | Run the platform matrix | docs/platform/README.md | .agents/skills/run-platform-matrix.md |
 | Run the full pipeline locally / in hooks | docs/operations/local-ci.md | .agents/skills/run-local-ci.md |
 | Debug a CI failure | docs/operations/ci.md | pipelines/README.md |
+| Run or deploy the telemetry hub | docs/operations/hub.md | worker/README.md |
+| Build, run or deploy the browser IDE, or add a language to it | docs/operations/ide.md | ide/README.md |
+| Run the desktop IDE, add a language pack, or see what the desktop app can and cannot do | docs/operations/desktop.md | docs/adr/0023-desktop-ide-shell.md |
+| Call Rust from F#, or use Rust in the IDE | docs/operations/rust.md | .agents/skills/add-rust-interop.md |
+| Change, build, deploy or verify the website and its installable apps (PWA) | docs/operations/site.md | site/README.md |
 | Cut a release | docs/operations/release.md | .agents/skills/cut-release.md |
 | Triage an issue | docs/operations/triage.md | .agents/skills/triage-issue.md |
 | Handle a security report | docs/operations/security.md | .agents/skills/handle-security-report.md |

@@ -1,0 +1,118 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "go",
+  "name": "Go",
+  "extensions": [
+    ".go"
+  ],
+  "scope": "source.go",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": true,
+    "size": 4
+  },
+  "server": {
+    "command": "gopls",
+    "args": [],
+    "install": "go install golang.org/x/tools/gopls@latest"
+  },
+  "tools": [
+    {
+      "id": "go",
+      "label": "Go",
+      "candidates": [
+        [
+          "go"
+        ]
+      ],
+      "version": [
+        "version"
+      ],
+      "install": "https://go.dev/dl/"
+    },
+    {
+      "id": "gofmt",
+      "label": "gofmt",
+      "candidates": [
+        [
+          "gofmt"
+        ]
+      ],
+      "version": [
+        "-e"
+      ],
+      "install": "installed with Go"
+    }
+  ],
+  "run": [
+    {
+      "when": {
+        "files": [
+          "go.mod"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "go",
+          "args": [
+            "run",
+            "."
+          ]
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "go",
+          "args": [
+            "run",
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ],
+  "test": [
+    {
+      "when": {
+        "files": [
+          "go.mod"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "test",
+          "tool": "go",
+          "args": [
+            "test",
+            "./..."
+          ]
+        }
+      ]
+    }
+  ],
+  "formatter": {
+    "phase": "run",
+    "tool": "gofmt",
+    "args": [
+      "-w",
+      "{entry}"
+    ]
+  },
+  "debug": {
+    "adapter": "dlv",
+    "args": [
+      "dap"
+    ],
+    "install": "go install github.com/go-delve/delve/cmd/dlv@latest"
+  }
+}

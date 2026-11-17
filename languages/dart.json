@@ -1,0 +1,82 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "dart",
+  "name": "Dart",
+  "extensions": [
+    ".dart"
+  ],
+  "scope": "source.dart",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "dart",
+    "args": [
+      "language-server"
+    ],
+    "install": "installed with the Dart SDK"
+  },
+  "tools": [
+    {
+      "id": "dart",
+      "label": "Dart",
+      "candidates": [
+        [
+          "dart"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://dart.dev/get-dart"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "dart",
+          "args": [
+            "run",
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ],
+  "test": [
+    {
+      "when": {
+        "files": [
+          "pubspec.yaml"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "test",
+          "tool": "dart",
+          "args": [
+            "test"
+          ]
+        }
+      ]
+    }
+  ],
+  "formatter": {
+    "phase": "run",
+    "tool": "dart",
+    "args": [
+      "format",
+      "{entry}"
+    ]
+  }
+}

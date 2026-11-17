@@ -1,0 +1,27 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "markdown",
+  "name": "Markdown",
+  "extensions": [
+    ".md",
+    ".markdown"
+  ],
+  "scope": "text.html.markdown",
+  "comments": {
+    "block": [
+      "<!--",
+      "-->"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "marksman",
+    "args": [
+      "server"
+    ],
+    "install": "https://github.com/artempyanykh/marksman"
+  }
+}

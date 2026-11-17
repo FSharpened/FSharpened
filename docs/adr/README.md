@@ -27,3 +27,10 @@ Proposed -> Accepted (human-approved) -> Superseded by ADR-N. Never edit an acce
 | 0014 | NativeAOT validated per RID |
 | 0015 | Recursive training with frozen judges and recursion budgets |
 | 0016 | One local-first CI pipeline, shared by hooks and GitHub Actions |
+| 0017 | A Cloudflare Worker hub for CI telemetry and operations |
+| 0018 | A browser IDE: an F# core compiled with Fable, executing through an allowlisting gateway |
+| 0019 | Rust compatibility: Rust in the browser IDE and a C-ABI interop pillar |
+| 0020 | A polyglot browser IDE: eighteen languages through two allowlisted execution backends |
+| 0021 | The IDE as a platform: projects, community, tooling, pre-compilation and a code-only agent (roadmap) |
+| 0022 | IDE parity with VS Code, and what "works with VS Code extensions and Copilot" can honestly mean |
+| 0023 | The desktop IDE is a native F# application, polyglot by fitness, with languages as data |

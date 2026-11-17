@@ -1,0 +1,42 @@
+name: site
+# The public website, its IDE page and the hub console are installable web apps. This job builds the site exactly as it
+# is deployed and fails on anything that would only break in production: a dead link, an inline script the CSP blocks,
+# an icon of the wrong size, a service worker that precaches a missing file, or a worker that touches private API calls.
+on:
+  pull_request:
+    paths: ['site/**', 'tools/site/**', 'branding/**', 'worker/admin/**', 'ide/web/**', '.github/workflows/site.yml']
+  push:
+    branches: [main]
+    paths: ['site/**', 'tools/site/**', 'branding/**', 'worker/admin/**', 'ide/web/**']
+permissions:
+  contents: read
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ide/web/package-lock.json
+      - run: dotnet tool restore
+      - run: npm ci --ignore-scripts
+        working-directory: ide/web
+      - run: npm run build
+        working-directory: ide/web
+      - name: Generated icons are up to date with branding/mark.svg
+        run: python tools/site/icons.py --check
+      - name: Build the site
+        run: python tools/site/build.py --require-ide
+      - name: Links, metadata, manifests, service-worker precache, CSP-safe markup
+        run: python tools/site/check.py
+      - name: Service worker behaviour (site and hub)
+        run: node --test "site/test/*.test.mjs"

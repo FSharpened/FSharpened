@@ -1,0 +1,61 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "ruby",
+  "name": "Ruby",
+  "extensions": [
+    ".rb",
+    ".rake",
+    ".gemspec"
+  ],
+  "filenames": [
+    "Rakefile",
+    "Gemfile"
+  ],
+  "scope": "source.ruby",
+  "comments": {
+    "line": "#",
+    "block": [
+      "=begin",
+      "=end"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "solargraph",
+    "args": [
+      "stdio"
+    ],
+    "install": "gem install solargraph"
+  },
+  "tools": [
+    {
+      "id": "ruby",
+      "label": "Ruby",
+      "candidates": [
+        [
+          "ruby"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://www.ruby-lang.org"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "ruby",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

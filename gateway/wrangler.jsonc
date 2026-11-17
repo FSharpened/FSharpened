@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ide",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "ratelimits": [
+    { "name": "RUN_LIMITER", "namespace_id": "1001", "simple": { "limit": 12, "period": 60 } }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://fsharpened.pages.dev,https://fsharpened.fsharpened.workers.dev",
+    "UPSTREAM": "https://godbolt.org",
+    "WANDBOX": "https://wandbox.org"
+  }
+}

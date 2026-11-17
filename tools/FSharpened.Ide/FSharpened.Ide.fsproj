@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Declared here on purpose: Fable 4 hangs when TargetFramework only comes from Directory.Build.props. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Description>Core of the FSharpened web IDE: workspace, statepoint timeline, diagnostic normalisation, engine fallback. Pure F#, tested natively and compiled to JavaScript by Fable.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shared, portable FSharpened sources compiled in place (Fable compiles from source; Invariant 5: the IDE reuses Statepoints, it does not re-implement them). -->
+    <Compile Include="..\..\src\FSharpened.Platform\Overlay.fs" Link="Shared\Overlay.fs" />
+    <Compile Include="..\..\src\FSharpened.Statepoints\Statepoints.fs" Link="Shared\Statepoints.fs" />
+    <Compile Include="..\..\src\FSharpened.Diagnostics\Diagnostics.fs" Link="Shared\Diagnostics.fs" />
+    <Compile Include="Languages.fs" />
+    <Compile Include="Templates.fs" />
+    <Compile Include="Diff.fs" />
+    <Compile Include="Workspace.fs" />
+    <Compile Include="Project.fs" />
+    <Compile Include="Timeline.fs" />
+    <Compile Include="ProjectState.fs" />
+    <Compile Include="Fuzzy.fs" />
+    <Compile Include="Search.fs" />
+    <Compile Include="Symbols.fs" />
+    <Compile Include="Snippets.fs" />
+    <Compile Include="Themes.fs" />
+    <Compile Include="Settings.fs" />
+    <Compile Include="VsCode.fs" />
+    <Compile Include="Problems.fs" />
+    <Compile Include="Engines.fs" />
+    <Compile Include="Protocol.fs" />
+  </ItemGroup>
+
+</Project>

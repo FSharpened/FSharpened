@@ -1,0 +1,94 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "c",
+  "name": "C",
+  "extensions": [
+    ".c",
+    ".h"
+  ],
+  "scope": "source.c",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "clangd",
+    "args": [],
+    "install": "install clangd (LLVM)"
+  },
+  "tools": [
+    {
+      "id": "cc",
+      "label": "C compiler",
+      "candidates": [
+        [
+          "gcc"
+        ],
+        [
+          "clang"
+        ],
+        [
+          "cc"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "install gcc or clang"
+    },
+    {
+      "id": "clang-format",
+      "label": "clang-format",
+      "candidates": [
+        [
+          "clang-format"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "install clang-format"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "build",
+          "tool": "cc",
+          "args": [
+            "{entry}",
+            "-o",
+            "{out}",
+            "{flags}"
+          ]
+        },
+        {
+          "phase": "run",
+          "tool": "built",
+          "args": []
+        }
+      ]
+    }
+  ],
+  "formatter": {
+    "phase": "run",
+    "tool": "clang-format",
+    "args": [
+      "-i",
+      "{entry}"
+    ]
+  },
+  "debug": {
+    "adapter": "lldb-dap",
+    "args": [],
+    "install": "install LLVM (lldb-dap)"
+  }
+}

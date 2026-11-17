@@ -1,0 +1,59 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "lua",
+  "name": "Lua",
+  "extensions": [
+    ".lua"
+  ],
+  "scope": "source.lua",
+  "comments": {
+    "line": "--",
+    "block": [
+      "--[[",
+      "]]"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "lua-language-server",
+    "args": [],
+    "install": "https://luals.github.io"
+  },
+  "tools": [
+    {
+      "id": "lua",
+      "label": "Lua",
+      "candidates": [
+        [
+          "lua"
+        ],
+        [
+          "lua5.4"
+        ],
+        [
+          "luajit"
+        ]
+      ],
+      "version": [
+        "-v"
+      ],
+      "install": "https://www.lua.org/download.html"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "lua",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

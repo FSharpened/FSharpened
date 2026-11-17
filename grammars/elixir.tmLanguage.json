@@ -1,0 +1,81 @@
+{
+  "name": "Elixir",
+  "scopeName": "source.elixir",
+  "fileTypes": ["ex", "exs"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#heredoc" },
+    { "include": "#sigil" },
+    { "include": "#string" },
+    { "include": "#charlist" },
+    { "include": "#atom" },
+    { "include": "#attribute" },
+    { "include": "#number" },
+    { "include": "#keyword" },
+    { "include": "#constant" },
+    { "include": "#module" },
+    { "include": "#operator" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.elixir",
+      "match": "#.*$"
+    },
+    "heredoc": {
+      "name": "string.quoted.triple.elixir",
+      "begin": "\"\"\"",
+      "end": "\"\"\"",
+      "patterns": [{ "include": "#interpolation" }, { "name": "constant.character.escape.elixir", "match": "\\\\." }]
+    },
+    "string": {
+      "name": "string.quoted.double.elixir",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "include": "#interpolation" }, { "name": "constant.character.escape.elixir", "match": "\\\\." }]
+    },
+    "charlist": {
+      "name": "string.quoted.single.elixir",
+      "begin": "'",
+      "end": "'",
+      "patterns": [{ "name": "constant.character.escape.elixir", "match": "\\\\." }]
+    },
+    "interpolation": {
+      "name": "meta.embedded.line.elixir",
+      "begin": "#\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "$self" }]
+    },
+    "sigil": {
+      "name": "string.regexp.elixir",
+      "match": "~[a-zA-Z](\\((?:[^)\\\\]|\\\\.)*\\)|\\[(?:[^\\]\\\\]|\\\\.)*\\]|\\{(?:[^}\\\\]|\\\\.)*\\}|<(?:[^>\\\\]|\\\\.)*>|/(?:[^/\\\\]|\\\\.)*/|\\|(?:[^|\\\\]|\\\\.)*\\||\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')[a-zA-Z]*"
+    },
+    "atom": {
+      "name": "constant.other.symbol.elixir",
+      "match": "(?<![:A-Za-z0-9_]):([A-Za-z_][A-Za-z0-9_]*[?!]?|\"[^\"]*\")|\\b[a-z_][A-Za-z0-9_]*[?!]?:(?=\\s)"
+    },
+    "attribute": {
+      "name": "variable.other.constant.elixir",
+      "match": "@[a-z_][A-Za-z0-9_]*"
+    },
+    "number": {
+      "name": "constant.numeric.elixir",
+      "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?)\\b"
+    },
+    "keyword": {
+      "name": "keyword.control.elixir",
+      "match": "\\b(def|defp|defmodule|defmacro|defmacrop|defstruct|defprotocol|defimpl|defdelegate|defguard|defexception|defoverridable|do|end|fn|if|unless|else|elsif|case|cond|when|with|for|receive|after|try|rescue|catch|raise|throw|reraise|import|require|alias|use|quote|unquote|in|and|or|not|true|false|nil)\\b"
+    },
+    "constant": {
+      "name": "constant.language.elixir",
+      "match": "\\b(true|false|nil|__MODULE__|__ENV__|__CALLER__)\\b"
+    },
+    "module": {
+      "name": "entity.name.type.module.elixir",
+      "match": "\\b[A-Z][A-Za-z0-9_]*(\\.[A-Z][A-Za-z0-9_]*)*\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.elixir",
+      "match": "\\|>|<>|\\+\\+|--|->|<-|=>|==|!=|===|!==|<=|>=|&&|\\|\\||[-+*/=<>!&|^~]"
+    }
+  }
+}

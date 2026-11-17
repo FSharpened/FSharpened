@@ -1,0 +1,21 @@
+{
+  "name": "fsharpened-hub",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate:local": "wrangler d1 migrations apply fsharpened-hub --local",
+    "db:migrate:remote": "wrangler d1 migrations apply fsharpened-hub --remote"
+  },
+  "dependencies": { "hono": "4.13.19" },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261116.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4",
+    "wrangler": "4.163.0"
+  }
+}

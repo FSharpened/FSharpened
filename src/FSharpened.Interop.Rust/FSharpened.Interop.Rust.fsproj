@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>F# calls Rust through the C ABI only. RID to Rust target-triple table, native library names and runtimes/rid/native layout, a no-#if native library resolver, a cargo build plan and cargo metadata reader that wrap cargo, and the ABI conventions (status codes, UTF-8 ownership, panics never cross) every bound Rust library follows.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Targets.fs" />
+    <Compile Include="Abi.fs" />
+    <Compile Include="Resolver.fs" />
+    <Compile Include="Command.fs" />
+    <Compile Include="Toolchain.fs" />
+    <Compile Include="Cargo.fs" />
+    <Compile Include="Pillar.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Platform\FSharpened.Platform.fsproj" />
+  </ItemGroup>
+
+</Project>

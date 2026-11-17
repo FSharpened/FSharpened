@@ -21,6 +21,7 @@
     <Project Path="src/FSharpened.Security/FSharpened.Security.fsproj" />
     <Project Path="src/FSharpened.Architecture/FSharpened.Architecture.fsproj" />
     <Project Path="src/FSharpened.Models/FSharpened.Models.fsproj" />
+    <Project Path="src/FSharpened.Interop.Rust/FSharpened.Interop.Rust.fsproj" />
     <Project Path="src/FSharpened.ML.Portability/FSharpened.ML.Portability.fsproj" />
     <Project Path="src/FSharpened.ML.Hardware/FSharpened.ML.Hardware.fsproj" />
     <Project Path="src/FSharpened.ML.Authoring/FSharpened.ML.Authoring.fsproj" />
@@ -32,8 +33,16 @@
   <Folder Name="/tools/">
     <Project Path="tools/FSharpened.Cli/FSharpened.Cli.fsproj" />
     <Project Path="tools/FSharpened.DevLoop/FSharpened.DevLoop.fsproj" />
+    <Project Path="tools/FSharpened.Ide/FSharpened.Ide.fsproj" />
+    <Project Path="tools/FSharpened.Ide.Web/FSharpened.Ide.Web.fsproj" />
+    <Project Path="tools/FSharpened.Ide.Host/FSharpened.Ide.Host.fsproj" />
+    <Project Path="tools/FSharpened.Ide.Desktop/FSharpened.Ide.Desktop.fsproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/FSharpened.Skeleton.Tests/FSharpened.Skeleton.Tests.fsproj" />
+    <Project Path="tests/FSharpened.Ide.Tests/FSharpened.Ide.Tests.fsproj" />
+    <Project Path="tests/FSharpened.Ide.Host.Tests/FSharpened.Ide.Host.Tests.fsproj" />
+    <Project Path="tests/FSharpened.Ide.Desktop.Tests/FSharpened.Ide.Desktop.Tests.fsproj" />
+    <Project Path="tests/FSharpened.Interop.Rust.Tests/FSharpened.Interop.Rust.Tests.fsproj" />
   </Folder>
 </Solution>

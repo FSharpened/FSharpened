@@ -1,0 +1,133 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "rust",
+  "name": "Rust",
+  "extensions": [
+    ".rs"
+  ],
+  "scope": "source.rust",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "rust-analyzer",
+    "args": [],
+    "install": "rustup component add rust-analyzer"
+  },
+  "tools": [
+    {
+      "id": "cargo",
+      "label": "Cargo",
+      "candidates": [
+        [
+          "cargo"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://rustup.rs"
+    },
+    {
+      "id": "rustc",
+      "label": "Rust (rustc)",
+      "candidates": [
+        [
+          "rustc"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://rustup.rs"
+    },
+    {
+      "id": "rustfmt",
+      "label": "rustfmt",
+      "candidates": [
+        [
+          "rustfmt"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "rustup component add rustfmt"
+    }
+  ],
+  "run": [
+    {
+      "when": {
+        "files": [
+          "Cargo.toml"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "cargo",
+          "args": [
+            "run"
+          ]
+        }
+      ]
+    },
+    {
+      "steps": [
+        {
+          "phase": "build",
+          "tool": "rustc",
+          "args": [
+            "{entry}",
+            "-o",
+            "{out}",
+            "{flags}"
+          ]
+        },
+        {
+          "phase": "run",
+          "tool": "built",
+          "args": []
+        }
+      ]
+    }
+  ],
+  "test": [
+    {
+      "when": {
+        "files": [
+          "Cargo.toml"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "test",
+          "tool": "cargo",
+          "args": [
+            "test"
+          ]
+        }
+      ]
+    }
+  ],
+  "formatter": {
+    "phase": "run",
+    "tool": "rustfmt",
+    "args": [
+      "{entry}"
+    ]
+  },
+  "debug": {
+    "adapter": "lldb-dap",
+    "args": [],
+    "install": "install LLVM (lldb-dap)"
+  }
+}
