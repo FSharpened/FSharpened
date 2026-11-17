@@ -1,0 +1,50 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "scala",
+  "name": "Scala",
+  "extensions": [
+    ".scala",
+    ".sc"
+  ],
+  "scope": "source.scala",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "tools": [
+    {
+      "id": "scala-cli",
+      "label": "Scala CLI",
+      "candidates": [
+        [
+          "scala-cli"
+        ]
+      ],
+      "version": [
+        "version"
+      ],
+      "install": "https://scala-cli.virtuslab.org"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "scala-cli",
+          "args": [
+            "run",
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

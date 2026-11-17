@@ -1,0 +1,48 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "julia",
+  "name": "Julia",
+  "extensions": [
+    ".jl"
+  ],
+  "scope": "source.julia",
+  "comments": {
+    "line": "#",
+    "block": [
+      "#=",
+      "=#"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "tools": [
+    {
+      "id": "julia",
+      "label": "Julia",
+      "candidates": [
+        [
+          "julia"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://julialang.org/downloads/"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "julia",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

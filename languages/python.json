@@ -1,0 +1,75 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "python",
+  "name": "Python",
+  "extensions": [
+    ".py",
+    ".pyw",
+    ".pyi"
+  ],
+  "scope": "source.python",
+  "comments": {
+    "line": "#"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "pyright-langserver",
+    "args": [
+      "--stdio"
+    ],
+    "install": "npm install -g pyright"
+  },
+  "tools": [
+    {
+      "id": "python",
+      "label": "Python",
+      "candidates": [
+        [
+          "python3"
+        ],
+        [
+          "python"
+        ],
+        [
+          "py",
+          "-3"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://www.python.org/downloads/"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "python",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ],
+  "test": [
+    {
+      "steps": [
+        {
+          "phase": "test",
+          "tool": "python",
+          "args": [
+            "-m",
+            "unittest",
+            "discover"
+          ]
+        }
+      ]
+    }
+  ]
+}

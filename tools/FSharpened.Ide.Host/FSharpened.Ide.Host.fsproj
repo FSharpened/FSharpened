@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Host services of the FSharpened desktop IDE (ADR-0023): language packs, run plans, the local runner, project trust, tool probes and the workspace on disk. No UI reference, so everything that can touch the machine is tested without a window.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="LanguagePack.fs" />
+    <Compile Include="Proc.fs" />
+    <Compile Include="Tools.fs" />
+    <Compile Include="Plans.fs" />
+    <Compile Include="Trust.fs" />
+    <Compile Include="DiskWorkspace.fs" />
+    <Compile Include="Git.fs" />
+    <Compile Include="Lsp.fs" />
+    <Compile Include="Interpret.fs" />
+    <Compile Include="Runner.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Ide\FSharpened.Ide.fsproj" />
+    <ProjectReference Include="..\..\src\FSharpened.Platform\FSharpened.Platform.fsproj" />
+  </ItemGroup>
+
+</Project>

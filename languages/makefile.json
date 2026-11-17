@@ -1,0 +1,21 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "makefile",
+  "name": "Makefile",
+  "extensions": [
+    ".mk"
+  ],
+  "filenames": [
+    "Makefile",
+    "makefile",
+    "GNUmakefile"
+  ],
+  "scope": "source.makefile",
+  "comments": {
+    "line": "#"
+  },
+  "indent": {
+    "tabs": true,
+    "size": 4
+  }
+}

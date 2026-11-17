@@ -1,0 +1,46 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "perl",
+  "name": "Perl",
+  "extensions": [
+    ".pl",
+    ".pm",
+    ".t"
+  ],
+  "scope": "source.perl",
+  "comments": {
+    "line": "#"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "tools": [
+    {
+      "id": "perl",
+      "label": "Perl",
+      "candidates": [
+        [
+          "perl"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://www.perl.org/get.html"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "perl",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

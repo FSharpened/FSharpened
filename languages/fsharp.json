@@ -1,0 +1,126 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "fsharp",
+  "name": "F#",
+  "extensions": [
+    ".fs",
+    ".fsx",
+    ".fsi"
+  ],
+  "scope": "source.fsharp",
+  "comments": {
+    "line": "//",
+    "block": [
+      "(*",
+      "*)"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "fsautocomplete",
+    "args": [],
+    "install": "dotnet tool install -g fsautocomplete"
+  },
+  "tools": [
+    {
+      "id": "dotnet",
+      "label": ".NET SDK",
+      "candidates": [
+        [
+          "dotnet"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://dotnet.microsoft.com/download"
+    }
+  ],
+  "run": [
+    {
+      "when": {
+        "entryExtensions": [
+          ".fsx"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "dotnet",
+          "args": [
+            "fsi",
+            "{entry}"
+          ]
+        }
+      ]
+    },
+    {
+      "when": {
+        "files": [
+          "*.fsproj"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "dotnet",
+          "args": [
+            "run"
+          ]
+        }
+      ]
+    }
+  ],
+  "test": [
+    {
+      "when": {
+        "files": [
+          "*.fsproj"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "test",
+          "tool": "dotnet",
+          "args": [
+            "test"
+          ]
+        }
+      ]
+    },
+    {
+      "when": {
+        "files": [
+          "*.sln"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "test",
+          "tool": "dotnet",
+          "args": [
+            "test"
+          ]
+        }
+      ]
+    }
+  ],
+  "formatter": {
+    "phase": "run",
+    "tool": "dotnet",
+    "args": [
+      "fantomas",
+      "{entry}"
+    ]
+  },
+  "debug": {
+    "adapter": "netcoredbg",
+    "args": [
+      "--interpreter=vscode"
+    ],
+    "install": "https://github.com/Samsung/netcoredbg"
+  }
+}

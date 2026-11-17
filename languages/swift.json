@@ -1,0 +1,53 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "swift",
+  "name": "Swift",
+  "extensions": [
+    ".swift"
+  ],
+  "scope": "source.swift",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "sourcekit-lsp",
+    "args": [],
+    "install": "installed with the Swift toolchain"
+  },
+  "tools": [
+    {
+      "id": "swift",
+      "label": "Swift",
+      "candidates": [
+        [
+          "swift"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://www.swift.org/install/"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "swift",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

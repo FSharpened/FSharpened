@@ -2,6 +2,7 @@
 
 Live: https://fsharpened.pages.dev/ide/ (gateway: https://ide.fsharpened.workers.dev).
 
+The native desktop IDE (same layout and themes, runs your own toolchain) is described in `docs/operations/desktop.md`.
 
 ## Languages
 Eighteen, in five groups. A file's language comes from its extension, so one project can mix them; the Compiler, Flags and Examples controls follow the open file. Every language really compiles or interprets and runs; none is simulated.

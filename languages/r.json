@@ -1,0 +1,53 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "r",
+  "name": "R",
+  "extensions": [
+    ".r"
+  ],
+  "scope": "source.r",
+  "comments": {
+    "line": "#"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "R",
+    "args": [
+      "--slave",
+      "-e",
+      "languageserver::run()"
+    ],
+    "install": "install.packages('languageserver') in R"
+  },
+  "tools": [
+    {
+      "id": "rscript",
+      "label": "R (Rscript)",
+      "candidates": [
+        [
+          "Rscript"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://cran.r-project.org"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "rscript",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

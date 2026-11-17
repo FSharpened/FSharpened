@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>FSharpened.Ide.Desktop</AssemblyName>
+    <Description>The FSharpened desktop IDE (ADR-0023): a native Avalonia window in F# over the same core as the website IDE.</Description>
+    <IsPackable>false</IsPackable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Ext.fs" />
+    <Compile Include="Palette.fs" />
+    <Compile Include="Session.fs" />
+    <Compile Include="Dialogs.fs" />
+    <Compile Include="MainWindow.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" />
+    <PackageReference Include="AvaloniaEdit.TextMate" />
+    <PackageReference Include="TextMateSharp.Grammars" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpened.Ide\FSharpened.Ide.fsproj" />
+    <ProjectReference Include="..\FSharpened.Ide.Host\FSharpened.Ide.Host.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Language packs ship next to the program; the user's own go in the app data folder. -->
+    <Content Include="..\..\languages\*.json" Link="languages\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

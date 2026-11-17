@@ -1,0 +1,100 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "csharp",
+  "name": "C#",
+  "extensions": [
+    ".cs",
+    ".csx"
+  ],
+  "scope": "source.cs",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "csharp-ls",
+    "args": [],
+    "install": "dotnet tool install -g csharp-ls"
+  },
+  "tools": [
+    {
+      "id": "dotnet",
+      "label": ".NET SDK",
+      "candidates": [
+        [
+          "dotnet"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://dotnet.microsoft.com/download"
+    }
+  ],
+  "run": [
+    {
+      "when": {
+        "files": [
+          "*.csproj"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "dotnet",
+          "args": [
+            "run"
+          ]
+        }
+      ]
+    }
+  ],
+  "test": [
+    {
+      "when": {
+        "files": [
+          "*.sln"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "test",
+          "tool": "dotnet",
+          "args": [
+            "test"
+          ]
+        }
+      ]
+    },
+    {
+      "when": {
+        "files": [
+          "*.csproj"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "test",
+          "tool": "dotnet",
+          "args": [
+            "test"
+          ]
+        }
+      ]
+    }
+  ],
+  "debug": {
+    "adapter": "netcoredbg",
+    "args": [
+      "--interpreter=vscode"
+    ],
+    "install": "https://github.com/Samsung/netcoredbg"
+  }
+}
