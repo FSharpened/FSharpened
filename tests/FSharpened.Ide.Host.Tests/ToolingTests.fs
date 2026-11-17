@@ -42,14 +42,14 @@ let private withServer
     (script: JsonElement -> (string -> unit) -> unit)
     (f: LspClient -> (string * LspDiagnostic list) list ref -> unit)
     =
-    use toServer = new AnonymousPipeServerStream(PipeDirection.Out)
+    let toServer = new AnonymousPipeServerStream(PipeDirection.Out)
 
-    use serverIn =
+    let serverIn =
         new AnonymousPipeClientStream(PipeDirection.In, toServer.ClientSafePipeHandle)
 
-    use fromServer = new AnonymousPipeServerStream(PipeDirection.Out)
+    let fromServer = new AnonymousPipeServerStream(PipeDirection.Out)
 
-    use clientIn =
+    let clientIn =
         new AnonymousPipeClientStream(PipeDirection.In, fromServer.ClientSafePipeHandle)
 
     let reply (json: string) =
@@ -82,7 +82,16 @@ let private withServer
     let client =
         LspClient(clientIn, toServer, (fun p d -> seen.Value <- (p, d) :: seen.Value))
 
-    f client seen
+    try
+        f client seen
+    finally
+        // Close the writing ends first so both readers see the end of the stream and stop. Disposing a read end while
+        // another thread is blocked reading it never returns on Linux.
+        toServer.Dispose()
+        fromServer.Dispose()
+        thread.Join(5000) |> ignore
+        serverIn.Dispose()
+        clientIn.Dispose()
 
 let private idOf (m: JsonElement) = m.GetProperty("id").GetRawText()
 
