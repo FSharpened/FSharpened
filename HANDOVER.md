@@ -47,5 +47,7 @@ VS Code-style features in the page (ADR-0022, Proposed; PLAN P7.1 to P7.3): comm
 ## CI status
 `python tools/ci/fsh_ci.py run --profile release` is green on win-x64 (preflight, docs-drift, selftest, Fantomas, strict build, 9 tests, NativeAOT publish + run, 30 packages). `.github/workflows/ci.yml` runs it on the six-RID matrix (win-arm64 experimental); results are recorded below once the first run completes.
 
+Local pipeline (2026-11-17): hardened for a machine under memory pressure (governor, infrastructure retry, process-tree timeouts, lazy build), with `doctor`, `status`, `watch`, a `--profile all` that also runs the web, gateway, hub and site stages, and a `release` bundle with `verify`; see `docs/operations/local-ci.md`. On win-x64 `full` passes in about 70 s cold and 5 s warm, `all` in about 3 min, with 316 tests.
+
 ## Exact Next Action
 Run `dotnet fantomas --check .` (after `dotnet tool restore`) and fix formatting; then copy `pipelines/github-actions/ci.yml` to `.github/workflows/`, fix whatever the six-RID matrix and per-RID `PublishAot` publish expose (the CLI may need trimming/AOT fixes), and record per-RID results here. Then start P0.5.2 (thread-safe `StatepointGraph`).
