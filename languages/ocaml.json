@@ -1,0 +1,53 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "ocaml",
+  "name": "OCaml",
+  "extensions": [
+    ".ml",
+    ".mli"
+  ],
+  "scope": "source.ocaml",
+  "comments": {
+    "block": [
+      "(*",
+      "*)"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "ocamllsp",
+    "args": [],
+    "install": "opam install ocaml-lsp-server"
+  },
+  "tools": [
+    {
+      "id": "ocaml",
+      "label": "OCaml",
+      "candidates": [
+        [
+          "ocaml"
+        ]
+      ],
+      "version": [
+        "-version"
+      ],
+      "install": "https://ocaml.org/install"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "ocaml",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "toml",
+  "name": "TOML",
+  "extensions": [
+    ".toml"
+  ],
+  "filenames": [
+    "Cargo.lock"
+  ],
+  "scope": "source.toml",
+  "comments": {
+    "line": "#"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "taplo",
+    "args": [
+      "lsp",
+      "stdio"
+    ],
+    "install": "cargo install taplo-cli --locked"
+  }
+}

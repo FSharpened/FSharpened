@@ -1,0 +1,27 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "html",
+  "name": "HTML",
+  "extensions": [
+    ".html",
+    ".htm"
+  ],
+  "scope": "text.html.basic",
+  "comments": {
+    "block": [
+      "<!--",
+      "-->"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "vscode-html-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "install": "npm install -g vscode-langservers-extracted"
+  }
+}

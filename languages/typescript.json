@@ -1,0 +1,59 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "typescript",
+  "name": "TypeScript",
+  "extensions": [
+    ".ts",
+    ".mts",
+    ".cts",
+    ".tsx"
+  ],
+  "scope": "source.ts",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "typescript-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "install": "npm install -g typescript typescript-language-server"
+  },
+  "tools": [
+    {
+      "id": "node",
+      "label": "Node.js",
+      "candidates": [
+        [
+          "node"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://nodejs.org"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "node",
+          "args": [
+            "--experimental-strip-types",
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

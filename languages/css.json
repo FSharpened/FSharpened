@@ -1,0 +1,28 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "css",
+  "name": "CSS",
+  "extensions": [
+    ".css",
+    ".scss",
+    ".less"
+  ],
+  "scope": "source.css",
+  "comments": {
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "vscode-css-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "install": "npm install -g vscode-langservers-extracted"
+  }
+}

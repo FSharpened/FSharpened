@@ -1,0 +1,57 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "powershell",
+  "name": "PowerShell",
+  "extensions": [
+    ".ps1",
+    ".psm1",
+    ".psd1"
+  ],
+  "scope": "source.powershell",
+  "comments": {
+    "line": "#",
+    "block": [
+      "<#",
+      "#>"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "tools": [
+    {
+      "id": "pwsh",
+      "label": "PowerShell",
+      "candidates": [
+        [
+          "pwsh"
+        ],
+        [
+          "powershell"
+        ]
+      ],
+      "version": [
+        "-NoProfile",
+        "-Command",
+        "$PSVersionTable.PSVersion.ToString()"
+      ],
+      "install": "https://aka.ms/powershell"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "pwsh",
+          "args": [
+            "-NoProfile",
+            "-File",
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

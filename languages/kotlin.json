@@ -1,0 +1,78 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "kotlin",
+  "name": "Kotlin",
+  "extensions": [
+    ".kt",
+    ".kts"
+  ],
+  "scope": "source.kotlin",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "kotlin-language-server",
+    "args": [],
+    "install": "https://github.com/fwcd/kotlin-language-server"
+  },
+  "tools": [
+    {
+      "id": "kotlinc",
+      "label": "Kotlin compiler",
+      "candidates": [
+        [
+          "kotlinc"
+        ]
+      ],
+      "version": [
+        "-version"
+      ],
+      "install": "https://kotlinlang.org/docs/command-line.html"
+    },
+    {
+      "id": "java",
+      "label": "Java",
+      "candidates": [
+        [
+          "java"
+        ]
+      ],
+      "version": [
+        "-version"
+      ],
+      "install": "https://adoptium.net"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "build",
+          "tool": "kotlinc",
+          "args": [
+            "{entry}",
+            "-include-runtime",
+            "-d",
+            "{dir}/fsh-out.jar"
+          ]
+        },
+        {
+          "phase": "run",
+          "tool": "java",
+          "args": [
+            "-jar",
+            "{dir}/fsh-out.jar"
+          ]
+        }
+      ]
+    }
+  ]
+}

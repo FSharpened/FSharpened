@@ -1,0 +1,50 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "zig",
+  "name": "Zig",
+  "extensions": [
+    ".zig"
+  ],
+  "scope": "source.zig",
+  "comments": {
+    "line": "//"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "zls",
+    "args": [],
+    "install": "https://github.com/zigtools/zls"
+  },
+  "tools": [
+    {
+      "id": "zig",
+      "label": "Zig",
+      "candidates": [
+        [
+          "zig"
+        ]
+      ],
+      "version": [
+        "version"
+      ],
+      "install": "https://ziglang.org/download/"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "zig",
+          "args": [
+            "run",
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

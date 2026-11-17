@@ -1,0 +1,27 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "xml",
+  "name": "XML",
+  "extensions": [
+    ".xml",
+    ".xaml",
+    ".axaml",
+    ".csproj",
+    ".fsproj",
+    ".vbproj",
+    ".props",
+    ".targets",
+    ".svg"
+  ],
+  "scope": "text.xml",
+  "comments": {
+    "block": [
+      "<!--",
+      "-->"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  }
+}

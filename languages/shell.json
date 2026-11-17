@@ -1,0 +1,58 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "shell",
+  "name": "Shell script",
+  "extensions": [
+    ".sh",
+    ".bash",
+    ".zsh"
+  ],
+  "filenames": [
+    ".bashrc",
+    ".bash_profile",
+    ".zshrc"
+  ],
+  "scope": "source.shell",
+  "comments": {
+    "line": "#"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "bash-language-server",
+    "args": [
+      "start"
+    ],
+    "install": "npm install -g bash-language-server"
+  },
+  "tools": [
+    {
+      "id": "bash",
+      "label": "Bash",
+      "candidates": [
+        [
+          "bash"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "install bash"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "bash",
+          "args": [
+            "{entry}"
+          ]
+        }
+      ]
+    }
+  ]
+}

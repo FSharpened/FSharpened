@@ -1,0 +1,24 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "yaml",
+  "name": "YAML",
+  "extensions": [
+    ".yaml",
+    ".yml"
+  ],
+  "scope": "source.yaml",
+  "comments": {
+    "line": "#"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  },
+  "server": {
+    "command": "yaml-language-server",
+    "args": [
+      "--stdio"
+    ],
+    "install": "npm install -g yaml-language-server"
+  }
+}

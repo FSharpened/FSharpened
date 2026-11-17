@@ -1,0 +1,98 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "cpp",
+  "name": "C++",
+  "extensions": [
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".hpp",
+    ".hh",
+    ".hxx"
+  ],
+  "scope": "source.cpp",
+  "comments": {
+    "line": "//",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "server": {
+    "command": "clangd",
+    "args": [],
+    "install": "install clangd (LLVM)"
+  },
+  "tools": [
+    {
+      "id": "c++",
+      "label": "C++ compiler",
+      "candidates": [
+        [
+          "g++"
+        ],
+        [
+          "clang++"
+        ],
+        [
+          "c++"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "install g++ or clang++"
+    },
+    {
+      "id": "clang-format",
+      "label": "clang-format",
+      "candidates": [
+        [
+          "clang-format"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "install clang-format"
+    }
+  ],
+  "run": [
+    {
+      "steps": [
+        {
+          "phase": "build",
+          "tool": "c++",
+          "args": [
+            "{entry}",
+            "-o",
+            "{out}",
+            "{flags}"
+          ]
+        },
+        {
+          "phase": "run",
+          "tool": "built",
+          "args": []
+        }
+      ]
+    }
+  ],
+  "formatter": {
+    "phase": "run",
+    "tool": "clang-format",
+    "args": [
+      "-i",
+      "{entry}"
+    ]
+  },
+  "debug": {
+    "adapter": "lldb-dap",
+    "args": [],
+    "install": "install LLVM (lldb-dap)"
+  }
+}

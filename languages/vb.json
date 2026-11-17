@@ -1,0 +1,49 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "vb",
+  "name": "Visual Basic",
+  "extensions": [
+    ".vb"
+  ],
+  "scope": "source.asp.vb.net",
+  "comments": {
+    "line": "'"
+  },
+  "indent": {
+    "tabs": false,
+    "size": 4
+  },
+  "tools": [
+    {
+      "id": "dotnet",
+      "label": ".NET SDK",
+      "candidates": [
+        [
+          "dotnet"
+        ]
+      ],
+      "version": [
+        "--version"
+      ],
+      "install": "https://dotnet.microsoft.com/download"
+    }
+  ],
+  "run": [
+    {
+      "when": {
+        "files": [
+          "*.vbproj"
+        ]
+      },
+      "steps": [
+        {
+          "phase": "run",
+          "tool": "dotnet",
+          "args": [
+            "run"
+          ]
+        }
+      ]
+    }
+  ]
+}

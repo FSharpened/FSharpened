@@ -30,6 +30,9 @@ Live at https://fsharpened.pages.dev/ide/ (ADR-0018, `docs/operations/ide.md`). 
 ## IDE workbench (added 2026-11-16, not deployed, uncommitted)
 VS Code-style features in the page (ADR-0022, Proposed; PLAN P7.1 to P7.3): command palette, quick open, search and replace, outline, multi-cursor, snippets, settings, themes, status-bar pickers, right-click menus, import of `.vsix`/theme/snippets/`settings.json` as data, and Download for VS Code. Details and limits: `docs/operations/ide.md`; what was verified and what was not: `docs/STATUS.md`. **GitHub Copilot and extension code cannot run in the page** (proprietary, needs GitHub, CSP forbids foreign code); the export recommends `GitHub.copilot` and `GitHub.copilot-chat` to VS Code instead. Rebuild before deploying: `cd ide/web && npm run build`, `python tools/site/build.py --require-ide`, `python tools/site/check.py`; the gateway is unchanged. Remaining Phase 6 items (pipelines, chess project, live view, linter, Community Projects, Workers AI, rust-rtpc, atomic FSharpened, the agent) are not started. Needs a human: accept ADRs 0019 to 0022 (all still Proposed), the rust-rtpc licence and `fsharpened-rtpc` repository decisions, committing this large working tree, review and merge of PR #9, and the deploy.
 
+## Desktop IDE (added 2026-11-17, uncommitted, not released)
+`tools/FSharpened.Ide.Desktop` (Avalonia, F#) over `tools/FSharpened.Ide.Host` (language packs in `languages/`, runner, trust, disk workspace, Git, language-server client) and the shared core; ADR-0023 (Proposed), PLAN P7.7, guide `docs/operations/desktop.md`. Full CI green on win-x64 (316 tests, 0 warnings); the Host tests also pass on Ubuntu (WSL, .NET 9.0.321). Checked in the real window with `--screenshot` (Go ran, a Go compile error became a problem, scripted language-server problems drew as underlines). Also built: hover box, replace in files, a line-based terminal (no pseudo-terminal), grammars for Haskell, OCaml, Elixir, Kotlin, Scala, Zig and TOML. Not built: pseudo-terminal, debugger, Rust natives, split editors; no VS Code extensions or Copilot. Not run on Linux or macOS. Run: `dotnet run --project tools/FSharpened.Ide.Desktop -- <folder>`.
+
 ## Open TODOs
 - [x] First build and test (P0.7) - fixed: FSharp.Core must be referenced explicitly under central package management; `RollForward=LatestMajor` so net8.0 tests run on SDK-only 9.x machines.
 - [ ] **P0** - Fill `LICENSE` with full Apache-2.0 text (human).
@@ -43,6 +46,8 @@ VS Code-style features in the page (ADR-0022, Proposed; PLAN P7.1 to P7.3): comm
 
 ## CI status
 `python tools/ci/fsh_ci.py run --profile release` is green on win-x64 (preflight, docs-drift, selftest, Fantomas, strict build, 9 tests, NativeAOT publish + run, 30 packages). `.github/workflows/ci.yml` runs it on the six-RID matrix (win-arm64 experimental); results are recorded below once the first run completes.
+
+Local pipeline (2026-11-17): hardened for a machine under memory pressure (governor, infrastructure retry, process-tree timeouts, lazy build), with `doctor`, `status`, `watch`, a `--profile all` that also runs the web, gateway, hub and site stages, and a `release` bundle with `verify`; see `docs/operations/local-ci.md`. On win-x64 `full` passes in about 70 s cold and 5 s warm, `all` in about 3 min, with 316 tests.
 
 ## Exact Next Action
 Run `dotnet fantomas --check .` (after `dotnet tool restore`) and fix formatting; then copy `pipelines/github-actions/ci.yml` to `.github/workflows/`, fix whatever the six-RID matrix and per-RID `PublishAot` publish expose (the CLI may need trimming/AOT fixes), and record per-RID results here. Then start P0.5.2 (thread-safe `StatepointGraph`).

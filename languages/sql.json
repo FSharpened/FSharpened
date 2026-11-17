@@ -1,0 +1,20 @@
+{
+  "format": "fsharpened.language/1",
+  "id": "sql",
+  "name": "SQL",
+  "extensions": [
+    ".sql"
+  ],
+  "scope": "source.sql",
+  "comments": {
+    "line": "--",
+    "block": [
+      "/*",
+      "*/"
+    ]
+  },
+  "indent": {
+    "tabs": false,
+    "size": 2
+  }
+}
