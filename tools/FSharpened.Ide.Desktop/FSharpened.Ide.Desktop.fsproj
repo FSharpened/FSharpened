@@ -20,6 +20,26 @@
     <Compile Include="TerminalView.fs" />
     <Compile Include="Dialogs.fs" />
     <Compile Include="Gutter.fs" />
+    <Compile Include="Model.fs" />
+    <Compile Include="Ui.fs" />
+    <Compile Include="Appearance.fs" />
+    <Compile Include="StatusBar.fs" />
+    <Compile Include="Problems.fs" />
+    <Compile Include="TerminalPanel.fs" />
+    <Compile Include="LanguageServers.fs" />
+    <Compile Include="HoverPanel.fs" />
+    <Compile Include="EditorTabs.fs" />
+    <Compile Include="RunPanel.fs" />
+    <Compile Include="RenameFeature.fs" />
+    <Compile Include="DebugPanel.fs" />
+    <Compile Include="Explorer.fs" />
+    <Compile Include="SidebarViews.fs" />
+    <Compile Include="FolderSession.fs" />
+    <Compile Include="Commands.fs" />
+    <Compile Include="CommandPalette.fs" />
+    <Compile Include="Menus.fs" />
+    <Compile Include="Layout.fs" />
+    <Compile Include="Wiring.fs" />
     <Compile Include="MainWindow.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
