@@ -90,6 +90,9 @@ def augment_path(env: dict) -> dict:
 
 def base_env() -> dict:
     env = augment_path(dict(os.environ))
+    # a git hook runs with the repository's own variables set; tests that make a scratch repository must not inherit them
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"):
+        env.pop(name, None)
     env.update(
         {
             "CI": "true",  # strict mode: warnings are errors (Directory.Build.props)
