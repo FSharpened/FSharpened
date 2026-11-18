@@ -276,7 +276,8 @@ export function createEditor(parent, { onChange, onRun, onCursor = () => {}, sni
   const prefs = new Compartment();
   let cfg = { ...DEFAULTS };
   let version = 0;
-  const labelOf = (name) => label.of(EditorView.contentAttributes.of({ "aria-label": (name || "No file") + " source code editor" }));
+  // tabindex 0 on the (already focusable) content tells scanners that the scrolling editor can be reached by keyboard
+  const labelOf = (name) => label.of(EditorView.contentAttributes.of({ "aria-label": (name || "No file") + " source code editor", tabindex: "0" }));
   const makeState = (lang, doc, name) => {
     versionOf.set(name, version);
     return EditorState.create({
@@ -370,7 +371,7 @@ export function createEditor(parent, { onChange, onRun, onCursor = () => {}, sni
       }
       langOf.set(to, lang);
       versionOf.set(to, was);
-      const effects = label.reconfigure(EditorView.contentAttributes.of({ "aria-label": to + " source code editor" }));
+      const effects = label.reconfigure(EditorView.contentAttributes.of({ "aria-label": to + " source code editor", tabindex: "0" }));
       if (live) { view.dispatch({ effects }); states.set(to, view.state); }
       else states.set(to, st.update({ effects }).state);
     },

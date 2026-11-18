@@ -223,14 +223,18 @@ function renderTabs() {
     const on = p === cur.active;
     const dup = names.filter((n) => n === names[i]).length > 1;
     const tab = el("button", { type: "button", role: "tab", "aria-selected": String(on), tabindex: on ? "0" : "-1", "data-path": p, title: p + " (Delete closes the tab)" }, names[i], dup ? el("span", { class: "dir" }, " " + (dirOf(p) || "/")) : null);
-    const x = el("button", { type: "button", class: "x", "aria-label": "Close " + p, tabindex: "-1", title: "Close" }, "×");
+    // The close button is a mouse and touch convenience: it is not a tab, so it is kept out of the tablist (aria-hidden) and out of the
+    // tab order. The keyboard closes a tab with Delete, and the palette and the tab menu have Close Editor.
+    const x = el("button", { type: "button", class: "x", "aria-hidden": "true", tabindex: "-1", title: "Close" }, "×");
     tab.addEventListener("click", () => openFile(p));
     x.addEventListener("click", () => closeFile(p));
     tab.addEventListener("auxclick", (e) => { if (e.button === 1) { e.preventDefault(); closeFile(p); } });
-    return el("span", { class: "ftab" + (on ? " on" : "") }, tab, x);
+    return el("span", { class: "ftab" + (on ? " on" : ""), role: "presentation" }, tab, x);
   });
+  const hadFocus = ui.ftabs.contains(document.activeElement);
   ui.ftabs.replaceChildren(...nodes);
   revealActiveTab();
+  if (hadFocus) ui.ftabs.querySelector('[aria-selected="true"]')?.focus(); // the redraw replaced the focused tab: keep the keyboard on the open one
 }
 /** The strip scrolls when many files are open; keep the selected tab in view without scrolling anything else. */
 function revealActiveTab() {

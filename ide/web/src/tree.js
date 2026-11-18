@@ -90,6 +90,7 @@ export function createTree(host, { langName, onOpen, onSelect, onCollapse }) {
     const i = list.indexOf(document.activeElement);
     if (i < 0 || e.altKey || e.ctrlKey || e.metaKey) return;
     const r = rowOf(list[i].dataset.path);
+    if (selected !== r.path) select(r.path, false); // the item the keyboard is on is the selected one, so a redraw keeps focus on it
     let handled = true;
     switch (e.key) {
       case "ArrowDown": if (i + 1 < list.length) select(list[i + 1].dataset.path, true); break;
