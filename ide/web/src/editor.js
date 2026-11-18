@@ -1,5 +1,5 @@
-import { EditorState, Compartment, EditorSelection, countColumn } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, dropCursor, rectangularSelection, crosshairCursor, highlightWhitespace } from "@codemirror/view";
+import { EditorState, Compartment, EditorSelection, countColumn, StateField, StateEffect } from "@codemirror/state";
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, dropCursor, rectangularSelection, crosshairCursor, highlightWhitespace, Decoration, WidgetType } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentMore, indentLess, toggleComment, toggleBlockComment, copyLineDown, copyLineUp, moveLineDown, moveLineUp, deleteLine, deleteTrailingWhitespace, indentSelection, undo, redo, selectAll } from "@codemirror/commands";
 import { StreamLanguage, syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, foldAll, unfoldAll, indentUnit } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap, autocompletion, completionKeymap, snippet, acceptCompletion } from "@codemirror/autocomplete";
@@ -92,6 +92,7 @@ const theme = EditorView.theme({
   ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": { backgroundColor: "var(--brand-25)", outline: "1px solid var(--brand)" },
   ".cm-highlightSpace": { backgroundImage: "radial-gradient(circle at 50% 55%, var(--mut) 8%, transparent 9%)", backgroundSize: "1ch 100%", backgroundRepeat: "repeat-x" },
   ".cm-highlightTab": { backgroundImage: "linear-gradient(var(--mut), var(--mut))", backgroundSize: "100% 1px", backgroundRepeat: "no-repeat", backgroundPosition: "0 60%" },
+  ".cm-ghost": { color: "var(--mut)", opacity: "0.75", whiteSpace: "pre", fontStyle: "italic", pointerEvents: "none" },
   ".cm-snippetField": { backgroundColor: "var(--brand-14)", outline: "1px dotted var(--brand)" },
   ".cm-activeLine": { backgroundColor: "var(--brand-7)" },
   ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--fg)" },
@@ -147,6 +148,35 @@ function insertBody(view, host, body, from, to) {
   const made = host.snippetTemplate(body, { ...host.snippetContext(), selected });
   snippet(made.template)(view, null, from, to);
 }
+
+
+// ---- ghost text: one suggestion shown after the caret (AI completion, aicomplete.js). Any edit or caret move dismisses it.
+const setGhost = StateEffect.define();
+class GhostWidget extends WidgetType {
+  constructor(text) { super(); this.text = text; }
+  eq(other) { return other.text === this.text; }
+  toDOM() { const s = document.createElement("span"); s.className = "cm-ghost"; s.textContent = this.text; s.setAttribute("aria-hidden", "true"); return s; }
+  ignoreEvent() { return true; }
+}
+const ghostField = StateField.define({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setGhost)) return e.value;
+    return value && (tr.docChanged || tr.selection) ? null : value;
+  },
+  provide: (f) => EditorView.decorations.from(f, (g) => (g ? Decoration.set([Decoration.widget({ widget: new GhostWidget(g.text), side: 1 }).range(g.pos)]) : Decoration.none)),
+});
+const acceptGhost = (v) => {
+  const g = v.state.field(ghostField, false);
+  if (!g) return false;
+  v.dispatch({ changes: { from: g.pos, insert: g.text }, selection: { anchor: g.pos + g.text.length }, effects: setGhost.of(null), userEvent: "input.complete", scrollIntoView: true });
+  return true;
+};
+const clearGhost = (v) => { if (!v.state.field(ghostField, false)) return false; v.dispatch({ effects: setGhost.of(null) }); return true; };
+
+// Tab indents while the editor is "trapping" it; Escape releases the trap so keyboard users can leave (WCAG 2.1.2).
+// It was an undeclared global, which throws in a strict ES module on every focus and key press.
+let tabTraps = true;
 
 const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform ?? "");
 
@@ -281,13 +311,13 @@ export function createEditor(parent, { onChange, onRun, onCursor = () => {}, sni
         doc.includes("\r\n") ? EditorState.lineSeparator.of("\r\n") : [],
         EditorState.allowMultipleSelections.of(true),
         prefs.of(settingsExtensions(cfg)),
-        foldGutter(), history(), drawSelection(), dropCursor(), indentOnInput(), bracketMatching(),
+        ghostField, foldGutter(), history(), drawSelection(), dropCursor(), indentOnInput(), bracketMatching(),
         autocompletion({ override: [complete(lang, host)] }), highlightActiveLine(), highlightSelectionMatches(), lintGutter(),
         rectangularSelection({ eventFilter: (e) => e.altKey && e.shiftKey && e.button === 0 }), crosshairCursor(),
         EditorView.clickAddsSelectionRange.of((e) => e.altKey || (mac ? e.metaKey : e.ctrlKey)),
         modes[lang] ? StreamLanguage.define(modes[lang]) : [], syntaxHighlighting(highlight), theme,
         // Tab indents, but Escape releases it so keyboard users can leave the editor (WCAG 2.1.2).
-        keymap.of([{ key: "Escape", run: () => { tabTraps = false; return false; } }, { key: "Tab", run: (v) => acceptCompletion(v) || (tabTraps ? indentMore(v) : false), shift: (v) => (tabTraps ? indentLess(v) : false) },
+        keymap.of([{ key: "Escape", run: (v) => { tabTraps = false; clearGhost(v); return false; } }, { key: "Tab", run: (v) => acceptGhost(v) || acceptCompletion(v) || (tabTraps ? indentMore(v) : false), shift: (v) => (tabTraps ? indentLess(v) : false) },
           { key: "Mod-Enter", run: () => { onRun(); return true; } },
           { key: "Mod-h", run: openSearchPanel, preventDefault: true },
           { key: "Mod-Alt-ArrowUp", run: addCursor(false) }, { key: "Mod-Alt-ArrowDown", run: addCursor(true) },
@@ -451,6 +481,13 @@ export function createEditor(parent, { onChange, onRun, onCursor = () => {}, sni
       insertBody(view, host, body, r.from, r.to);
       view.focus();
     },
+    /** The open file's text and the caret offset, for AI completion. */
+    context: () => ({ text: view.state.sliceDoc(), cursor: view.state.selection.main.head }),
+    /** Show `text` after the caret as a suggestion (Tab accepts it, Escape or any edit dismisses it). */
+    showGhost(text) { view.dispatch({ effects: setGhost.of({ pos: view.state.selection.main.head, text }) }); },
+    hasGhost: () => !!view.state.field(ghostField, false),
+    acceptGhost: () => acceptGhost(view),
+    clearGhost: () => clearGhost(view),
     /** Run an editor command by name; false when there is no such command. */
     run(name) {
       const fn = commands[name];

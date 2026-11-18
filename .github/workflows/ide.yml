@@ -1,10 +1,10 @@
 name: ide
 on:
   pull_request:
-    paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**', 'tools/site/**', '.github/workflows/ide.yml']
+    paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**', 'src/FSharpened.Tooling/Completion/**', 'tools/site/**', '.github/workflows/ide.yml']
   push:
     branches: [main]
-    paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**']
+    paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**', 'src/FSharpened.Tooling/Completion/**']
 permissions:
   contents: read
 jobs:

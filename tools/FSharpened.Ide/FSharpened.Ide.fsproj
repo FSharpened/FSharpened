@@ -12,6 +12,13 @@
     <Compile Include="..\..\src\FSharpened.Platform\Overlay.fs" Link="Shared\Overlay.fs" />
     <Compile Include="..\..\src\FSharpened.Statepoints\Statepoints.fs" Link="Shared\Statepoints.fs" />
     <Compile Include="..\..\src\FSharpened.Diagnostics\Diagnostics.fs" Link="Shared\Diagnostics.fs" />
+    <!-- The completion provider interface lives in the Tooling pillar (ADR-0026); like the sources above it is compiled in place so Fable can reach it. -->
+    <Compile Include="..\..\src\FSharpened.Tooling\Completion\Types.fs" Link="Shared\Completion\Types.fs" />
+    <Compile Include="..\..\src\FSharpened.Tooling\Completion\Context.fs" Link="Shared\Completion\Context.fs" />
+    <Compile Include="..\..\src\FSharpened.Tooling\Completion\StaticProvider.fs" Link="Shared\Completion\StaticProvider.fs" />
+    <Compile Include="..\..\src\FSharpened.Tooling\Completion\Chain.fs" Link="Shared\Completion\Chain.fs" />
+    <Compile Include="..\..\src\FSharpened.Tooling\Completion\MiniJson.fs" Link="Shared\Completion\MiniJson.fs" />
+    <Compile Include="..\..\src\FSharpened.Tooling\Completion\WorkersAi.fs" Link="Shared\Completion\WorkersAi.fs" />
     <Compile Include="Languages.fs" />
     <Compile Include="Templates.fs" />
     <Compile Include="Diff.fs" />

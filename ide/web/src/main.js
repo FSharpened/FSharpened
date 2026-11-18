@@ -10,6 +10,7 @@ import { exportProjectZip, exportFolderZip, exportVsCodeZip, importArchive, impo
 import { decodeText } from "./archive.js";
 import { createPrefs } from "./settings.js";
 import { createWorkbench } from "./workbench.js";
+import { createAiCompletion } from "./aicomplete.js";
 
 const GATEWAY = __GATEWAY__;
 useManifestName(Core.manifestName);
@@ -105,6 +106,7 @@ const ui = {
 };
 let editor;
 let tree;
+let ai;                                          // opt-in AI completion (aicomplete.js, ADR-0026); off until enabled
 let prefs;                                       // editor settings, imported themes and snippets (settings.js)
 let wb;                                          // the workbench: palette, menus, search, outline, status bar (workbench.js)
 let backing;                                     // the storage everything is kept in: localStorage, or memory when blocked
@@ -976,7 +978,7 @@ const canRun = () => { const t = runTarget(); return !!(t && fileAt(t)); };
 
 /** What commands, menus and the palette may do. They never touch the page or the project except through this. */
 const app = {
-  Core, get editor() { return editor; }, get prefs() { return prefs; }, get storage() { return backing; },
+  Core, get editor() { return editor; }, get prefs() { return prefs; }, get ai() { return ai; }, get storage() { return backing; },
   toast, ask, narrow, setSide, showSide, showPanel, toggleSide: () => setSide(!sideOpen()),
   project: () => cur.project, projects: () => store.list(), currentProjectId: () => cur.id, langName,
   hasFile: () => !!fileAt(cur.active), activePath: () => cur.active, activeText, activeLanguage: activeLang, languageOf: pathLang,
@@ -1007,6 +1009,7 @@ async function init() {
     snippets: (lang) => prefs.snippetsFor(lang), snippetTemplate: (body, ctx) => Core.snippetTemplate(body, ctx), snippetContext: () => wb.snippetContext(),
   });
   editor.configure(prefs.settings);
+  ai = createAiCompletion({ storage: backing, editor, toast, snippets: (lang) => prefs.snippetsFor(lang), activeLanguage: activeLang, activePath: () => cur.active, hasFile: () => !!fileAt(cur.active), announce: toast });
   wb = createWorkbench(app);
   tree = createTree(ui.tree, {
     langName,

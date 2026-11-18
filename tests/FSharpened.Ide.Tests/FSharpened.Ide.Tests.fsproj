@@ -10,6 +10,7 @@
     <Compile Include="ProjectTests.fs" />
     <Compile Include="EditorTests.fs" />
     <Compile Include="VsCodeTests.fs" />
+    <Compile Include="CompletionTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

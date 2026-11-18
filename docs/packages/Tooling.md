@@ -12,7 +12,7 @@ VS Code companion, VSIX, headless language-server harness, SharpLsp gap closure 
 
 ## Public API
 
-_Skeleton: API surface is not yet defined._ When it is, list every public module and type here. The docs-drift check compares this section to the compiled assembly (see `docs/operations/ci.md`).
+_The pillar marker is still a skeleton._ The first real code is `FSharpened.Tooling.Completion` (ADR-0026): `CompletionRequest`, `Candidate`, `CompletionResult`, `ICompletionProvider`, `Context` (windowing, secret and sensitive-file filter), `StaticProvider`, `Chain`, `MiniJson` and `WorkersAi` (a provider that calls the `ai/` Worker through an injected transport). Pure F#, tested through `tests/FSharpened.Ide.Tests` because the browser IDE compiles the same files with Fable; see `docs/operations/ai.md`. The rest of the API surface is not yet defined. When it is, list every public module and type here. The docs-drift check compares this section to the compiled assembly (see `docs/operations/ci.md`).
 
 ## Usage
 

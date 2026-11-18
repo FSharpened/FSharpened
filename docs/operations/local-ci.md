@@ -22,7 +22,7 @@ python tools/ci/fsh_ci.py install-hooks        # pre-commit = fast, pre-push = f
 |---|---|---|
 | `fast` | preflight, docs-drift, selftest, tools-restore, format | the pre-commit gate, about 10 s |
 | `full` | fast + restore, build (strict), test, aot, rust, benchmarks | exactly what `ci.yml` runs on each RID. Keep it identical to that workflow |
-| `all` | full + web, gateway, hub, site | everything GitHub runs across `ci.yml`, `ide.yml`, `hub.yml` and `site.yml`; the JavaScript stages skip with a warning when Node is missing |
+| `all` | full + web, gateway, hub, ai, site | everything GitHub runs across `ci.yml`, `ide.yml`, `hub.yml`, `ai.yml` and `site.yml`; the JavaScript stages skip with a warning when Node is missing |
 | `release` | full + pack, bundle (requires NativeAOT; cache off) | a verified `artifacts/release/<commit>-<rid>/` bundle. Publishing it is a human step |
 
 ## Preflight (nothing else runs if it fails)
@@ -45,6 +45,7 @@ Python >= 3.10; git state; `dotnet` found and SDK >= the `global.json` pin (the 
 | `web` | the browser IDE: Fable compiles the F# core, esbuild bundles it, `node --test` checks it reads compiler output like .NET does, and the bundle is over 100 KB (`ide.yml`, job `web`) |
 | `gateway` | the IDE gateway worker: `tsc --noEmit` and vitest (`ide.yml`, job `gateway`) |
 | `hub` | the hub worker: `tsc --noEmit` and vitest (`hub.yml`) |
+| `ai` | the Workers AI worker (`ai/`, ADR-0026): `tsc --noEmit` and vitest against a mocked `AI` binding; nothing calls Cloudflare (`ai.yml`) |
 | `site` | icons current, site built, links/metadata/manifests/service-worker precache/CSP-safe markup checked, service-worker behaviour tests (`site.yml`) |
 
 ## Robustness

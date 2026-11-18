@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "ai": { "binding": "AI" },
+  "durable_objects": { "bindings": [ { "name": "LEDGER", "class_name": "BudgetLedger" } ] },
+  "migrations": [ { "tag": "v1", "new_sqlite_classes": ["BudgetLedger"] } ],
+  "vars": {
+    // The kill switch and the default: OFF. Nothing calls a model until a maintainer sets this to "true" (docs/operations/ai.md).
+    "AI_ENABLED": "false",
+    "ALLOWED_ORIGINS": "https://fsharpened.pages.dev,https://fsharpened.fsharpened.workers.dev",
+    "DEFAULT_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+    "AI_TIMEOUT_MS": "8000",
+    "CACHE_TTL_SECONDS": "3600",
+    "CALLER_REQUESTS_PER_MINUTE": "6",
+    "CALLER_REQUESTS_PER_DAY": "200",
+    "CALLER_TOKENS_PER_DAY": "40000",
+    "GLOBAL_REQUESTS_PER_MINUTE": "60",
+    "GLOBAL_REQUESTS_PER_DAY": "2000",
+    "GLOBAL_TOKENS_PER_DAY": "300000"
+  }
+}

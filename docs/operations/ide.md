@@ -132,3 +132,6 @@ After a deploy, run every language's first starter through the real gateway from
 
 ## Privacy
 Code is sent to Compiler Explorer or Wandbox (whichever serves the language) when the user presses Run; the page says so, naming both. Projects (files, tabs, input and compiler choices) live in the browser's local storage; snapshots live in memory until the page closes. Share links keep code in the URL fragment, which is never sent to a server. A `.vsix`, theme, snippets file or `settings.json` that you import is read inside the page and never uploaded; what is kept (themes, snippets, settings, recent commands) stays in this browser's local storage. Download for VS Code builds its zip in the page.
+
+## AI completion (opt-in)
+Off by default. The command palette has **AI: Enable AI Completion…** and **AI: Suggest Inline Completion** (`Alt+\`), which send a window around the caret of the open file to the Workers AI Worker (`ai/`, `docs/operations/ai.md`) once a person has turned it on. Not deployed yet; the page says what is sent before it is enabled.

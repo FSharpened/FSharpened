@@ -41,6 +41,7 @@ export const SHORTCUTS = [
     ["Mod+Shift+[ / Mod+Shift+]", "Fold / unfold the block"],
     ["Ctrl+Space", "Show suggestions, keywords and snippets"],
     ["Tab", "Accept a suggestion, or move to the next snippet field"],
+    ["Alt+\\", "Ask for an inline AI suggestion (opt-in, off by default). Tab accepts it, Escape dismisses it"],
   ] },
   { group: "Several cursors", items: [
     ["Alt+Click", "Add a cursor"],

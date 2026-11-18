@@ -1,0 +1,27 @@
+name: ai
+on:
+  pull_request:
+    paths: ['ai/**', '.github/workflows/ai.yml']
+  push:
+    branches: [main]
+    paths: ['ai/**']
+permissions:
+  contents: read
+jobs:
+  ai:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ai/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npx tsc --noEmit
+      - name: Tests (the AI binding, the Durable Object ledger and the cache are mocks; nothing calls Cloudflare)
+        run: npm test
