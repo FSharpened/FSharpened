@@ -10,6 +10,9 @@
     <Compile Include="DiskTests.fs" />
     <Compile Include="ReplaceTests.fs" />
     <Compile Include="TerminalTests.fs" />
+    <Compile Include="VtTests.fs" />
+    <Compile Include="TermKeysTests.fs" />
+    <Compile Include="PtyTests.fs" />
     <Compile Include="RunTests.fs" />
     <Compile Include="ToolingTests.fs" />
   </ItemGroup>

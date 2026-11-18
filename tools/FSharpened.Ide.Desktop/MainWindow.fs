@@ -290,26 +290,10 @@ type Shell(env: HostEnv) =
             FontSize = 12.0
         )
 
-    // the terminal panel: the user's shell on pipes (no pseudo-terminal), output above, one input line below
-    let termOutput =
-        TextBox(
-            IsReadOnly = true,
-            FontFamily = monoFont,
-            AcceptsReturn = true,
-            BorderThickness = Thickness 0.0,
-            TextWrapping = TextWrapping.NoWrap
-        )
+    // the terminal panel: the user's shell on a pseudo-terminal, drawn by a terminal view (PLAN P7.8)
+    let termView = TerminalView()
 
-    let termInput =
-        TextBox(
-            FontFamily = monoFont,
-            BorderThickness = Thickness(0.0, 1.0, 0.0, 0.0),
-            PlaceholderText = "Type a command and press Enter"
-        )
-
-    let mutable term: TermSession option = None
-    let termHistory = List<string>()
-    let mutable termHistoryAt = 0
+    let mutable term: TermBackend option = None
     let mutable terminalShownFn: unit -> unit = ignore
 
     let paletteInput =
@@ -390,6 +374,7 @@ type Shell(env: HostEnv) =
         editor.Options.ShowTabs <- e.RenderWhitespace
         editor.Options.IndentationSize <- e.TabSize
         editor.Options.ConvertTabsToSpaces <- e.InsertSpaces
+        termView.SetFont(monoFont, float (max 8 (e.FontSize - 1)))
         crumbs.IsVisible <- e.Breadcrumbs
 
     let savePrefs () = env.SavePrefs prefs
@@ -682,21 +667,9 @@ type Shell(env: HostEnv) =
         | _ -> ()
 
     // ---- terminal ---------------------------------------------------------------------------------
-    let termMaxChars = 200000
-
-    /// Appends text to the terminal view from any thread, keeping the last part when it grows large.
+    /// Shows a message in the terminal (our own lines, not the shell's).
     let termAppend (text: string) =
-        Dispatcher.UIThread.Post(fun () ->
-            let current = termOutput.Text |> Option.ofObj |> Option.defaultValue ""
-            let joined = current + text
-
-            termOutput.Text <-
-                if joined.Length > termMaxChars then
-                    joined.Substring(joined.Length - termMaxChars)
-                else
-                    joined
-
-            termOutput.CaretIndex <- termOutput.Text.Length)
+        termView.Feed(text.Replace("\r\n", "\n").Replace("\n", "\r\n"))
 
     let stopTerminal () =
         match term with
@@ -709,7 +682,7 @@ type Shell(env: HostEnv) =
     let startTerminal () =
         match root, term with
         | None, _ -> termAppend "Open a folder first: the terminal starts in it.\n"
-        | Some _, Some t when t.IsRunning -> ()
+        | Some _, Some t when t.IsRunning() -> ()
         | Some r, _ ->
             task {
                 let! allowed =
@@ -734,49 +707,50 @@ type Shell(env: HostEnv) =
                     }
 
                 if allowed then
-                    let shell = Terminal.defaultShell ()
+                    let ptyShell = Terminal.defaultInteractiveShell ()
+                    let pipeShell = Terminal.defaultShell ()
+                    let mutable started: TermBackend option = None
 
-                    let session =
-                        TermSession(
-                            shell,
-                            r,
-                            termAppend,
+                    let opened =
+                        TermBackends.openShell
+                            true
+                            ptyShell
+                            pipeShell
+                            r
+                            (max 20 termView.Cols)
+                            (max 5 termView.Rows)
+                            termView.Feed
                             (fun code ->
-                                termAppend (sprintf "\n[%s ended with code %d]\n" shell.Name code)
+                                termAppend (
+                                    sprintf
+                                        "\n[%s ended with code %d]\n"
+                                        (match started with
+                                         | Some b -> b.Shell.Name
+                                         | None -> ptyShell.Name)
+                                        code
+                                )
+
                                 Dispatcher.UIThread.Post(fun () -> term <- None))
-                        )
 
-                    match session.Start() with
-                    | Ok() ->
-                        term <- Some session
-
-                        termAppend (
-                            sprintf
-                                "%s in %s (no pseudo-terminal: full-screen programs and Ctrl+C do not work)\n"
-                                shell.Name
-                                r
-                        )
+                    match opened with
+                    | Ok(backend, note) ->
+                        started <- Some backend
+                        term <- Some backend
+                        note |> Option.iter (fun n -> termAppend (n + "\n"))
+                        termView.Focus() |> ignore
                     | Error e -> termAppend (e + "\n")
             }
             |> ignore
 
     let restartTerminal () =
         stopTerminal ()
-        termOutput.Text <- ""
+        termView.Clear()
         startTerminal ()
 
+    /// Sends a line to the shell, as if typed and followed by Enter.
     let sendTerminalLine (line: string) =
         match term with
-        | Some t when t.IsRunning ->
-            if
-                line.Trim() <> ""
-                && (termHistory.Count = 0 || termHistory[termHistory.Count - 1] <> line)
-            then
-                termHistory.Add line
-
-            termHistoryAt <- termHistory.Count
-            termAppend ("> " + line + "\n")
-            t.Send line
+        | Some t when t.IsRunning() -> t.Write(line + "\r")
         | _ -> termAppend "The shell is not running. Use Terminal: Restart.\n"
 
     do
@@ -784,6 +758,19 @@ type Shell(env: HostEnv) =
             (fun () ->
                 if term.IsNone then
                     startTerminal ())
+
+        // what is typed in the terminal goes to the shell; a window resize tells it the new size
+        termView.Input.Add(fun text ->
+            match term with
+            | Some t when t.IsRunning() -> t.Write text
+            | _ ->
+                if text.Contains '\r' then
+                    termAppend "The shell is not running. Use Terminal: Restart.\n")
+
+        termView.Resized.Add(fun (c, r) ->
+            match term with
+            | Some t -> t.Resize(c, r)
+            | None -> ())
 
     let stopServers () =
         for kv in lspSessions do
@@ -2093,7 +2080,7 @@ type Shell(env: HostEnv) =
               (fun () ->
                   setPanelVisible true
                   showPanel "terminal"
-                  termInput.Focus() |> ignore) }
+                  termView.Focus() |> ignore) }
           { Id = "terminal-restart"
             Title = "Terminal: Restart"
             Keys = ""
@@ -2105,7 +2092,7 @@ type Shell(env: HostEnv) =
           { Id = "terminal-clear"
             Title = "Terminal: Clear"
             Keys = ""
-            Run = (fun () -> termOutput.Text <- "") }
+            Run = (fun () -> termView.Clear()) }
           { Id = "explorer"
             Title = "View: Show Explorer"
             Keys = "Ctrl+Shift+E"
@@ -2587,21 +2574,21 @@ type Shell(env: HostEnv) =
         problemsHost.Children.Add problemsBox
         let inputHost = Grid()
         inputHost.Children.Add inputBox
-        let termHost = DockPanel()
-        DockPanel.SetDock(termInput, Dock.Bottom)
-        termHost.Children.Add termInput
-        termHost.Children.Add termOutput
+        let termHost = Grid()
+        termHost.Children.Add termView
 
         themed (fun r ->
             outputBox.Background <- r.EditorBg
             outputBox.Foreground <- r.Fg
             inputBox.Background <- r.EditorBg
             inputBox.Foreground <- r.Fg
-            termOutput.Background <- r.EditorBg
-            termOutput.Foreground <- r.Fg
-            termInput.Background <- r.EditorBg
-            termInput.Foreground <- r.Fg
-            termInput.BorderBrush <- r.Line)
+
+            let colorOf (b: IBrush) =
+                match b with
+                | :? ISolidColorBrush as s -> s.Color
+                | _ -> Colors.Magenta
+
+            termView.SetColors(colorOf r.Fg, colorOf r.EditorBg, r.Dark, colorOf r.Selection))
 
         let headerButtons = StackPanel(Orientation = Orientation.Horizontal)
         headerButtons.Children.Add(tabButton "output" "OUTPUT" outputHost)
@@ -2812,31 +2799,6 @@ type Shell(env: HostEnv) =
 
         editor.TextArea.Caret.PositionChanged.Add(fun _ -> updateStatus ())
 
-        termInput.KeyDown.Add(fun e ->
-            match e.Key with
-            | Key.Enter ->
-                e.Handled <- true
-                let line = termInput.Text |> Option.ofObj |> Option.defaultValue ""
-                termInput.Text <- ""
-                sendTerminalLine line
-            | Key.Up when termHistory.Count > 0 ->
-                e.Handled <- true
-                termHistoryAt <- max 0 (termHistoryAt - 1)
-                termInput.Text <- termHistory[termHistoryAt]
-                termInput.CaretIndex <- termInput.Text.Length
-            | Key.Down when termHistory.Count > 0 ->
-                e.Handled <- true
-                termHistoryAt <- min termHistory.Count (termHistoryAt + 1)
-
-                termInput.Text <-
-                    if termHistoryAt >= termHistory.Count then
-                        ""
-                    else
-                        termHistory[termHistoryAt]
-
-                termInput.CaretIndex <- termInput.Text.Length
-            | _ -> ())
-
         // hover: rest the pointer on code for a moment and a box appears; moving, typing or leaving hides it
         hoverTimer.Tick.Add(fun _ ->
             hoverTimer.Stop()
@@ -2947,7 +2909,12 @@ type Shell(env: HostEnv) =
                     e.Handled <- true
                     (command id).Run()
 
+                // a shell has its own use for most Ctrl keys: while it has the focus only a few shortcuts stay with the window
+                let terminalOwnsKey =
+                    termView.IsFocused && not (TerminalKeys.windowKeeps e.Key e.KeyModifiers)
+
                 match e.Key with
+                | _ when terminalOwnsKey -> ()
                 | Key.P when ctrl && shift -> pick "palette"
                 | Key.P when ctrl -> pick "quick-open"
                 | Key.G when ctrl -> pick "goto-line"
