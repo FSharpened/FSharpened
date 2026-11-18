@@ -7,6 +7,7 @@
   <ItemGroup>
     <Compile Include="Overlay.fs" />
     <Compile Include="Platform.fs" />
+    <Compile Include="Pty.fs" />
   </ItemGroup>
 
 </Project>

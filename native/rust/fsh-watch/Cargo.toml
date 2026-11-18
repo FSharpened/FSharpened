@@ -1,0 +1,21 @@
+[package]
+name = "fsh-watch"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+license = "Apache-2.0"
+description = "File watching and fast text search for the FSharpened desktop IDE (PLAN P7.8): a C-ABI library bound through FSharpened.Interop.Rust."
+
+[lib]
+# cdylib: the shared library .NET loads with NativeLibrary. The C ABI is the contract (ADR-0019).
+crate-type = ["cdylib"]
+
+[profile.release]
+# Every export runs in catch_unwind and reports a panic as a status code; "abort" would turn it into a process abort.
+panic = "unwind"
+
+[dependencies]
+ignore = "0.4.30"
+notify = "8.2.1"
+regex = "1.13.1"

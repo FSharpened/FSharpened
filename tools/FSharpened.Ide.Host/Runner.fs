@@ -24,7 +24,7 @@ module Runner =
     let maxTimeoutSec = 120
     let private buildTimeout = TimeSpan.FromSeconds 180.0
 
-    let private exeSuffix () =
+    let exeSuffix () =
         match (RuntimeIdentity.detect ()).Os with
         | Windows -> ".exe"
         | _ -> ""

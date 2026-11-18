@@ -71,5 +71,22 @@
         }
       ]
     }
-  ]
+  ],
+  "debug": {
+    "adapter": "python",
+    "args": [
+      "-m",
+      "debugpy.adapter"
+    ],
+    "install": "python -m pip install debugpy",
+    "adapterId": "debugpy",
+    "request": "launch",
+    "launch": {
+      "type": "python",
+      "program": "{file}",
+      "cwd": "{root}",
+      "console": "internalConsole",
+      "justMyCode": true
+    }
+  }
 }

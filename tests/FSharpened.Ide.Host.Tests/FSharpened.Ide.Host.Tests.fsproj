@@ -9,9 +9,26 @@
     <Compile Include="PackTests.fs" />
     <Compile Include="DiskTests.fs" />
     <Compile Include="ReplaceTests.fs" />
+    <Compile Include="FolderTests.fs" />
     <Compile Include="TerminalTests.fs" />
+    <Compile Include="VtTests.fs" />
+    <Compile Include="TermKeysTests.fs" />
+    <Compile Include="PtyTests.fs" />
     <Compile Include="RunTests.fs" />
     <Compile Include="ToolingTests.fs" />
+    <Compile Include="LaunchTests.fs" />
+    <Compile Include="RenameTests.fs" />
+    <Compile Include="LspFeatureTests.fs" />
+    <Compile Include="GitTests.fs" />
+    <Compile Include="DapTests.fs" />
+    <Compile Include="CursorTests.fs" />
+    <Compile Include="KeybindingTests.fs" />
+    <Compile Include="SnippetTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="fake_dap.py" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="fake_lsp.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

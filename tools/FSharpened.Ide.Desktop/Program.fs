@@ -17,6 +17,9 @@ type Options =
       File: string option
       Commands: string list
       LateCommands: string list
+      Breakpoints: (string * int) list
+      Caret: (int * int) option
+      RenameTo: string option
       TerminalLines: string list
       Theme: string option
       Palette: string option
@@ -38,6 +41,21 @@ let parse (argv: string[]) : Options =
                 { o with
                     LateCommands = o.LateCommands @ [ v ] }
                 t
+        | "--breakpoint" :: v :: t ->
+            // file:line, the file relative to the folder
+            match v.LastIndexOf ':' with
+            | i when i > 0 && fst (Int32.TryParse(v.Substring(i + 1))) ->
+                go
+                    { o with
+                        Breakpoints = o.Breakpoints @ [ v.Substring(0, i), int (v.Substring(i + 1)) ] }
+                    t
+            | _ -> go o t
+        | "--caret" :: v :: t ->
+            match v.Split(':') with
+            | [| l; c |] when fst (Int32.TryParse l) && fst (Int32.TryParse c) ->
+                go { o with Caret = Some(int l, int c) } t
+            | _ -> go o t
+        | "--rename-to" :: v :: t -> go { o with RenameTo = Some v } t
         | "--search" :: v :: t -> go { o with Search = Some v } t
         | "--replace-with" :: v :: t -> go { o with ReplaceWith = v } t
         | "--terminal-line" :: v :: t ->
@@ -63,6 +81,9 @@ let parse (argv: string[]) : Options =
           File = None
           Commands = []
           LateCommands = []
+          Breakpoints = []
+          Caret = None
+          RenameTo = None
           TerminalLines = []
           Theme = None
           Palette = None
@@ -99,7 +120,13 @@ type App() =
             window.Opened.Add(fun _ ->
                 o.Theme |> Option.iter shell.SetTheme
                 o.Folder |> Option.iter shell.OpenFolder
+
+                for (f, l) in o.Breakpoints do
+                    shell.SetBreakpoint(f, l)
+
                 o.File |> Option.iter (fun f -> shell.OpenFile(f, 0, 0))
+                o.Caret |> Option.iter (fun (l, c) -> shell.SetCaret(l, c))
+                shell.RenameTo <- o.RenameTo
 
                 for c in o.Commands do
                     shell.Run c
@@ -145,6 +172,22 @@ type App() =
                             use bmp = new RenderTargetBitmap(size, Avalonia.Vector(96.0, 96.0))
                             bmp.Render window
                             bmp.Save(path, PngBitmapEncoderOptions())
+
+                            // a dialog is a window of its own (a rename preview, a question): save each beside the main one
+                            desktop.Windows
+                            |> Seq.filter (fun w -> not (Object.ReferenceEquals(w, window)) && w.IsVisible)
+                            |> Seq.iteri (fun i w ->
+                                let ws = PixelSize(int w.Bounds.Width, int w.Bounds.Height)
+
+                                if ws.Width > 0 && ws.Height > 0 then
+                                    use wb = new RenderTargetBitmap(ws, Avalonia.Vector(96.0, 96.0))
+                                    wb.Render w
+
+                                    wb.Save(
+                                        Path.ChangeExtension(path, null) + sprintf ".dialog%d.png" (i + 1),
+                                        PngBitmapEncoderOptions()
+                                    ))
+
                             File.WriteAllText(path + ".txt", shell.Diagnostics())
                         with e ->
                             File.WriteAllText(path + ".error.txt", e.ToString())

@@ -39,9 +39,34 @@ dotnet test tests/FSharpened.Interop.Rust.Tests                                 
 Without `cargo` the 12 tests that need the built library pass without calling it (the pure contract tests still run); with `FSH_REQUIRE_RUST=1` they fail instead, so a CI job cannot go green on a runner that has no Rust.
 
 ### In CI
-- The `rust` stage of `python tools/ci/fsh_ci.py run` runs `cargo test --locked` for the reference crate, then `cargo fmt --check` and `cargo clippy -D warnings` when those components are installed (it notes it when they are not). A run in which zero Rust tests executed fails.
+- The `rust` stage of `python tools/ci/fsh_ci.py run` runs `cargo test --locked` for **every crate under `native/rust`** (each needs a committed `Cargo.lock`), then `cargo fmt --check` and `cargo clippy -D warnings` for each when those components are installed (it notes it when they are not). A crate in which zero Rust tests executed fails the stage.
 - `--require-rust` turns a missing `cargo` from a skip into a failure and sets `FSH_REQUIRE_RUST=1` for the test stage. GitHub CI passes it; a laptop without Rust does not need to.
-- Rust files and `Cargo.lock` are part of the cache key of the build, test and AOT stages, so editing the crate re-runs them.
+- Rust files, `Cargo.toml` and `Cargo.lock` of every crate are part of the cache key of the build, test and AOT stages, so editing a crate re-runs them.
+- The Host project builds `fsh-watch` itself (see below), so `dotnet build` needs no separate step; with `--require-rust` the Host tests fail, rather than pass quietly, when that library is missing.
+
+### The second crate: `fsh-watch` (PLAN P7.8a)
+`native/rust/fsh-watch` is the first library built for a product, not as an example: file watching and fast search for the desktop IDE ([desktop.md](desktop.md)). It follows the same ABI conventions (status codes, thread-local last error, UTF-8 ownership, panics caught). Results are JSON documents, which the F# side reads with `JsonDocument` (no reflection).
+
+| Function | What it does |
+|---|---|
+| `fsh_watch_abi_version() -> u32` | ABI version, 1; checked once when the library is loaded |
+| `fsh_watch_start(root, ignore_csv, debounce_ms, &handle)` | starts a recursive watch; `ignore_csv` null means `.git,node_modules,bin,obj,target` |
+| `fsh_watch_poll(handle, timeout_ms, &json)` | waits for the next batch: `{"overflow":bool,"events":[{"kind":"created\|changed\|removed\|renamed","path","from"?,"dir"}]}`, or null when nothing happened. Paths are relative with `/` |
+| `fsh_watch_stop(handle)` | ends the watch; a poll waiting on it returns |
+| `fsh_search(root, query, flags, include, exclude, ignore_csv, max_hits, max_per_file, max_file_bytes, &json)` | `flags`: 1 case-sensitive, 2 whole word, 4 regex, 8 honour `.gitignore`. Result: the managed `SearchResult` shape (`files[].hits[]` with 1-based line, UTF-16 column and length, preview) |
+| `fsh_watch_last_error()`, `fsh_watch_free_string(p)` | the usual pair |
+
+How it behaves, and what it does not promise:
+- The watcher uses the `notify` crate and does its own batching: events collect until `debounce_ms` of quiet (or until a burst has lasted ten debounces, one second at least), then each path is reported once, **judged by what is on disk when the batch closes**, not by the order of the raw events (the three systems disagree on that order). Create then remove vanishes; remove then create is *changed*; a folder whose contents changed is not reported. If more than 5000 paths changed, or the system dropped events, the batch says `overflow` and carries no list; the caller looks at the folder again. Ignored folders are still watched by the operating system (inotify and ReadDirectoryChangesW have no exclusion), their events are dropped afterwards.
+- Search reads files on up to 8 threads in batches and takes the results in explorer order (files before folders, case-insensitive), so a result cap cuts at the same place every time. It uses the `regex` crate (linear time, no look-around or back-references) and the `ignore` crate for `.gitignore`. A pattern that does not compile is reported in the JSON `error`; the F# side then asks the managed engine.
+- Columns and lengths count UTF-16 code units, like .NET strings, so a hit after an emoji lines up in the editor.
+
+Build and test:
+```bash
+cargo test --locked --manifest-path native/rust/fsh-watch/Cargo.toml                       # the Rust side: 57 tests, incl. a real watch of a temp folder
+dotnet test tests/FSharpened.Ide.Host.Tests --filter FullyQualifiedName~FolderTests         # the F# side: pure parts, fallbacks, native engines called for real
+```
+The Host project's build runs `cargo build --release --locked` for this crate when `cargo` is on the PATH and copies the library to `runtimes/<rid>/native/` next to the program (`FshSkipRust=true` skips it). Without cargo nothing is built, the IDE uses its managed search and polling watcher, and `FolderTests` pass without calling the library unless `FSH_REQUIRE_RUST=1`.
 
 ### Shipping a library
 Put the file at `runtimes/<rid>/native/<file>` in the NuGet package and resolve it with `NativeResolver.planFor identity [ AppContext.BaseDirectory ] "<crate lib name>"`. The RID to target-triple table (`Targets.all`) covers the six CI-matrix RIDs plus `linux-musl-x64` and `linux-musl-arm64`. `dotnet publish` for a RID copies the layout.
@@ -57,4 +82,4 @@ Put the file at `runtimes/<rid>/native/<file>` in the NuGet package and resolve 
 | `Cargo.lock` out of date under `--locked` | Run `cargo update -p <crate>` or `cargo generate-lockfile` in the crate and commit the lock file. |
 
 ### What is verified, and what is not
-Verified on Windows x64 with a real toolchain (cargo 1.99): the crate builds and its tests pass, the F# tests call into the built library (arithmetic, status codes, last error, UTF-8 ownership, caught panics, resolver failures), and the toolchain probe parses real `cargo --version` and `rustc -vV` output. **Not yet verified:** the other five matrix RIDs (the GitHub matrix is the first place that happens), musl, NativeAOT publish of a program that binds the library, and callbacks from Rust into .NET (out of scope, see ADR-0019).
+Verified on Windows x64 with a real toolchain (cargo 1.99): the crate builds and its tests pass, the F# tests call into the built library (arithmetic, status codes, last error, UTF-8 ownership, caught panics, resolver failures), and the toolchain probe parses real `cargo --version` and `rustc -vV` output. **Verified for `fsh-watch` on Windows x64 only:** the 57 Rust tests, the F# tests including native-versus-managed search parity, and the desktop app running with the library (an outside change reached the explorer and an open tab; a native search listed results). **Not yet verified:** the other five matrix RIDs (the GitHub matrix is the first place that happens), musl, NativeAOT publish of a program that binds the library, and callbacks from Rust into .NET (out of scope, see ADR-0019).

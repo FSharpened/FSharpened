@@ -8,8 +8,19 @@
 
   <ItemGroup>
     <Compile Include="DesktopTests.fs" />
+    <Compile Include="DecisionTests.fs" />
     <Compile Include="HoverTests.fs" />
+    <Compile Include="DebugViewTests.fs" />
     <Compile Include="GrammarTests.fs" />
+    <Compile Include="TerminalViewTests.fs" />
+    <Compile Include="HeadlessHarness.fs" />
+    <Compile Include="HeadlessWindowTests.fs" />
+    <Compile Include="AccessibilityTests.fs" />
+    <Compile Include="LspDecisionTests.fs" />
+    <Compile Include="LspWindowTests.fs" />
+    <Compile Include="GitWindowTests.fs" />
+    <Compile Include="EditingWindowTests.fs" />
+    <Compile Include="KeybindingWindowTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,6 +28,12 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="TextMateSharp.Grammars" />
+    <PackageReference Include="Avalonia.Headless" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the scripted language server of the host tests, for the window tests that need a server -->
+    <Content Include="..\FSharpened.Ide.Host.Tests\fake_lsp.py" Link="fake_lsp.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

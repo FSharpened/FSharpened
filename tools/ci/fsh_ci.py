@@ -88,8 +88,16 @@ def augment_path(env: dict) -> dict:
     return env
 
 
+# Git sets these for a hook so that git commands inside it act on the repository being pushed. The tests make their own
+# repositories in temporary folders (and expect a plain folder to be no repository), so they must not inherit them.
+GIT_REPO_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                 "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE")
+
+
 def base_env() -> dict:
     env = augment_path(dict(os.environ))
+    for name in GIT_REPO_VARS:
+        env.pop(name, None)
     env.update(
         {
             "CI": "true",  # strict mode: warnings are errors (Directory.Build.props)
@@ -595,37 +603,54 @@ def stage_aot(ctx: Ctx) -> Result:
     return Result(PASS, f"{ctx.rid} binary {size:.1f} MB runs", metrics={"binary_mb": round(size, 2)})
 
 
-RUST_CRATE = "native/rust/fsh-interop-example/Cargo.toml"
+RUST_CRATE = "native/rust/fsh-interop-example/Cargo.toml"  # the reference crate; every crate under native/rust runs
+
+
+def rust_crates() -> list[str]:
+    """Every crate under native/rust (one folder each, with a Cargo.toml), as repo-relative manifest paths."""
+    return sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / "native" / "rust").glob("*/Cargo.toml"))
 
 
 def stage_rust(ctx: Ctx) -> Result:
-    """The reference Rust crate for Interop.Rust (ADR-0019): unit tests, plus rustfmt and clippy when installed.
-    The F# side is exercised by the Interop.Rust tests in the test stage, which fail instead of passing quietly
-    when FSH_REQUIRE_RUST=1 (set by --require-rust)."""
+    """Every Rust crate under native/rust (ADR-0019, PLAN P7.8): unit tests, plus rustfmt and clippy when installed.
+    The F# side is exercised by the Interop.Rust and Host tests in the test stage, which fail instead of passing
+    quietly when FSH_REQUIRE_RUST=1 (set by --require-rust)."""
     if not which("cargo", ctx.env):
         if ctx.require_rust:
             return Result(FAIL, "cargo not found (--require-rust)")
-        return Result(SKIP, "cargo not found; install Rust with rustup to run the Interop.Rust stage")
+        return Result(SKIP, "cargo not found; install Rust with rustup to run the Rust stage")
+    crates = rust_crates()
+    if not crates:
+        return Result(FAIL, "no Rust crate found under native/rust")
     env = dict(ctx.env)
     env["CARGO_TARGET_DIR"] = str(ctx.run_dir / "rust-target")
-    manifest = ["--manifest-path", RUST_CRATE]
-    rc, out = run_cmd(ctx, "rust", ["cargo", "test", "--locked", *manifest], timeout=900, env=env)
-    if rc != 0:
-        return Result(FAIL, tail(out, 15))
-    passed = sum(int(m.group(1)) for m in re.finditer(r"test result: ok\. (\d+) passed", out))
-    if passed == 0:
-        return Result(FAIL, "zero Rust tests executed (a green run with no tests is a failure)")
-    notes = []
-    for component, args in (("fmt", ["cargo", "fmt", "--check", *manifest]),
-                            ("clippy", ["cargo", "clippy", "--locked", *manifest, "--all-targets", "--", "-D", "warnings"])):
-        probe, _ = run_cmd(ctx, "rust", ["cargo", component, "--version"], timeout=60, append=True, env=env)
-        if probe != 0:
-            notes.append(f"{component} not installed (skipped)")
-            continue
-        rc, out = run_cmd(ctx, "rust", args, timeout=900, append=True, env=env)
+    total = 0
+    notes: list[str] = []
+    per_crate: list[str] = []
+    for index, crate in enumerate(crates):
+        name = crate.split("/")[-2]
+        manifest = ["--manifest-path", crate]
+        rc, out = run_cmd(ctx, "rust", ["cargo", "test", "--locked", *manifest], timeout=900, env=env, append=index > 0)
         if rc != 0:
-            return Result(FAIL, f"cargo {component} failed:\n" + tail(out, 12))
-    return Result(PASS, f"{passed} Rust tests passed" + ("; " + "; ".join(notes) if notes else ""), metrics={"rust_tests": passed})
+            return Result(FAIL, f"{name}: " + tail(out, 15))
+        passed = sum(int(m.group(1)) for m in re.finditer(r"test result: ok\. (\d+) passed", out))
+        if passed == 0:
+            return Result(FAIL, f"{name}: zero Rust tests executed (a green run with no tests is a failure)")
+        total += passed
+        per_crate.append(f"{name} {passed}")
+        for component, args in (("fmt", ["cargo", "fmt", "--check", *manifest]),
+                                ("clippy", ["cargo", "clippy", "--locked", *manifest, "--all-targets", "--", "-D", "warnings"])):
+            probe, _ = run_cmd(ctx, "rust", ["cargo", component, "--version"], timeout=60, append=True, env=env)
+            if probe != 0:
+                note = f"{component} not installed (skipped)"
+                if note not in notes:
+                    notes.append(note)
+                continue
+            rc, out = run_cmd(ctx, "rust", args, timeout=900, append=True, env=env)
+            if rc != 0:
+                return Result(FAIL, f"{name}: cargo {component} failed:\n" + tail(out, 12))
+    detail = f"{total} Rust tests passed in {len(crates)} crate(s) ({', '.join(per_crate)})"
+    return Result(PASS, detail + ("; " + "; ".join(notes) if notes else ""), metrics={"rust_tests": total})
 
 
 def stage_benchmarks(ctx: Ctx) -> Result:

@@ -22,7 +22,8 @@ So three requirements decide the design:
 | Part | Language | Why this one |
 |---|---|---|
 | UI, core, host, language-pack engine, language-server client | **F#** | one typed core shared with the website; the project's purpose |
-| Terminal (pseudo-terminal), file watching, fast project search | **Rust**, behind the C ABI through `FSharpened.Interop.Rust` (ADR-0019) | `portable-pty`, `notify` and the `ignore` walker are the best portable implementations; the interop pillar exists to be used |
+| File watching, fast project search | **Rust**, behind the C ABI through `FSharpened.Interop.Rust` (ADR-0019) | `notify` and the `ignore` walker are the best portable implementations; the interop pillar exists to be used |
+| Terminal (pseudo-terminal) | **F#**, P/Invoke in `FSharpened.Platform` (amended 2026-11-17) | ConPTY (`CreatePseudoConsole`) on Windows and `posix_openpt` plus `posix_spawn` on Linux and macOS are a few dozen calls each; no native build step, and the platform split stays in the one project the hard rules allow it in. `portable-pty` stays an option if a case needs it |
 | Any language server, compiler, debugger, formatter | **whatever the language ships** (gopls, rust-analyzer, clangd, pyright, ...) | started as processes from the pack; this is how "all languages" works |
 | Website only | TypeScript or JavaScript (Fable output, CodeMirror) | not part of the desktop app |
 | A remote or container agent (not built) | **Go** is the candidate | a static single binary that runs anywhere; plugs in over the same JSON-RPC protocol, so it needs no change to the app |
@@ -51,3 +52,10 @@ So three requirements decide the design:
 - **Avalonia with an embedded browser editor (Monaco in a web view).** Hybrid; the native editor is simpler and keeps the process model clean.
 - **A Go or Rust host for everything.** Loses the shared typed core and the purpose of the project; used only where a library is clearly better (Rust, item 5).
 - **Hard-coding each language in F#.** The website does this for its 18 and it does not scale to "all languages"; the desktop reads packs instead.
+
+## Amendment 2026-11-18: module layout, tests and accessibility
+- **Layout.** The desktop app's code is not one file. `Program.fs` starts Avalonia; `MainWindow.fs` holds `Shell`, which only joins the parts. Compile order (F# is order dependent): `Ext`, `Access`, `Palette`, `Session`, `Hover`, `DebugView`, `Grammars`, `TerminalView`, `Dialogs`, `Gutter`, `Model`, `Decisions`, `Ui` (the widgets and the state every part shares), `Appearance`, `StatusBar`, `Problems`, `TerminalPanel`, `LanguageServers`, `HoverPanel`, `EditorTabs`, `RunPanel`, `RenameFeature`, `DebugPanel`, `Explorer`, `SidebarViews`, `FolderSession`, `Commands`, `CommandPalette`, `Menus`, `Layout`, `Wiring`, `MainWindow`, `Program`. A part is a class that takes the earlier parts it needs in its constructor; none reaches back to a later one (late links go through function slots on `Ui`, e.g. `OpenFileFn`). The split changed no behaviour.
+- **Decisions are pure.** What does not need a control (path rules, the key map, bracket pairing, disk-sync policy, status text) lives in `Decisions.fs` with unit tests, so a change to it is tested without a window.
+- **The window is tested headless** (Avalonia.Headless, no display): the real `Shell` on a temp folder. See `docs/operations/desktop.md`, "Tests and accessibility".
+- **Accessibility is a rule of the build**: a control a person can operate without an accessible name fails `AccessibilityTests`. This adds no dependency.
+- **Programs are started through `Launch`** (`Proc.fs`): PATH and PATHEXT lookup, and on Windows a `.cmd` or `.bat` through `cmd.exe /d /v:off /s /c` with strict quoting; an argument that quotes cannot hold is refused. This refines item 6 ("never through a shell"): the only shell is `cmd.exe` for a Windows script, with arguments that cannot act as commands.

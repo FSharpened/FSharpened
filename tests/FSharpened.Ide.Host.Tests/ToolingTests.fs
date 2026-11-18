@@ -38,7 +38,7 @@ let ``file URIs and paths convert both ways and other schemes are not paths`` ()
     Assert.Equal("", LspWire.ofUri "not a uri")
 
 /// A scripted language server on the far end of two pipes.
-let private withServer
+let internal withServer
     (script: JsonElement -> (string -> unit) -> unit)
     (f: LspClient -> (string * LspDiagnostic list) list ref -> unit)
     =
@@ -93,9 +93,9 @@ let private withServer
         serverIn.Dispose()
         clientIn.Dispose()
 
-let private idOf (m: JsonElement) = m.GetProperty("id").GetRawText()
+let internal idOf (m: JsonElement) = m.GetProperty("id").GetRawText()
 
-let private methodOf (m: JsonElement) =
+let internal methodOf (m: JsonElement) =
     match m.TryGetProperty "method" with
     | true, v -> v.GetString()
     | _ -> ""
