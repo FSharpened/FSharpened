@@ -90,6 +90,11 @@ def augment_path(env: dict) -> dict:
 
 def base_env() -> dict:
     env = augment_path(dict(os.environ))
+    # A git hook runs with GIT_DIR (and friends) pointing at this repository. Stages that run tests which create their own
+    # throwaway repositories (or ask about a plain folder) would see this one instead, so the hook run would fail where
+    # a normal run passes.
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"):
+        env.pop(name, None)
     env.update(
         {
             "CI": "true",  # strict mode: warnings are errors (Directory.Build.props)
