@@ -216,7 +216,9 @@ module Proc =
             let mutable fin = false
 
             while not fin do
-                let! n = reader.ReadAsync(buf, 0, buf.Length)
+                // not back onto the caller's context: when that is a UI thread waiting for this very result, the read
+                // would only finish when the caller gives up waiting
+                let! n = reader.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)
 
                 if n = 0 then
                     fin <- true

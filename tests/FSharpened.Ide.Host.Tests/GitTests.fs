@@ -300,3 +300,26 @@ let ``git is read without optional locks and the repository's fsmonitor hook is 
         Git.status dir |> ignore
         Git.branch dir |> ignore
         Assert.False(File.Exists marker))
+
+/// A synchronization context that never runs what is posted to it: a UI thread blocked on the call.
+type private DeadContext() =
+    inherit Threading.SynchronizationContext()
+    override _.Post(_, _) = ()
+
+[<Fact>]
+let ``a program run from a thread with a UI context that waits is read at once, not after the pipe timeout`` () =
+    let argv =
+        if OperatingSystem.IsWindows() then
+            [ "cmd.exe"; "/c"; "echo hello" ]
+        else
+            [ "sh"; "-c"; "echo hello" ]
+
+    let run () =
+        Threading.SynchronizationContext.SetSynchronizationContext(DeadContext())
+        Proc.run argv (Path.GetTempPath()) None (TimeSpan.FromSeconds 20.0)
+
+    match Threading.Tasks.Task.Run(run).GetAwaiter().GetResult() with
+    | Ok r ->
+        Assert.Contains("hello", r.Stdout)
+        Assert.True(r.Millis < 2500L, sprintf "took %d ms" r.Millis)
+    | Error e -> failwith e
