@@ -722,3 +722,118 @@ type ProjectSession(initial: obj) =
                   "createdMs" ==> e.CreatedMs
                   "isHead" ==> e.IsHead ])
         |> List.toArray
+
+// ---- multi-file runs (ADR-0024) --------------------------------------------------------------------
+let private problemObj (p: BundleProblem) : obj =
+    createObj [ "path" ==> p.Path; "line" ==> p.Line; "message" ==> p.Message ]
+
+let private bundleObj (b: Bundle) : obj =
+    createObj
+        [ "language" ==> Language.id b.Language
+          "entry" ==> b.Entry
+          "source" ==> b.Source
+          "included" ==> List.toArray b.Included
+          "notes" ==> List.toArray b.Notes
+          "segments"
+          ==> (b.Segments
+               |> List.map (fun s ->
+                   createObj
+                       [ "path" ==> s.Path
+                         "start" ==> s.Start
+                         "count" ==> s.Count
+                         "from" ==> s.From ])
+               |> List.toArray) ]
+
+let private bundleOf (o: obj) : Bundle =
+    let segments: obj[] = o?segments
+    let included: string[] = o?included
+
+    { Language = langOf (unbox<string> o?language)
+      Entry = unbox<string> o?entry
+      Source = ""
+      Included = Array.toList included
+      Segments =
+        segments
+        |> Array.map (fun s ->
+            { Path = unbox<string> s?path
+              Start = unbox<int> s?start
+              Count = unbox<int> s?count
+              From = unbox<int> s?from })
+        |> Array.toList
+      Notes = [] }
+
+/// What the IDE does with several files of this language: { merged, text }.
+let bundleSupport (languageId: string) : obj =
+    match Bundler.support (langOf languageId) with
+    | Merged t -> createObj [ "merged" ==> true; "text" ==> t ]
+    | Alone t -> createObj [ "merged" ==> false; "text" ==> t ]
+
+/// The one source for running `path` with its files: { ok, bundle, problems: [{ path, line, message }] }.
+let bundleMake (project: obj) (path: string) : obj =
+    match Bundler.make (projectOf project) path with
+    | Ok b -> createObj [ "ok" ==> true; "bundle" ==> bundleObj b; "problems" ==> Array.empty<obj> ]
+    | Result.Error ps ->
+        createObj
+            [ "ok" ==> false
+              "bundle" ==> null
+              "problems" ==> (ps |> List.map problemObj |> List.toArray) ]
+
+/// Where a line a run reported is in the project: { path, line }, or null when it is in code the bundler wrote.
+let bundleLocate (bundle: obj) (output: string) (line: int) : obj =
+    match Bundler.locateIn (bundleOf bundle) output line with
+    | Some(p, l) -> createObj [ "path" ==> p; "line" ==> l ]
+    | None -> null
+
+/// The paths a run executes, in order: the pipeline, or the entry file alone.
+let pipelineSteps (project: obj) : string[] =
+    Pipeline.steps (projectOf project) |> List.toArray
+
+/// Every step bundled: { ok, stages: [{ index, path, language, bundle }], problems }.
+let pipelinePlan (project: obj) : obj =
+    match Pipeline.plan (projectOf project) with
+    | Ok stages ->
+        createObj
+            [ "ok" ==> true
+              "stages"
+              ==> (stages
+                   |> List.map (fun s ->
+                       createObj
+                           [ "index" ==> s.Index
+                             "path" ==> s.Path
+                             "language" ==> Language.id s.Language
+                             "bundle" ==> bundleObj s.Bundle ])
+                   |> List.toArray)
+              "problems" ==> Array.empty<obj> ]
+    | Result.Error ps ->
+        createObj
+            [ "ok" ==> false
+              "stages" ==> Array.empty<obj>
+              "problems" ==> (ps |> List.map problemObj |> List.toArray) ]
+
+/// finished: [{ path, ok, stdout, summary }]. Returns { done, ok, summary, index, stdin }: either the next step and its input, or
+/// how the run ended.
+let pipelineNext (paths: string[]) (finished: obj[]) (stdin: string) : obj =
+    let done' =
+        finished
+        |> Array.map (fun f ->
+            { Path = unbox<string> f?path
+              Ok = unbox<bool> f?ok
+              Stdout = unbox<string> f?stdout
+              Summary = unbox<string> f?summary })
+        |> Array.toList
+
+    match Pipeline.next (Array.toList paths) done' stdin with
+    | RunStage(i, input) ->
+        createObj
+            [ "done" ==> false
+              "ok" ==> true
+              "summary" ==> ""
+              "index" ==> i
+              "stdin" ==> input ]
+    | Stop o ->
+        createObj
+            [ "done" ==> true
+              "ok" ==> o.Ok
+              "summary" ==> o.Summary
+              "index" ==> -1
+              "stdin" ==> "" ]
