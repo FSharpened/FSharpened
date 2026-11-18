@@ -302,6 +302,21 @@ class RustStageTests(unittest.TestCase):
         for crate in crates:
             self.assertTrue((ci.ROOT / crate).with_name("Cargo.lock").is_file(), crate + " needs a committed Cargo.lock (--locked)")
 
+    def test_the_runner_does_not_pass_a_hooks_git_variables_to_its_children(self):
+        saved = {k: os.environ.get(k) for k in ci.GIT_REPO_VARS}
+        try:
+            for k in ci.GIT_REPO_VARS:
+                os.environ[k] = "x"
+            env = ci.base_env()
+            for k in ci.GIT_REPO_VARS:
+                self.assertNotIn(k, env)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
     def test_rust_is_in_the_full_profile_but_not_the_fast_one(self):
         self.assertIn("rust", ci.PROFILES["full"])
         self.assertNotIn("rust", ci.PROFILES["fast"])

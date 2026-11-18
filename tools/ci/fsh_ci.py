@@ -88,8 +88,16 @@ def augment_path(env: dict) -> dict:
     return env
 
 
+# Git sets these for a hook so that git commands inside it act on the repository being pushed. The tests make their own
+# repositories in temporary folders (and expect a plain folder to be no repository), so they must not inherit them.
+GIT_REPO_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                 "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE")
+
+
 def base_env() -> dict:
     env = augment_path(dict(os.environ))
+    for name in GIT_REPO_VARS:
+        env.pop(name, None)
     env.update(
         {
             "CI": "true",  # strict mode: warnings are errors (Directory.Build.props)
