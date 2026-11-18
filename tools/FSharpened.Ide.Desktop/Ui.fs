@@ -52,10 +52,23 @@ type Ui(env: HostEnv) =
     let expanded = HashSet<string>()
     let mutable gitBranch: string option = None
     let mutable gitChanges: Map<string, GitChange> = Map.empty
+    let mutable gitEntries: GitEntry list = []
+    /// Run after git's state (branch, changes) was read again.
+    let onGitChanged = List<unit -> unit>()
+    /// Sidebar views other parts add: name -> (title, builder).
+    let extraViews = Dictionary<string, string * (unit -> Control)>()
     let mutable runDiagnostics: FSharpened.Diagnostics.StructuredDiagnostic list = []
 
     let lspDiagnostics =
         Dictionary<string, FSharpened.Diagnostics.StructuredDiagnostic list>()
+
+    /// The diagnostics as the server sent them, per file, to go back with a code action request.
+    let lspRaw = Dictionary<string, LspDiagnostic list>()
+
+    /// Run when the active file changes or its language server becomes ready, and when its text has settled after an
+    /// edit: for the features that read the server (outline) or git (the diff gutter).
+    let onDocShown = List<OpenDoc -> unit>()
+    let onSettled = List<OpenDoc -> unit>()
 
     let lspSessions = Dictionary<string, LspSession>()
     let lspFailed = HashSet<string>()
@@ -231,6 +244,42 @@ type Ui(env: HostEnv) =
         )
 
     let problemsBox = ListBox(Background = Brushes.Transparent)
+    let referencesBox = ListBox(Background = Brushes.Transparent)
+
+    // signature help: a small box by the caret while a call's arguments are typed
+    let signatureText =
+        TextBlock(TextWrapping = TextWrapping.Wrap, FontFamily = monoFont, FontSize = 12.0)
+
+    let signatureBox =
+        Border(
+            Child = signatureText,
+            IsVisible = false,
+            IsHitTestVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            MaxWidth = 640.0,
+            Padding = Thickness(10.0, 6.0),
+            CornerRadius = CornerRadius 4.0,
+            BorderThickness = Thickness 1.0
+        )
+
+    // the quick-fix lightbulb: shown at the caret's line when the language server offers a fix
+    let lightbulb =
+        Button(
+            Content = "💡",
+            IsVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Padding = Thickness(2.0, 0.0),
+            Background = Brushes.Transparent,
+            BorderThickness = Thickness 0.0
+        )
+
+    do
+        themed (fun r ->
+            signatureBox.Background <- r.Card
+            signatureBox.BorderBrush <- r.Line
+            signatureText.Foreground <- r.Fg)
 
     let inputBox =
         TextBox(
@@ -347,6 +396,15 @@ type Ui(env: HostEnv) =
             "Errors and warnings from the language server and the last run. Enter opens the place."
             problemsBox
 
+        describe "References" "Every place that uses the symbol you asked about. Enter opens the place." referencesBox
+
+        describe "Signature help" "The parameters of the call being typed, the current one in bold." signatureBox
+
+        describe
+            "Quick fix"
+            "The language server offers a fix here. Press Enter, or Ctrl+Period, to see the choices."
+            lightbulb
+
         describe "Standard input" "Text the program reads from standard input when it runs." inputBox
 
         describe
@@ -435,6 +493,13 @@ type Ui(env: HostEnv) =
         with get () = gitChanges
         and set v = gitChanges <- v
 
+    member _.GitEntries
+        with get () = gitEntries
+        and set v = gitEntries <- v
+
+    member _.OnGitChanged = onGitChanged
+    member _.ExtraViews = extraViews
+
     member _.Hooks = hooks
     member _.InputBox = inputBox
     member _.Label = label
@@ -444,6 +509,9 @@ type Ui(env: HostEnv) =
         and set v = lastSearchEngine <- v
 
     member _.LspDiagnostics = lspDiagnostics
+    member _.LspRaw = lspRaw
+    member _.OnDocShown = onDocShown
+    member _.OnSettled = onSettled
     member _.LspFailed = lspFailed
     member _.LspSessions = lspSessions
     member _.LspStarting = lspStarting
@@ -473,6 +541,10 @@ type Ui(env: HostEnv) =
         and set v = prefs <- v
 
     member _.ProblemsBox = problemsBox
+    member _.ReferencesBox = referencesBox
+    member _.SignatureBox = signatureBox
+    member _.SignatureText = signatureText
+    member _.Lightbulb = lightbulb
 
     member _.ProblemsList
         with get () = problemsList

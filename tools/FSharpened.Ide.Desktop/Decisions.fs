@@ -185,6 +185,7 @@ module Keymap =
         match key with
         | Key.P when ctrl && shift -> Some "palette"
         | Key.P when ctrl -> Some "quick-open"
+        | Key.G when ctrl && shift -> Some "git-view"
         | Key.G when ctrl -> Some "goto-line"
         | Key.O when ctrl && shift -> Some "goto-symbol"
         | Key.O when ctrl -> Some "open-folder"
@@ -204,7 +205,10 @@ module Keymap =
         | Key.H when ctrl && shift -> Some "replace-in-files"
         | Key.H when ctrl -> Some "replace-in-file"
         | Key.M when ctrl && shift -> Some "problems"
+        | Key.Space when ctrl && shift -> Some "signature-help"
         | Key.Space when ctrl -> Some "complete"
+        | Key.OemPeriod when ctrl -> Some "quick-fix"
+        | Key.F12 when shift -> Some "references"
         | Key.F12 -> Some "definition"
         | Key.F5 when ctrl -> Some "run"
         | Key.F5 when shift -> Some "debug-stop"

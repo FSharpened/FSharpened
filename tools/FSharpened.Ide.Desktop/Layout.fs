@@ -110,6 +110,7 @@ type Layout
         let activity = StackPanel()
         activity.Children.Add(activityButton "🗂" "Explorer (Ctrl+Shift+E)" "files")
         activity.Children.Add(activityButton "🔍" "Search (Ctrl+Shift+F)" "search")
+        activity.Children.Add(activityButton "⎇" "Source control" "git")
         activity.Children.Add(activityButton "☰" "Outline" "outline")
         activity.Children.Add(activityButton "🛠" "Tools and languages" "tools")
 
@@ -224,6 +225,8 @@ type Layout
         editorHost.Children.Add welcome
         editorHost.Children.Add editor
         editorHost.Children.Add hoverBox
+        editorHost.Children.Add ui.SignatureBox
+        editorHost.Children.Add ui.Lightbulb
         editor.IsVisible <- false
         themed (fun r -> editorHost.Background <- r.EditorBg)
 
@@ -265,6 +268,8 @@ type Layout
         outputHost.Children.Add outputBox
         let problemsHost = Grid()
         problemsHost.Children.Add problemsBox
+        let referencesHost = Grid()
+        referencesHost.Children.Add ui.ReferencesBox
         let inputHost = Grid()
         inputHost.Children.Add inputBox
         let termHost = Border(Child = termView) |> Access.focusRing
@@ -285,16 +290,18 @@ type Layout
 
         let headerButtons = StackPanel(Orientation = Orientation.Horizontal)
 
-        Access.describe "Panel tabs" "Output, problems, input, terminal and debug." headerButtons
+        Access.describe "Panel tabs" "Output, problems, references, input, terminal and debug." headerButtons
         |> Access.role AutomationControlType.Tab
         |> ignore
 
         Access.describe "Output contents" "" outputHost |> ignore
         Access.describe "Problems contents" "" problemsHost |> ignore
+        Access.describe "References contents" "" referencesHost |> ignore
         Access.describe "Input contents" "" inputHost |> ignore
         Access.describe "Terminal contents" "" termHost |> ignore
         headerButtons.Children.Add(tabButton "output" "OUTPUT" outputHost)
         headerButtons.Children.Add(tabButton "problems" "PROBLEMS" problemsHost)
+        headerButtons.Children.Add(tabButton "references" "REFERENCES" referencesHost)
         headerButtons.Children.Add(tabButton "input" "INPUT" inputHost)
         headerButtons.Children.Add(tabButton "terminal" "TERMINAL" termHost)
 
@@ -433,6 +440,7 @@ type Layout
         let panelContent = Grid()
         panelContent.Children.Add outputHost
         panelContent.Children.Add problemsHost
+        panelContent.Children.Add referencesHost
         panelContent.Children.Add inputHost
         panelContent.Children.Add termHost
         panelContent.Children.Add debugHost

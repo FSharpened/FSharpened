@@ -21,8 +21,10 @@
     <Compile Include="TerminalView.fs" />
     <Compile Include="Dialogs.fs" />
     <Compile Include="Gutter.fs" />
+    <Compile Include="GitGutter.fs" />
     <Compile Include="Model.fs" />
     <Compile Include="Decisions.fs" />
+    <Compile Include="LspDecisions.fs" />
     <Compile Include="Ui.fs" />
     <Compile Include="Appearance.fs" />
     <Compile Include="StatusBar.fs" />
@@ -31,8 +33,15 @@
     <Compile Include="LanguageServers.fs" />
     <Compile Include="HoverPanel.fs" />
     <Compile Include="EditorTabs.fs" />
+    <Compile Include="GitFeature.fs" />
     <Compile Include="RunPanel.fs" />
     <Compile Include="RenameFeature.fs" />
+    <Compile Include="ReferencesFeature.fs" />
+    <Compile Include="OutlineFeature.fs" />
+    <Compile Include="SignatureFeature.fs" />
+    <Compile Include="CodeActionFeature.fs" />
+    <Compile Include="FormatFeature.fs" />
+    <Compile Include="ServerFeatures.fs" />
     <Compile Include="DebugPanel.fs" />
     <Compile Include="Explorer.fs" />
     <Compile Include="SidebarViews.fs" />

@@ -96,6 +96,10 @@ type LanguageServers(ui: Ui, problems: Problems, terminalPanel: TerminalPanel) =
                                 if doc.Pack.IsSome && doc.Pack.Value.Id = pack.Id then
                                     doc.LspOpen <- false
                                     syncLsp doc
+
+                                    if ui.Active = Some doc then
+                                        for h in ui.OnDocShown do
+                                            h doc
                         | Error e ->
                             lspFailed.Add pack.Id |> ignore
                             say (sprintf "No language server for %s: %s" pack.Name (e.Split('\n')[0]))
@@ -116,6 +120,7 @@ type LanguageServers(ui: Ui, problems: Problems, terminalPanel: TerminalPanel) =
         lspFailed.Clear()
         lspStarting.Clear()
         lspDiagnostics.Clear()
+        ui.LspRaw.Clear()
 
     let completeNow () =
         match ui.Root, ui.Active with

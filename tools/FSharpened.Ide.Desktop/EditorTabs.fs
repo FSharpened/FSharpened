@@ -188,6 +188,10 @@ type EditorTabs
             applyGrammar d
             recomputeOutline doc
             syncLsp doc
+
+            for h in ui.OnDocShown do
+                h doc
+
             editor.TextArea.Caret.Line <- doc.Line
             editor.TextArea.Caret.Column <- doc.Column
 

@@ -106,6 +106,9 @@ type Wiring
 
                 updateStatus ()
                 ui.RefreshSidebarFn()
+
+                for h in ui.OnSettled do
+                    h d
             | None -> ())
 
         editor.TextArea.Caret.PositionChanged.Add(fun _ -> updateStatus ())
@@ -173,7 +176,9 @@ type Wiring
         editorMenu.Items.Push(menuItem "Select All" "Ctrl+A" (fun () -> editor.SelectAll()))
         editorMenu.Items.Push(Separator())
         editorMenu.Items.Push(menuItem "Go to Symbol…" "Ctrl+Shift+O" (fun () -> ui.ShowPaletteFn "@"))
-        editorMenu.Items.Push(menuItem "Format Document" "Shift+Alt+F" formatCurrent)
+        editorMenu.Items.Push(menuItem "Format Document" "Shift+Alt+F" (fun () -> (command "format").Run()))
+        editorMenu.Items.Push(menuItem "Find All References" "Shift+F12" (fun () -> (command "references").Run()))
+        editorMenu.Items.Push(menuItem "Quick Fix…" "Ctrl+OemPeriod" (fun () -> (command "quick-fix").Run()))
         editorMenu.Items.Push(menuItem "Rename Symbol" "F2" renameSymbolNow)
         editorMenu.Items.Push(menuItem "Toggle Breakpoint" "F9" toggleBreakpoint)
         editorMenu.Items.Push(menuItem "Run This File" "Ctrl+F5" (fun () -> runCurrent Runner.defaultTimeoutSec))

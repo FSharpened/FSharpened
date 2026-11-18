@@ -319,6 +319,9 @@ type SidebarViews(ui: Ui, appearance: Appearance, statusBar: StatusBar, editorTa
             | "tools" ->
                 fillTools ()
                 "TOOLS AND LANGUAGES", (ScrollViewer(Content = toolsPanel) :> Control)
+            | other when ui.ExtraViews.ContainsKey other ->
+                let title, build = ui.ExtraViews[other]
+                title, build ()
             | _ -> "EXPLORER", (fileTree :> Control)
 
         sidebarTitle.Text <- title

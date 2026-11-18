@@ -55,7 +55,7 @@ type RenameFeature(ui: Ui, languageServers: LanguageServers, editorTabs: EditorT
 
     /// Writes the planned changes: open files are edited in the editor (one undoable edit each, left unsaved), the
     /// others go to disk through the workspace. Returns what happened, in words.
-    let applyRename (r: string) (changes: FileChange list) : string =
+    let applyRename (verb: string) (r: string) (changes: FileChange list) : string =
         let failed = List<string>()
         let mutable done' = 0
 
@@ -80,9 +80,9 @@ type RenameFeature(ui: Ui, languageServers: LanguageServers, editorTabs: EditorT
                     | Error e -> failed.Add(sprintf "%s: %s" rel e)
 
         if failed.Count = 0 then
-            sprintf "Renamed in %s" (Edits.summary changes)
+            sprintf "%s in %s" verb (Edits.summary changes)
         else
-            sprintf "Renamed in %d file(s); %s" done' (String.Join("; ", failed))
+            sprintf "%s in %d file(s); %s" verb done' (String.Join("; ", failed))
 
     /// The identifier under a position, for when the server does not say what it is renaming.
     let wordAt = TextAt.wordAt
@@ -186,7 +186,7 @@ type RenameFeature(ui: Ui, languageServers: LanguageServers, editorTabs: EditorT
                                             "Rename"
 
                                     if yes then
-                                        say (applyRename r changes)
+                                        say (applyRename "Renamed" r changes)
                                         rebuildTabs ()
                         | _ -> ()
                 }
@@ -194,6 +194,21 @@ type RenameFeature(ui: Ui, languageServers: LanguageServers, editorTabs: EditorT
         | _ -> say "Open a file in a folder first"
 
 
+    /// Applies the edit a server sends with a code action or formatting, with no preview: open files change in the
+    /// editor (one undoable edit each, left unsaved), the others are written. Returns what happened, in words.
+    let applyServerEdit (verb: string) (we: WorkspaceEdit) : string =
+        match ui.Root with
+        | None -> "Open a folder first"
+        | Some r ->
+            match Edits.plan (readForRename r) we with
+            | Error m -> "Not applied: " + m
+            | Ok [] -> "The server's edit changes nothing"
+            | Ok changes ->
+                let said = applyRename verb r changes
+                rebuildTabs ()
+                said
+
+    member _.ApplyServerEdit = applyServerEdit
     member _.FullPathOf = fullPathOf
     member _.RenameSymbolNow = renameSymbolNow
 

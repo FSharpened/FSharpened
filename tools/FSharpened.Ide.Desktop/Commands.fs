@@ -37,6 +37,8 @@ type Commands
         editorTabs: EditorTabs,
         runPanel: RunPanel,
         renameFeature: RenameFeature,
+        serverFeatures: ServerFeatures,
+        gitFeature: GitFeature,
         debugPanel: DebugPanel,
         explorer: Explorer,
         sidebarViews: SidebarViews,
@@ -53,7 +55,7 @@ type Commands
     let debugStep = debugPanel.DebugStep
     let debugStop = debugPanel.DebugStop
     let env = ui.Env
-    let formatCurrent = runPanel.FormatCurrent
+    let formatCurrent = serverFeatures.FormatDocument
     let gotoDefinitionNow = languageServers.GotoDefinitionNow
     let newEntry = explorer.NewEntry
     let openFolderDialog = folderSession.OpenFolderDialog
@@ -206,6 +208,45 @@ type Commands
             Title = "Rename Symbol (language server)"
             Keys = "F2"
             Run = renameSymbolNow }
+          { Id = "git-view"
+            Title = "Git: Show Source Control"
+            Keys = "Ctrl+Shift+G"
+            Run = (fun () -> showSidebar "git") }
+          { Id = "git-stage-file"
+            Title = "Git: Stage Current File"
+            Keys = ""
+            Run = gitFeature.StageFile }
+          { Id = "git-unstage-file"
+            Title = "Git: Unstage Current File"
+            Keys = ""
+            Run = gitFeature.UnstageFile }
+          { Id = "git-commit"
+            Title = "Git: Commit Staged Changes"
+            Keys = ""
+            Run =
+              (fun () ->
+                  showSidebar "git"
+                  gitFeature.Commit()) }
+          { Id = "git-switch-branch"
+            Title = "Git: Switch Branch…"
+            Keys = ""
+            Run = gitFeature.SwitchBranch }
+          { Id = "git-new-branch"
+            Title = "Git: Create New Branch…"
+            Keys = ""
+            Run = gitFeature.NewBranch }
+          { Id = "git-blame"
+            Title = "Git: Toggle Blame"
+            Keys = ""
+            Run = gitFeature.ToggleBlame }
+          { Id = "git-refresh"
+            Title = "Git: Refresh"
+            Keys = ""
+            Run = gitFeature.Refresh }
+          { Id = "trust-folder"
+            Title = "Run: Trust This Folder…"
+            Keys = ""
+            Run = gitFeature.TrustFolder }
           { Id = "run-long"
             Title = "Run: Run This File (120 s limit)"
             Keys = ""
@@ -226,6 +267,25 @@ type Commands
             Title = "Go to Definition (language server)"
             Keys = "F12"
             Run = gotoDefinitionNow }
+          { Id = "references"
+            Title = "Find All References (language server)"
+            Keys = "Shift+F12"
+            Run = serverFeatures.FindReferences }
+          { Id = "signature-help"
+            Title = "Show Signature Help (language server)"
+            Keys = "Ctrl+Shift+Space"
+            Run = serverFeatures.ShowSignatureHelp }
+          { Id = "quick-fix"
+            Title = "Quick Fix… (language server)"
+            Keys = "Ctrl+."
+            Run = serverFeatures.QuickFix }
+          { Id = "references-panel"
+            Title = "View: Show References"
+            Keys = ""
+            Run =
+              (fun () ->
+                  setPanelVisible true
+                  showPanel "references") }
           { Id = "quick-open"
             Title = "Go to File…"
             Keys = "Ctrl+P"

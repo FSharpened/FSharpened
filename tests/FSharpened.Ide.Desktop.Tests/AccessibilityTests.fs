@@ -129,7 +129,7 @@ let ``every interactive control has a name in each sidebar view and each bottom 
         s.OpenFolder()
         s.Shell.OpenFile("src/app.fs", 0, 0)
 
-        for view in [ "find-files"; "outline"; "tools"; "explorer" ] do
+        for view in [ "find-files"; "git-view"; "outline"; "tools"; "explorer" ] do
             s.Shell.Run view
             pump 150
             assertAllNamed ("sidebar " + view) s.Window
@@ -138,7 +138,7 @@ let ``every interactive control has a name in each sidebar view and each bottom 
         pump 300
         assertAllNamed "search results" s.Window
 
-        for panel in [ "output"; "problems"; "input"; "debug" ] do
+        for panel in [ "output"; "problems"; "references"; "input"; "debug" ] do
             click (find<Button> s.Window (panel + "-panel"))
             assertAllNamed ("panel " + panel) s.Window)
 

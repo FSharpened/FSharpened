@@ -63,22 +63,47 @@ type StatusBar(ui: Ui) =
 
     let outlineTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds 350.0)
 
+    /// Reads the branch and the changes. Git runs only in a trusted folder: a repository's own configuration and hooks
+    /// can start programs, so an untrusted folder is shown as having no git at all.
     let refreshGit () =
         match ui.Root with
-        | Some r ->
+        | Some r when ui.Env.Trust.IsTrusted r ->
             task {
-                let! branch, changes = Task.Run(fun () -> Git.branch r, Git.status r |> Map.ofList)
-                ui.GitBranch <- branch
-                ui.GitChanges <- changes
+                let! branch, entries =
+                    Task.Run(fun () ->
+                        Git.branch r,
+                        (match GitOps.entries r with
+                         | Ok e -> e
+                         | Error _ -> []))
 
-                statusGit.Text <- Status.git branch changes.Count
+                ui.GitBranch <- branch
+                ui.GitEntries <- entries
+
+                // the explorer's mark is the staged change, else the unstaged one
+                ui.GitChanges <-
+                    entries
+                    |> List.choose (fun e ->
+                        match e.Staged |> Option.orElse e.Unstaged with
+                        | Some c -> Some(e.Path, c)
+                        | None -> None)
+                    |> Map.ofList
+
+                statusGit.Text <- Status.git branch ui.GitChanges.Count
                 ui.RefreshTreeFn()
+
+                for h in ui.OnGitChanged do
+                    h ()
             }
             |> ignore
-        | None ->
+        | _ ->
             ui.GitBranch <- None
             ui.GitChanges <- Map.empty
+            ui.GitEntries <- []
             statusGit.Text <- ""
+            ui.RefreshTreeFn()
+
+            for h in ui.OnGitChanged do
+                h ()
 
     member _.OutlineTimer = outlineTimer
     member _.RecomputeOutline = recomputeOutline

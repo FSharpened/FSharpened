@@ -103,7 +103,17 @@ type Menus(ui: Ui, appearance: Appearance, sidebarViews: SidebarViews, folderSes
               Separator()
               menuItem "Exit" "Alt+F4" (fun () -> window.Close()) ]
 
-        top "_Edit" [ item "find"; item "find-files"; Separator(); item "format" ]
+        top
+            "_Edit"
+            [ item "find"
+              item "find-files"
+              Separator()
+              item "format"
+              Separator()
+              item "definition"
+              item "references"
+              item "quick-fix"
+              item "signature-help" ]
 
         top
             "_View"
@@ -130,7 +140,27 @@ type Menus(ui: Ui, appearance: Appearance, sidebarViews: SidebarViews, folderSes
               item "line-numbers"
               item "breadcrumbs" ]
 
-        top "_Run" [ item "run"; item "run-long"; Separator(); item "revoke-trust" ]
+        top
+            "_Run"
+            [ item "run"
+              item "run-long"
+              Separator()
+              item "trust-folder"
+              item "revoke-trust" ]
+
+        top
+            "_Git"
+            [ item "git-view"
+              Separator()
+              item "git-stage-file"
+              item "git-unstage-file"
+              item "git-commit"
+              Separator()
+              item "git-switch-branch"
+              item "git-new-branch"
+              Separator()
+              item "git-blame"
+              item "git-refresh" ]
 
         top
             "_Debug"

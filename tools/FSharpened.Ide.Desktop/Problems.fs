@@ -168,8 +168,10 @@ type Problems(ui: Ui) =
             if not (rel.StartsWith "..") && not (Path.IsPathRooted rel) then
                 if list.IsEmpty then
                     lspDiagnostics.Remove rel |> ignore
+                    ui.LspRaw.Remove rel |> ignore
                 else
                     lspDiagnostics[rel] <- list |> List.map (toStructured rel)
+                    ui.LspRaw[rel] <- list
 
                 refreshProblems ()
                 updateSquiggles ()

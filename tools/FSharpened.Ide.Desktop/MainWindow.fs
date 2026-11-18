@@ -40,8 +40,12 @@ type Shell(env: HostEnv) =
     let editorTabs =
         EditorTabs(ui, appearance, statusBar, problems, languageServers, hoverPanel)
 
+    let gitFeature = GitFeature(ui, statusBar, editorTabs)
     let runPanel = RunPanel(ui, appearance, problems, languageServers, editorTabs)
     let renameFeature = RenameFeature(ui, languageServers, editorTabs)
+
+    let serverFeatures =
+        ServerFeatures(ui, appearance, statusBar, languageServers, runPanel, renameFeature)
 
     let debugPanel =
         DebugPanel(ui, appearance, languageServers, editorTabs, renameFeature)
@@ -62,6 +66,8 @@ type Shell(env: HostEnv) =
             editorTabs,
             runPanel,
             renameFeature,
+            serverFeatures,
+            gitFeature,
             debugPanel,
             explorer,
             sidebarViews,
@@ -166,6 +172,15 @@ type Shell(env: HostEnv) =
     member _.RenameTo
         with get () = renameFeature.RenameTo
         and set (v: string option) = renameFeature.RenameTo <- v
+
+    /// Git's gutter, blame and actions, for the tests and the screenshot switches.
+    member _.Git = gitFeature
+
+    /// The quick fixes the server offered at the caret, as (title, can be applied), and applying one by its title:
+    /// for the tests and the screenshot switches.
+    member _.OfferedFixes = serverFeatures.OfferedFixes
+    member _.RefreshFixes() = serverFeatures.RefreshFixes()
+    member _.ApplyFix(title: string) = serverFeatures.ApplyFix title
 
     /// The breakpoints now set, as (file, lines).
     member _.Breakpoints = allBreakpoints ()
