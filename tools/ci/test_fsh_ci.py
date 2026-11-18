@@ -155,6 +155,15 @@ class LazyPlanTests(unittest.TestCase):
         self.assertEqual(ci.plan_lazy(["preflight", "restore", "build"], set()), {})
 
 
+class BaseEnvTests(unittest.TestCase):
+    def test_git_hook_variables_do_not_reach_the_stages(self):
+        with mock.patch.dict(os.environ, {"GIT_DIR": "/some/repo/.git", "GIT_INDEX_FILE": "x", "GIT_WORK_TREE": "/w"}):
+            env = ci.base_env()
+        for name in ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE"):
+            self.assertNotIn(name, env)
+        self.assertEqual(env["CI"], "true")
+
+
 class ProfileTests(unittest.TestCase):
     def test_profiles_reference_known_stages_and_start_with_preflight(self):
         for name, stages in ci.PROFILES.items():
