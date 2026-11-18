@@ -176,6 +176,7 @@ while True:
             if m.group(1) and current is not None:
                 sym["kind"] = 6
                 current.setdefault("children", []).append(sym)
+                current["range"]["end"] = sym["range"]["end"]
             else:
                 top.append(sym)
                 current = sym if kind in (5, 23) else None

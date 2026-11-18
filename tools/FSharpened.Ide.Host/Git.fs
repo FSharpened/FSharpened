@@ -15,10 +15,35 @@ type GitChange =
 /// The state of the opened folder's repository, read by running `git` (a program found on the PATH, started with an
 /// argument list, never through a shell). A folder that is not a repository, or a computer without git, gives None.
 module Git =
+    /// `--no-optional-locks` keeps a status refresh from fighting a git command the person runs in a terminal at the
+    /// same time; `core.fsmonitor=false` keeps the repository's own configuration from starting a program of its own.
+    let internal baseArgs =
+        [ "git"
+          "--no-optional-locks"
+          "-c"
+          "core.quotepath=false"
+          "-c"
+          "core.fsmonitor=false" ]
+
     let private run (root: string) (args: string list) : string option =
-        match Proc.run ("git" :: "-c" :: "core.quotepath=false" :: args) root None (TimeSpan.FromSeconds 10.0) with
+        match Proc.run (baseArgs @ args) root None (TimeSpan.FromSeconds 10.0) with
         | Ok r when r.ExitCode = Some 0 -> Some r.Stdout
         | _ -> None
+
+    /// Runs git and gives its output, or the reason in git's own words.
+    let internal exec
+        (root: string)
+        (args: string list)
+        (stdin: string option)
+        (seconds: float)
+        : Result<string, string> =
+        match Proc.run (baseArgs @ args) root stdin (TimeSpan.FromSeconds seconds) with
+        | Ok r when r.ExitCode = Some 0 -> Ok r.Stdout
+        | Ok r when r.TimedOut -> Error "git took too long and was stopped"
+        | Ok r ->
+            let why = (if r.Stderr.Trim() <> "" then r.Stderr else r.Stdout).Trim()
+            Error(if why = "" then "git failed" else why)
+        | Error e -> Error e
 
     /// The current branch, or the short commit when HEAD is detached.
     let branch (root: string) : string option =
