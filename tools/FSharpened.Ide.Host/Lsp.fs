@@ -337,6 +337,9 @@ type LspClient(fromServer: Stream, toServer: Stream, onDiagnostics: string -> Ls
 
     member _.IsOpen = not closed
 
+    /// What the server said it can do at `initialize` (the `capabilities` object); None before the handshake.
+    member _.ServerCapabilities: JsonElement option = capabilities
+
     /// Sends a request and waits for its result; Ok None when the server returns null or does not answer, Error with
     /// the server's own message when it answers with an error.
     member _.RequestEx(methodName: string, args: obj) : Task<Result<JsonElement option, string>> =
@@ -408,7 +411,20 @@ type LspClient(fromServer: Stream, toServer: Stream, onDiagnostics: string -> Ls
                                completion = {| completionItem = {| snippetSupport = false |} |}
                                hover = {| contentFormat = [| "plaintext"; "markdown" |] |}
                                definition = {| linkSupport = false |}
-                               rename = {| prepareSupport = true |} |}
+                               rename = {| prepareSupport = true |}
+                               references = {| |}
+                               documentSymbol = {| hierarchicalDocumentSymbolSupport = true |}
+                               signatureHelp =
+                                {| signatureInformation =
+                                    {| documentationFormat = [| "plaintext"; "markdown" |]
+                                       parameterInformation = {| labelOffsetSupport = true |} |} |}
+                               codeAction =
+                                {| codeActionLiteralSupport =
+                                    {| codeActionKind = {| valueSet = [| "quickfix"; "refactor"; "source" |] |} |}
+                                   isPreferredSupport = true
+                                   disabledSupport = true
+                                   resolveSupport = {| properties = [| "edit" |] |} |}
+                               formatting = {| |} |}
                            workspace = {| workspaceEdit = {| documentChanges = true |} |} |}
                        workspaceFolders =
                         [| {| uri = LspWire.toUri rootPath

@@ -18,6 +18,7 @@
     <Compile Include="ToolingTests.fs" />
     <Compile Include="LaunchTests.fs" />
     <Compile Include="RenameTests.fs" />
+    <Compile Include="LspFeatureTests.fs" />
     <Compile Include="DapTests.fs" />
   </ItemGroup>
 

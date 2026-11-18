@@ -22,6 +22,7 @@
     <Compile Include="TermBackend.fs" />
     <Compile Include="Git.fs" />
     <Compile Include="Lsp.fs" />
+    <Compile Include="LspFeatures.fs" />
     <Compile Include="Rename.fs" />
     <Compile Include="Dap.fs" />
     <Compile Include="Interpret.fs" />
