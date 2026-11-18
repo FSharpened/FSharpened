@@ -154,6 +154,12 @@ let ``a tab says when it has unsaved edits or is gone from disk`` () =
     Assert.Equal("a.fs (deleted on disk)", Status.tabTitle "src/a.fs" false true)
     Assert.Equal("a.fs ● (deleted on disk)", Status.tabTitle "src/a.fs" true true)
 
+[<Fact>]
+let ``a screen reader hears the state of a tab in words`` () =
+    Assert.Equal("a.fs", Status.tabName "src/a.fs" false false)
+    Assert.Equal("a.fs, unsaved changes", Status.tabName "src/a.fs" true false)
+    Assert.Equal("a.fs, deleted on disk", Status.tabName "src/a.fs" false true)
+
 let private diag (sev: Severity) : StructuredDiagnostic = StructuredDiagnostic.create "X" sev "m"
 
 [<Fact>]

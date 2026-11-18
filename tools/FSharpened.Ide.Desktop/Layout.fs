@@ -6,6 +6,8 @@ open System.Collections.Generic
 open System.IO
 open System.Threading.Tasks
 open Avalonia
+open Avalonia.Automation
+open Avalonia.Automation.Peers
 open Avalonia.Controls
 open Avalonia.Controls.Documents
 open Avalonia.Controls.Primitives
@@ -114,6 +116,13 @@ type Layout
         let activityBorder =
             Border(Child = activity, BorderThickness = Thickness(0.0, 0.0, 1.0, 0.0))
 
+        Access.describe
+            "Activity bar"
+            "Choose the explorer, search, outline or tools view of the sidebar."
+            activityBorder
+        |> Access.landmark AutomationLandmarkType.Navigation
+        |> ignore
+
         themed (fun r ->
             activityBorder.Background <- r.Card
             activityBorder.BorderBrush <- r.Line)
@@ -129,6 +138,9 @@ type Layout
         let vsplit =
             GridSplitter(Width = 4.0, ResizeDirection = GridResizeDirection.Columns, Background = Brushes.Transparent)
 
+        Access.describe "Resize sidebar" "Drag, or press Left and Right, to change the sidebar's width." vsplit
+        |> ignore
+
         // tab strip with run controls
         let runButton =
             Button(
@@ -143,6 +155,11 @@ type Layout
             runButton.Foreground <- r.BrandFg)
 
         ToolTip.SetTip(runButton, "Run this file (Ctrl+F5)")
+
+        Access.describe "Run this file" "Runs the open file with its language's tools. Shortcut Ctrl+F5." runButton
+        |> Access.shortcut "Ctrl+F5"
+        |> ignore
+
         runButton.Click.Add(fun _ -> runCurrent Runner.defaultTimeoutSec)
         themed (restyleBox flagsBox)
         flagsBox.Margin <- Thickness(0.0, 4.0)
@@ -161,6 +178,7 @@ type Layout
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
             )
+            |> Access.describe "Open files" "Scrolls the tab strip."
         )
 
         let tabBorder =
@@ -195,6 +213,9 @@ type Layout
             openBtn.Background <- r.Brand
             openBtn.Foreground <- r.BrandFg)
 
+        Access.describe "Open folder" "Choose a folder to work in. Shortcut Ctrl+O." openBtn
+        |> ignore
+
         openBtn.Click.Add(fun _ -> openFolderDialog ())
         welcome.Children.Add openBtn
         welcome.Children.Add(muted "Ctrl+Shift+P  commands      Ctrl+P  go to file      Ctrl+F5  run      F5  debug")
@@ -206,12 +227,16 @@ type Layout
         editor.IsVisible <- false
         themed (fun r -> editorHost.Background <- r.EditorBg)
 
+        // the focus ring (keys only) round the editor
+        let editorRing = Border(Child = editorHost) |> Access.focusRing
+        themed (fun r -> editorRing.BorderBrush <- r.Accent)
+
         let editorColumn = DockPanel()
         DockPanel.SetDock(tabBorder, Dock.Top)
         DockPanel.SetDock(crumbs, Dock.Top)
         editorColumn.Children.Add tabBorder
         editorColumn.Children.Add crumbs
-        editorColumn.Children.Add editorHost
+        editorColumn.Children.Add editorRing
 
         // bottom panel
         let tabButton (name: string) (title: string) (content: Control) =
@@ -224,6 +249,14 @@ type Layout
                 )
 
             themed (fun r -> b.Foreground <- r.Fg)
+
+            Access.describe
+                (title.Substring(0, 1) + title.Substring(1).ToLowerInvariant() + " panel")
+                ("Shows the " + title.ToLowerInvariant() + " panel.")
+                b
+            |> Access.role AutomationControlType.TabItem
+            |> ignore
+
             b.Click.Add(fun _ -> showPanel name)
             panelTabs.Add((name, b, content))
             b
@@ -234,8 +267,8 @@ type Layout
         problemsHost.Children.Add problemsBox
         let inputHost = Grid()
         inputHost.Children.Add inputBox
-        let termHost = Grid()
-        termHost.Children.Add termView
+        let termHost = Border(Child = termView) |> Access.focusRing
+        themed (fun r -> termHost.BorderBrush <- r.Accent)
 
         themed (fun r ->
             outputBox.Background <- r.EditorBg
@@ -251,6 +284,15 @@ type Layout
             termView.SetColors(colorOf r.Fg, colorOf r.EditorBg, r.Dark, colorOf r.Selection))
 
         let headerButtons = StackPanel(Orientation = Orientation.Horizontal)
+
+        Access.describe "Panel tabs" "Output, problems, input, terminal and debug." headerButtons
+        |> Access.role AutomationControlType.Tab
+        |> ignore
+
+        Access.describe "Output contents" "" outputHost |> ignore
+        Access.describe "Problems contents" "" problemsHost |> ignore
+        Access.describe "Input contents" "" inputHost |> ignore
+        Access.describe "Terminal contents" "" termHost |> ignore
         headerButtons.Children.Add(tabButton "output" "OUTPUT" outputHost)
         headerButtons.Children.Add(tabButton "problems" "PROBLEMS" problemsHost)
         headerButtons.Children.Add(tabButton "input" "INPUT" inputHost)
@@ -258,6 +300,7 @@ type Layout
 
         // the debug panel: toolbar on top, then call stack | variables | console
         let debugHost = DockPanel()
+        Access.describe "Debug contents" "" debugHost |> ignore
 
         let tool (id: string) (text: string) (tip: string) (click: unit -> unit) =
             let b = flat text tip click
@@ -265,6 +308,11 @@ type Layout
             b
 
         let toolbar = StackPanel(Orientation = Orientation.Horizontal)
+
+        Access.describe "Debug toolbar" "Start, continue, step, pause and stop the program." toolbar
+        |> Access.role AutomationControlType.ToolBar
+        |> ignore
+
         toolbar.Children.Add(tool "start" "▶ Start" "Start debugging (F5)" debugStartOrContinue)
         toolbar.Children.Add(tool "continue" "▶ Continue" "Continue (F5)" debugContinue)
 
@@ -417,6 +465,9 @@ type Layout
                 HorizontalAlignment = HorizontalAlignment.Stretch
             )
 
+        Access.describe "Resize bottom panel" "Drag, or press Up and Down, to change the panel's height." hsplit
+        |> ignore
+
         mainGrid.RowDefinitions.Add(RowDefinition(Height = GridLength.Star))
         mainGrid.RowDefinitions.Add bottomSplitRow
         mainGrid.RowDefinitions.Add bottomRow
@@ -507,6 +558,13 @@ type Layout
         status.Children.Add left
         status.Children.Add right
         let statusBorder = Border(Child = status, Height = 24.0)
+
+        Access.describe
+            "Status bar"
+            "The open folder, Git branch, the latest message, problems, position and language."
+            statusBorder
+        |> Access.role AutomationControlType.StatusBar
+        |> ignore
 
         themed (fun r ->
             statusBorder.Background <- r.Brand

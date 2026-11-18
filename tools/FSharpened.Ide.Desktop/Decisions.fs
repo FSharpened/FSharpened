@@ -160,6 +160,12 @@ module Status =
         + (if dirty then " ●" else "")
         + (if missing then " (deleted on disk)" else "")
 
+    /// What a screen reader says for a tab: the dot becomes words.
+    let tabName (rel: string) (dirty: bool) (missing: bool) =
+        Path.GetFileName rel
+        + (if dirty then ", unsaved changes" else "")
+        + (if missing then ", deleted on disk" else "")
+
     /// A language server's severity number as a diagnostic severity.
     let severityOf (n: int) =
         match n with
@@ -186,6 +192,10 @@ module Keymap =
         | Key.S when ctrl -> Some "save"
         | Key.N when ctrl -> Some "new-file"
         | Key.W when ctrl -> Some "close-tab"
+        | Key.PageDown when ctrl -> Some "next-tab"
+        | Key.PageUp when ctrl -> Some "previous-tab"
+        | Key.D1 when ctrl -> Some "focus-editor"
+        | Key.D0 when ctrl -> Some "focus-explorer"
         | Key.B when ctrl -> Some "toggle-sidebar"
         | Key.J when ctrl -> Some "toggle-panel"
         | Key.E when ctrl && shift -> Some "explorer"

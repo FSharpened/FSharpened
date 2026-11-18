@@ -6,6 +6,8 @@ open System.Collections.Generic
 open System.IO
 open System.Threading.Tasks
 open Avalonia
+open Avalonia.Automation
+open Avalonia.Automation.Peers
 open Avalonia.Controls
 open Avalonia.Controls.Documents
 open Avalonia.Controls.Primitives
@@ -90,6 +92,8 @@ type Ui(env: HostEnv) =
             )
 
         ToolTip.SetTip(b, tip)
+        // a button of symbols ("✕") is named by what its tip says it does
+        Access.describe (Access.plainName tip) tip b |> ignore
         themed (fun r -> b.Foreground <- r.Fg)
         b.Click.Add(fun _ -> click ())
         b
@@ -121,6 +125,13 @@ type Ui(env: HostEnv) =
         let t =
             TextBox(PlaceholderText = hint, FontFamily = monoFont, VerticalContentAlignment = VerticalAlignment.Center)
 
+        // "Files to include, e.g. src/**, *.go" is named "Files to include"
+        let named =
+            match hint.IndexOf ", e.g." with
+            | -1 -> hint
+            | i -> hint.Substring(0, i)
+
+        Access.describe named hint t |> ignore
         themed (restyleBox t)
         t
 
@@ -132,6 +143,9 @@ type Ui(env: HostEnv) =
                 m.InputGesture <- KeyGesture.Parse gesture
             with _ ->
                 () // a gesture only shown in the palette, such as Ctrl+=, has no menu form
+
+        Access.nameOnly (Access.labelName header) (if gesture = "" then "" else "Shortcut " + gesture) m
+        |> ignore
 
         m.Click.Add(fun _ -> click ())
         m
@@ -311,6 +325,75 @@ type Ui(env: HostEnv) =
     let say (text: string) = statusRun.Text <- text
 
     let setOutput (text: string) = outputBox.Text <- text
+
+    // ---- accessibility: what a screen reader says about each control ------------------------------
+    do
+        let describe name help (c: #Control) = Access.describe name help c |> ignore
+
+        describe
+            "Code editor"
+            "Edits the open file. Ctrl+Space completes, F12 goes to the definition, F2 renames, F9 sets a breakpoint."
+            editor
+
+        describe
+            "Folder tree"
+            "The files of the open folder. Arrow keys move, Right and Left open and close a folder, Enter opens a file."
+            fileTree
+
+        describe "Output" "What the last run printed. Read only." outputBox
+
+        describe
+            "Problems"
+            "Errors and warnings from the language server and the last run. Enter opens the place."
+            problemsBox
+
+        describe "Standard input" "Text the program reads from standard input when it runs." inputBox
+
+        describe
+            "Compiler flags"
+            "Extra flags for the compiler or interpreter when this file runs, for example -O2."
+            flagsBox
+
+        describe
+            "Terminal"
+            "Your shell, in the open folder. Keys go to the shell; Ctrl+Shift+C copies and Ctrl+Shift+V pastes."
+            termView
+
+        describe "Call stack" "The frames of the paused program. Enter shows the frame's variables." dbgStack
+        describe "Variables" "The variables of the selected frame. Right opens a variable's children." dbgVars
+        describe "Debug console output" "What the program and the debugger printed. Read only." dbgConsole
+
+        describe
+            "Evaluate expression"
+            "Type an expression and press Enter to evaluate it while the program is paused."
+            dbgInput
+
+        describe
+            "Command palette input"
+            "Type to open a file, a greater-than sign for commands, a colon for a line, an at sign for a symbol."
+            paletteInput
+
+        describe "Command palette results" "Up and Down choose, Enter runs, Escape closes." paletteList
+        describe "Command palette" "" palette
+        describe "Tabs" "The open files." tabStrip
+        describe "Sidebar" "Explorer, search, outline or tools, as chosen in the activity bar." sidebarHost
+        describe "Breadcrumb" "The open file's path and the symbols around the caret." crumbs
+        describe "Welcome" "Open a folder to begin." welcome
+        describe "Sidebar title" "" sidebarTitle
+        // the focus lands on the editor's text area, so a screen reader needs the name there too
+        Access.nameOnly "Code editor" "Edits the open file." editor.TextArea |> ignore
+        Access.role AutomationControlType.Tab tabStrip |> ignore
+        Access.landmark AutomationLandmarkType.Navigation sidebarHost |> ignore
+        Access.landmark AutomationLandmarkType.Main editor |> ignore
+        Access.role AutomationControlType.Pane palette |> ignore
+        Access.live statusRun |> ignore
+        Access.describe "Status message" "" statusRun |> ignore
+        Access.describe "Folder name" "" statusFolder |> ignore
+        Access.describe "Git branch and changes" "" statusGit |> ignore
+        Access.describe "File watcher" "" statusWatch |> ignore
+        Access.describe "Cursor position" "" statusPos |> ignore
+        Access.describe "Language of the open file" "" statusLang |> ignore
+        Access.describe "Problem counts" "" statusProblems |> ignore
 
     member _.Active
         with get () = active

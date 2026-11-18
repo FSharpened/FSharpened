@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <Compile Include="Ext.fs" />
+    <Compile Include="Access.fs" />
     <Compile Include="Palette.fs" />
     <Compile Include="Session.fs" />
     <Compile Include="Hover.fs" />

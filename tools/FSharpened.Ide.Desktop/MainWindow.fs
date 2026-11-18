@@ -126,6 +126,12 @@ type Shell(env: HostEnv) =
     let window = ui.Window
 
     member _.Window = window
+
+    /// The ids of every command (the palette, the menus and the keys run these).
+    member _.CommandIds = commands.Commands |> List.map (fun c -> c.Id)
+
+    /// The editor's find and replace panel (for the tests).
+    member _.SearchPanel = ui.SearchPanel
     member _.Env = env
     member _.Editor = editor
     member _.OpenFolder(path: string) = openFolder path

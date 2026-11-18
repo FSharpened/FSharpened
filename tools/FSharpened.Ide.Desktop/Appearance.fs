@@ -54,6 +54,8 @@ type Appearance(ui: Ui) =
             content.IsVisible <- (n = name)
             button.FontWeight <- (if n = name then FontWeight.Bold else FontWeight.Normal)
 
+            Avalonia.Automation.AutomationProperties.SetItemStatus(button, (if n = name then "selected" else ""))
+
     let setPanelVisible (v: bool) =
         ui.PanelShown <- v
         bottomRow.Height <- (if v then GridLength 230.0 else GridLength 0.0)

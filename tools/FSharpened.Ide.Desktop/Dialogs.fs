@@ -7,6 +7,11 @@ open Avalonia.Input
 open Avalonia.Layout
 open Avalonia.Media
 
+let private shownEvent = Event<Window>()
+
+/// Raised for every dialog the window opens, just before it is shown (the tests use it to find a question).
+let shown = shownEvent.Publish
+
 let private shell (owner: Window) (title: string) (roles: Palette.Roles) (width: float) (body: Control) : Window =
     let w = Window()
     w.Title <- title
@@ -17,6 +22,8 @@ let private shell (owner: Window) (title: string) (roles: Palette.Roles) (width:
     w.WindowStartupLocation <- WindowStartupLocation.CenterOwner
     w.Background <- roles.Bg
     w.Content <- body
+    Access.describe title "" w |> ignore
+    shownEvent.Trigger w
     w
 
 let private button (roles: Palette.Roles) (text: string) (primary: bool) (click: unit -> unit) : Button =
@@ -27,6 +34,7 @@ let private button (roles: Palette.Roles) (text: string) (primary: bool) (click:
     b.Background <- (if primary then roles.Brand else roles.Card)
     b.Foreground <- (if primary then roles.BrandFg else roles.Fg)
     b.BorderBrush <- roles.Line
+    Access.describe text "" b |> ignore
     b.Click.Add(fun _ -> click ())
     b
 
@@ -94,6 +102,10 @@ let ask
     input.Background <- roles.Code
     input.Foreground <- roles.Fg
     input.BorderBrush <- roles.Line
+
+    Access.describe (Access.plainName (label.TrimEnd ':')) "Type, then press Enter to accept or Escape to cancel." input
+    |> ignore
+
     let problem = message roles ""
     problem.Foreground <- roles.Bad
 
@@ -199,6 +211,10 @@ let preview
     scroll.Content <- list
     scroll.MaxHeight <- 340.0
     scroll.HorizontalScrollBarVisibility <- Primitives.ScrollBarVisibility.Auto
+
+    Access.describe "Changes" "The files and lines the rename changes." scroll
+    |> ignore
+
     let border = Border()
     border.Child <- scroll
     border.BorderBrush <- roles.Line

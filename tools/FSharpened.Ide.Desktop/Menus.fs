@@ -6,6 +6,8 @@ open System.Collections.Generic
 open System.IO
 open System.Threading.Tasks
 open Avalonia
+open Avalonia.Automation
+open Avalonia.Automation.Peers
 open Avalonia.Controls
 open Avalonia.Controls.Documents
 open Avalonia.Controls.Primitives
@@ -46,35 +48,43 @@ type Menus(ui: Ui, appearance: Appearance, sidebarViews: SidebarViews, folderSes
         let c = command id
         menuItem (c.Title.Substring(c.Title.IndexOf ':' + 1).Trim()) c.Keys c.Run
 
+    /// A menu item is named by its header, without the access-key underscore.
+    let named (m: MenuItem) =
+        Access.nameOnly (Access.labelName (string m.Header)) "" m
+
     let buildMenu () =
         let bar = Menu()
+
+        Access.describe "Main menu" "File, Edit, View, Run, Debug and Tools." bar
+        |> Access.landmark AutomationLandmarkType.Navigation
+        |> ignore
 
         themed (fun r ->
             bar.Background <- r.Card
             bar.Foreground <- r.Fg)
 
         let top (header: string) (items: Control list) =
-            let m = MenuItem(Header = header)
+            let m = named (MenuItem(Header = header))
 
             for i in items do
                 m.Items.Push i
 
             bar.Items.Push m
 
-        let recent = MenuItem(Header = "Open Recent")
+        let recent = named (MenuItem(Header = "Open Recent"))
 
         recent.SubmenuOpened.Add(fun _ ->
             recent.Items.Clear()
 
             if ui.Prefs.Recent.IsEmpty then
-                recent.Items.Push(MenuItem(Header = "(none)", IsEnabled = false))
+                recent.Items.Push(named (MenuItem(Header = "(none)", IsEnabled = false)))
 
             for p in ui.Prefs.Recent do
                 recent.Items.Push(menuItem p "" (fun () -> openFolder p)))
 
-        recent.Items.Push(MenuItem(Header = "(none)", IsEnabled = false))
+        recent.Items.Push(named (MenuItem(Header = "(none)", IsEnabled = false)))
 
-        let themeMenu = MenuItem(Header = "Color Theme")
+        let themeMenu = named (MenuItem(Header = "Color Theme"))
 
         for t in Palette.choices do
             themeMenu.Items.Push(menuItem t.Name "" (fun () -> applyTheme t))
@@ -152,6 +162,10 @@ type Menus(ui: Ui, appearance: Appearance, sidebarViews: SidebarViews, folderSes
             )
 
         ToolTip.SetTip(b, tip)
+
+        Access.describe (Access.plainName tip) ("Shows the " + Access.plainName tip + " view of the sidebar.") b
+        |> ignore
+
         themed (fun r -> b.Foreground <- r.Muted)
 
         b.Click.Add(fun _ ->

@@ -55,8 +55,31 @@ type SidebarViews(ui: Ui, appearance: Appearance, statusBar: StatusBar, editorTa
     let wordToggle = ToggleButton(Content = "ab", Padding = Thickness(6.0, 2.0))
     let regexToggle = ToggleButton(Content = ".*", Padding = Thickness(6.0, 2.0))
     let searchSummary = muted ""
+
     let outlineList = ListBox(Background = Brushes.Transparent)
     let toolsPanel = StackPanel(Spacing = 6.0, Margin = Thickness(12.0, 4.0))
+
+    // what a screen reader says about the search view's controls (the text boxes are named by `ui.TextBox`)
+    do
+        Access.describe "Match case" "Only matches with the same upper and lower case." caseToggle
+        |> ignore
+
+        Access.describe "Match whole word" "Only matches that are whole words." wordToggle
+        |> ignore
+
+        Access.describe "Use regular expression" "Reads the search text as a regular expression." regexToggle
+        |> ignore
+
+        Access.describe "Search results" "Matches in files. Enter opens the one chosen." searchResults
+        |> ignore
+
+        Access.describe "Outline" "The symbols of the open file. Enter goes to the one chosen." outlineList
+        |> ignore
+
+        Access.describe "Search summary" "" searchSummary |> ignore
+
+        Access.describe "Tools and languages" "Which programs the language packs found on this computer." toolsPanel
+        |> ignore
 
     let textOf (b: TextBox) =
         b.Text |> Option.ofObj |> Option.defaultValue ""
@@ -260,7 +283,7 @@ type SidebarViews(ui: Ui, appearance: Appearance, statusBar: StatusBar, editorTa
         }
         |> ignore
 
-    let searchView () : Control =
+    let buildSearchView () : Control =
         let s = StackPanel(Spacing = 6.0, Margin = Thickness(10.0, 0.0))
         s.Children.Add searchBox
         s.Children.Add replaceBox
@@ -278,6 +301,10 @@ type SidebarViews(ui: Ui, appearance: Appearance, statusBar: StatusBar, editorTa
         d.Children.Add s
         d.Children.Add searchResults
         d :> Control
+
+    // built once: a control has one parent, and Search can be chosen again while the view is already showing
+    let searchPane = lazy (buildSearchView ())
+    let searchView () : Control = searchPane.Value
 
     let showSidebar (name: string) =
         ui.SidebarView <- name

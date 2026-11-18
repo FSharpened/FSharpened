@@ -88,6 +88,20 @@ type Explorer(ui: Ui, editorTabs: EditorTabs) =
 
                     item.Header <- name
 
+                    // everything the context menu does is also on keys while the row has the focus
+                    item.KeyDown.Add(fun ev ->
+                        match ev.Key with
+                        | Key.Enter when not e.IsDir ->
+                            ev.Handled <- true
+                            ui.OpenFileFn e.Rel 0 0
+                        | Key.F2 ->
+                            ev.Handled <- true
+                            renameEntry e
+                        | Key.Delete ->
+                            ev.Handled <- true
+                            deleteEntry e
+                        | _ -> ())
+
                     let menu = ContextMenu()
                     buildTreeMenu menu e
                     item.ContextMenu <- menu

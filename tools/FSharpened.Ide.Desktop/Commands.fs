@@ -58,6 +58,10 @@ type Commands
     let newEntry = explorer.NewEntry
     let openFolderDialog = folderSession.OpenFolderDialog
     let rebuildTabs = editorTabs.RebuildTabs
+    let activate = editorTabs.Activate
+    let docs = ui.Docs
+    let editor = ui.Editor
+    let fileTree = ui.FileTree
     let renameSymbolNow = renameFeature.RenameSymbolNow
     let replaceBox = sidebarViews.ReplaceBox
     let restartTerminal = terminalPanel.RestartTerminal
@@ -96,6 +100,16 @@ type Commands
         applyEditorPrefs ()
         savePrefs ()
 
+    /// The next (or, with a negative step, the previous) open file, wrapping round.
+    let cycleTab (step: int) =
+        if docs.Count > 1 then
+            let i =
+                match ui.Active with
+                | Some a -> docs.IndexOf a
+                | None -> 0
+
+            activate (Some docs[(i + step + docs.Count) % docs.Count])
+
     let commands: Command list =
         [ { Id = "open-folder"
             Title = "File: Open Folder…"
@@ -122,6 +136,25 @@ type Commands
             Title = "View: Close Editor"
             Keys = "Ctrl+W"
             Run = (fun () -> ui.Active |> Option.iter closeDoc) }
+          { Id = "next-tab"
+            Title = "View: Next Editor"
+            Keys = "Ctrl+PageDown"
+            Run = (fun () -> cycleTab 1) }
+          { Id = "previous-tab"
+            Title = "View: Previous Editor"
+            Keys = "Ctrl+PageUp"
+            Run = (fun () -> cycleTab -1) }
+          { Id = "focus-editor"
+            Title = "View: Focus Editor"
+            Keys = "Ctrl+1"
+            Run = (fun () -> editor.Focus() |> ignore) }
+          { Id = "focus-explorer"
+            Title = "View: Focus Explorer"
+            Keys = "Ctrl+0"
+            Run =
+              (fun () ->
+                  showSidebar "files"
+                  fileTree.Focus() |> ignore) }
           { Id = "close-folder"
             Title = "File: Close Folder"
             Keys = ""

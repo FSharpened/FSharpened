@@ -6,6 +6,8 @@ open System.Collections.Generic
 open System.IO
 open System.Threading.Tasks
 open Avalonia
+open Avalonia.Automation
+open Avalonia.Automation.Peers
 open Avalonia.Controls
 open Avalonia.Controls.Documents
 open Avalonia.Controls.Primitives
@@ -94,10 +96,53 @@ type EditorTabs
                     BorderThickness = Thickness(0.0, 0.0, 1.0, (if isActive then 2.0 else 0.0)),
                     BorderBrush = (if isActive then ui.Roles.Brand else ui.Roles.Line),
                     Background = (if isActive then ui.Roles.EditorBg else Brushes.Transparent),
-                    Cursor = new Cursor(StandardCursorType.Hand)
+                    Cursor = new Cursor(StandardCursorType.Hand),
+                    Focusable = true
                 )
 
+            // a tab is a control of its own for the keyboard and for a screen reader: the focus ring is drawn by the
+            // `tab` style (App.fs), Enter or Space activates it, Delete closes it; Ctrl+PageUp and Ctrl+PageDown move along the strip
+            tab.Classes.Add "tab"
             ToolTip.SetTip(tab, d.Rel)
+
+            Access.describe
+                (Status.tabName d.Rel d.Dirty d.MissingOnDisk)
+                (sprintf "%s. Enter shows it, Delete closes it." d.Rel)
+                tab
+            |> Access.role AutomationControlType.TabItem
+            |> ignore
+
+            Avalonia.Automation.AutomationProperties.SetItemStatus(tab, (if isActive then "selected" else ""))
+
+            Access.describe
+                ("Close " + Path.GetFileName d.Rel)
+                "Closes the file; asks first when it has unsaved changes."
+                close
+            |> ignore
+
+            // the focus ring (keys only): the tab's border turns to the accent colour while the focus is on it
+            let restBrush = tab.BorderBrush
+            let restThickness = tab.BorderThickness
+
+            tab.GotFocus.Add(fun e ->
+                if e.NavigationMethod <> NavigationMethod.Pointer then
+                    tab.BorderBrush <- ui.Roles.Accent
+                    tab.BorderThickness <- Thickness 2.0)
+
+            tab.LostFocus.Add(fun _ ->
+                tab.BorderBrush <- restBrush
+                tab.BorderThickness <- restThickness)
+
+            tab.KeyDown.Add(fun e ->
+                match e.Key with
+                | Key.Enter
+                | Key.Space ->
+                    e.Handled <- true
+                    activate (Some d)
+                | Key.Delete ->
+                    e.Handled <- true
+                    closeDoc d
+                | _ -> ())
 
             tab.PointerPressed.Add(fun e ->
                 let p = e.GetCurrentPoint tab
@@ -255,6 +300,12 @@ type EditorTabs
                             outlineTimer.Start()
                             rebuildTabs ())
 
+                        // the undo stack learns of the first edit only after `TextChanged` has fired, so the tab's
+                        // "unsaved" dot is also redrawn when the stack says the text is no longer the original
+                        d.Doc.UndoStack.PropertyChanged.Add(fun a ->
+                            if a.PropertyName = "IsOriginalFile" then
+                                rebuildTabs ())
+
                         docs.Add d
                         Some d
                     | Error e ->
@@ -272,6 +323,7 @@ type EditorTabs
 
     do ui.OpenFileFn <- openFile
 
+    member _.Activate = activate
     member _.CloseDoc = closeDoc
     member _.CloseNow = closeNow
     member _.OpenFile = openFile

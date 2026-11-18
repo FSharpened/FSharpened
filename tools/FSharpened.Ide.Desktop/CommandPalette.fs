@@ -72,6 +72,10 @@ type CommandPalette(ui: Ui, commands: Commands) =
             row.Children.Add d
 
         row.Children.Add t
+
+        Access.describe text (if detail = "" then "" else "Shortcut " + detail) row
+        |> ignore
+
         row
 
     let refreshPalette () =

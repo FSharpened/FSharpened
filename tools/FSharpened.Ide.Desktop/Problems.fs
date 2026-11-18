@@ -88,6 +88,21 @@ type Problems(ui: Ui) =
 
             row.Children.Add msg
             row.Children.Add(TextBlock(Text = where, Foreground = ui.Roles.Muted))
+
+            Access.describe
+                (sprintf
+                    "%s: %s"
+                    (if d.Severity = FSharpened.Diagnostics.Severity.Error then
+                         "Error"
+                     elif d.Severity = FSharpened.Diagnostics.Severity.Warning then
+                         "Warning"
+                     else
+                         "Information")
+                    d.Message)
+                where
+                row
+            |> ignore
+
             problemsBox.Items.Push row
 
         statusProblems.Text <- Status.problems list
