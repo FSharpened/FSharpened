@@ -21,6 +21,9 @@
     <Compile Include="LspFeatureTests.fs" />
     <Compile Include="GitTests.fs" />
     <Compile Include="DapTests.fs" />
+    <Compile Include="CursorTests.fs" />
+    <Compile Include="KeybindingTests.fs" />
+    <Compile Include="SnippetTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -38,6 +38,7 @@ type Commands
         runPanel: RunPanel,
         renameFeature: RenameFeature,
         serverFeatures: ServerFeatures,
+        editorFeatures: EditorFeatures,
         gitFeature: GitFeature,
         debugPanel: DebugPanel,
         explorer: Explorer,
@@ -115,15 +116,12 @@ type Commands
     let commands: Command list =
         [ { Id = "open-folder"
             Title = "File: Open Folder…"
-            Keys = "Ctrl+O"
             Run = openFolderDialog }
           { Id = "new-file"
             Title = "File: New File…"
-            Keys = "Ctrl+N"
             Run = (fun () -> newEntry "" false) }
           { Id = "save"
             Title = "File: Save"
-            Keys = "Ctrl+S"
             Run =
               (fun () ->
                   ui.Active
@@ -132,204 +130,191 @@ type Commands
                       rebuildTabs ())) }
           { Id = "save-all"
             Title = "File: Save All"
-            Keys = "Ctrl+Shift+S"
             Run = saveAll }
           { Id = "close-tab"
             Title = "View: Close Editor"
-            Keys = "Ctrl+W"
             Run = (fun () -> ui.Active |> Option.iter closeDoc) }
           { Id = "next-tab"
             Title = "View: Next Editor"
-            Keys = "Ctrl+PageDown"
             Run = (fun () -> cycleTab 1) }
           { Id = "previous-tab"
             Title = "View: Previous Editor"
-            Keys = "Ctrl+PageUp"
             Run = (fun () -> cycleTab -1) }
           { Id = "focus-editor"
             Title = "View: Focus Editor"
-            Keys = "Ctrl+1"
             Run = (fun () -> editor.Focus() |> ignore) }
           { Id = "focus-explorer"
             Title = "View: Focus Explorer"
-            Keys = "Ctrl+0"
             Run =
               (fun () ->
                   showSidebar "files"
                   fileTree.Focus() |> ignore) }
           { Id = "close-folder"
             Title = "File: Close Folder"
-            Keys = ""
             Run = closeFolder }
           { Id = "run"
             Title = "Run: Run This File"
-            Keys = "Ctrl+F5"
             Run = (fun () -> runCurrent Runner.defaultTimeoutSec) }
           { Id = "debug-start"
             Title = "Debug: Start Debugging"
-            Keys = "F5"
             Run = debugStartOrContinue }
           { Id = "debug-continue"
             Title = "Debug: Continue"
-            Keys = ""
             Run = debugContinue }
           { Id = "debug-step-over"
             Title = "Debug: Step Over"
-            Keys = "F10"
             Run = (fun () -> debugStep "Step over" (fun c t -> c.Next t)) }
           { Id = "debug-step-into"
             Title = "Debug: Step Into"
-            Keys = "F11"
             Run = (fun () -> debugStep "Step into" (fun c t -> c.StepIn t)) }
           { Id = "debug-step-out"
             Title = "Debug: Step Out"
-            Keys = "Shift+F11"
             Run = (fun () -> debugStep "Step out" (fun c t -> c.StepOut t)) }
           { Id = "debug-pause"
             Title = "Debug: Pause"
-            Keys = ""
             Run = debugPause }
           { Id = "debug-stop"
             Title = "Debug: Stop Debugging"
-            Keys = "Shift+F5"
             Run = debugStop }
           { Id = "toggle-breakpoint"
             Title = "Debug: Toggle Breakpoint"
-            Keys = "F9"
             Run = toggleBreakpoint }
           { Id = "debug-panel"
             Title = "Debug: Show Debug Panel"
-            Keys = ""
             Run =
               (fun () ->
                   setPanelVisible true
                   showPanel "debug") }
           { Id = "rename-symbol"
             Title = "Rename Symbol (language server)"
-            Keys = "F2"
             Run = renameSymbolNow }
           { Id = "git-view"
             Title = "Git: Show Source Control"
-            Keys = "Ctrl+Shift+G"
             Run = (fun () -> showSidebar "git") }
           { Id = "git-stage-file"
             Title = "Git: Stage Current File"
-            Keys = ""
             Run = gitFeature.StageFile }
           { Id = "git-unstage-file"
             Title = "Git: Unstage Current File"
-            Keys = ""
             Run = gitFeature.UnstageFile }
           { Id = "git-commit"
             Title = "Git: Commit Staged Changes"
-            Keys = ""
             Run =
               (fun () ->
                   showSidebar "git"
                   gitFeature.Commit()) }
           { Id = "git-switch-branch"
             Title = "Git: Switch Branch…"
-            Keys = ""
             Run = gitFeature.SwitchBranch }
           { Id = "git-new-branch"
             Title = "Git: Create New Branch…"
-            Keys = ""
             Run = gitFeature.NewBranch }
           { Id = "git-blame"
             Title = "Git: Toggle Blame"
-            Keys = ""
             Run = gitFeature.ToggleBlame }
           { Id = "git-refresh"
             Title = "Git: Refresh"
-            Keys = ""
             Run = gitFeature.Refresh }
           { Id = "trust-folder"
             Title = "Run: Trust This Folder…"
-            Keys = ""
             Run = gitFeature.TrustFolder }
           { Id = "run-long"
             Title = "Run: Run This File (120 s limit)"
-            Keys = ""
             Run = (fun () -> runCurrent Runner.maxTimeoutSec) }
           { Id = "show-hover"
             Title = "Editor: Show Hover"
-            Keys = ""
             Run = showHoverAtCaret }
           { Id = "format"
             Title = "Format Document"
-            Keys = "Shift+Alt+F"
             Run = formatCurrent }
           { Id = "complete"
             Title = "Trigger Suggest (language server)"
-            Keys = "Ctrl+Space"
             Run = completeNow }
           { Id = "definition"
             Title = "Go to Definition (language server)"
-            Keys = "F12"
             Run = gotoDefinitionNow }
           { Id = "references"
             Title = "Find All References (language server)"
-            Keys = "Shift+F12"
             Run = serverFeatures.FindReferences }
           { Id = "signature-help"
             Title = "Show Signature Help (language server)"
-            Keys = "Ctrl+Shift+Space"
             Run = serverFeatures.ShowSignatureHelp }
           { Id = "quick-fix"
             Title = "Quick Fix… (language server)"
-            Keys = "Ctrl+."
             Run = serverFeatures.QuickFix }
+          { Id = "cursor-below"
+            Title = "Cursors: Add Cursor Below"
+            Run = editorFeatures.Cursors.AddCursorBelow }
+          { Id = "cursor-above"
+            Title = "Cursors: Add Cursor Above"
+            Run = editorFeatures.Cursors.AddCursorAbove }
+          { Id = "select-next-match"
+            Title = "Cursors: Add Selection to Next Match"
+            Run = editorFeatures.Cursors.SelectNextMatch }
+          { Id = "select-all-matches"
+            Title = "Cursors: Select All Matches"
+            Run = editorFeatures.Cursors.SelectAllMatches }
+          { Id = "clear-cursors"
+            Title = "Cursors: Back to One Cursor"
+            Run = editorFeatures.Cursors.Clear }
+          { Id = "insert-snippet"
+            Title = "Snippets: Insert Snippet…"
+            Run = (fun () -> ui.ShowPaletteFn "$") }
+          { Id = "reload-snippets"
+            Title = "Snippets: Reload My Snippets"
+            Run = editorFeatures.Snippets.Reload }
+          { Id = "snippets-folder"
+            Title = "Snippets: Open My Snippets Folder"
+            Run =
+              (fun () ->
+                  Directory.CreateDirectory env.UserSnippets |> ignore
+
+                  window.Launcher.LaunchDirectoryInfoAsync(DirectoryInfo env.UserSnippets)
+                  |> ignore) }
+          { Id = "keybindings"
+            Title = "Preferences: Keyboard Shortcuts"
+            Run = (fun () -> showSidebar "keys") }
           { Id = "references-panel"
             Title = "View: Show References"
-            Keys = ""
             Run =
               (fun () ->
                   setPanelVisible true
                   showPanel "references") }
           { Id = "quick-open"
             Title = "Go to File…"
-            Keys = "Ctrl+P"
             Run = (fun () -> ui.ShowPaletteFn "") }
           { Id = "goto-line"
             Title = "Go to Line…"
-            Keys = "Ctrl+G"
             Run = (fun () -> ui.ShowPaletteFn ":") }
           { Id = "goto-symbol"
             Title = "Go to Symbol in Editor…"
-            Keys = "Ctrl+Shift+O"
             Run = (fun () -> ui.ShowPaletteFn "@") }
           { Id = "palette"
             Title = "Show All Commands"
-            Keys = "Ctrl+Shift+P"
             Run = (fun () -> ui.ShowPaletteFn ">") }
           { Id = "find"
             Title = "Find in File"
-            Keys = "Ctrl+F"
             Run =
               (fun () ->
                   searchPanel.Open()
                   ()) }
           { Id = "find-files"
             Title = "Search: Find in Files"
-            Keys = "Ctrl+Shift+F"
             Run = (fun () -> showSidebar "search") }
           { Id = "replace-in-file"
             Title = "Edit: Replace in This File"
-            Keys = "Ctrl+H"
             Run =
               (fun () ->
                   searchPanel.IsReplaceMode <- true
                   searchPanel.Open()) }
           { Id = "replace-in-files"
             Title = "Search: Replace in Files"
-            Keys = "Ctrl+Shift+H"
             Run =
               (fun () ->
                   showSidebar "search"
                   replaceBox.Focus() |> ignore) }
           { Id = "terminal"
             Title = "Terminal: Open"
-            Keys = "Ctrl+`"
             Run =
               (fun () ->
                   setPanelVisible true
@@ -337,7 +322,6 @@ type Commands
                   termView.Focus() |> ignore) }
           { Id = "terminal-restart"
             Title = "Terminal: Restart"
-            Keys = ""
             Run =
               (fun () ->
                   setPanelVisible true
@@ -345,87 +329,69 @@ type Commands
                   restartTerminal ()) }
           { Id = "terminal-clear"
             Title = "Terminal: Clear"
-            Keys = ""
             Run = (fun () -> termView.Clear()) }
           { Id = "explorer"
             Title = "View: Show Explorer"
-            Keys = "Ctrl+Shift+E"
             Run = (fun () -> showSidebar "files") }
           { Id = "outline"
             Title = "View: Show Outline"
-            Keys = ""
             Run = (fun () -> showSidebar "outline") }
           { Id = "tools"
             Title = "View: Show Tools and Languages"
-            Keys = ""
             Run = (fun () -> showSidebar "tools") }
           { Id = "toggle-sidebar"
             Title = "View: Toggle Side Bar"
-            Keys = "Ctrl+B"
             Run = (fun () -> setSidebarVisible (not ui.SidebarShown)) }
           { Id = "toggle-panel"
             Title = "View: Toggle Panel"
-            Keys = "Ctrl+J"
             Run = (fun () -> setPanelVisible (not ui.PanelShown)) }
           { Id = "problems"
             Title = "View: Show Problems"
-            Keys = "Ctrl+Shift+M"
             Run =
               (fun () ->
                   setPanelVisible true
                   showPanel "problems") }
           { Id = "output"
             Title = "View: Show Output"
-            Keys = ""
             Run =
               (fun () ->
                   setPanelVisible true
                   showPanel "output") }
           { Id = "zoom-in"
             Title = "View: Increase Font Size"
-            Keys = "Ctrl+="
             Run = (fun () -> setFont 1) }
           { Id = "zoom-out"
             Title = "View: Decrease Font Size"
-            Keys = "Ctrl+-"
             Run = (fun () -> setFont -1) }
           { Id = "wrap"
             Title = "View: Toggle Word Wrap"
-            Keys = "Alt+Z"
             Run = (fun () -> toggle (fun e -> e.WordWrap) (fun e v -> { e with WordWrap = v })) }
           { Id = "whitespace"
             Title = "View: Toggle Render Whitespace"
-            Keys = ""
             Run = (fun () -> toggle (fun e -> e.RenderWhitespace) (fun e v -> { e with RenderWhitespace = v })) }
           { Id = "line-numbers"
             Title = "View: Toggle Line Numbers"
-            Keys = ""
             Run = (fun () -> toggle (fun e -> e.LineNumbers) (fun e v -> { e with LineNumbers = v })) }
           { Id = "breadcrumbs"
             Title = "View: Toggle Breadcrumbs"
-            Keys = ""
             Run = (fun () -> toggle (fun e -> e.Breadcrumbs) (fun e v -> { e with Breadcrumbs = v })) }
           { Id = "refresh-tools"
             Title = "Tools: Refresh Installed Tools"
-            Keys = ""
             Run = (fun () -> showSidebar "tools") }
           { Id = "reload-packs"
             Title = "Languages: Reload Language Packs"
-            Keys = ""
             Run =
               (fun () ->
                   env.ReloadLanguages()
                   showSidebar "tools") }
           { Id = "packs-folder"
             Title = "Languages: Open My Language Packs Folder"
-            Keys = ""
             Run =
               (fun () ->
                   Directory.CreateDirectory env.UserPacks |> ignore
                   window.Launcher.LaunchDirectoryInfoAsync(DirectoryInfo env.UserPacks) |> ignore) }
           { Id = "revoke-trust"
             Title = "Run: Revoke Trust for This Folder"
-            Keys = ""
             Run =
               (fun () ->
                   match ui.Root with
@@ -436,7 +402,6 @@ type Commands
         @ [ for t in Palette.choices ->
                 { Id = "theme-" + t.Id
                   Title = "Color Theme: " + t.Name
-                  Keys = ""
                   Run = (fun () -> applyTheme t) } ]
 
 

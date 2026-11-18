@@ -55,6 +55,12 @@ type Ui(env: HostEnv) =
     let mutable gitEntries: GitEntry list = []
     /// Run after git's state (branch, changes) was read again.
     let onGitChanged = List<unit -> unit>()
+    /// The keyboard shortcuts now in force (the shipped ones with the person's `keybindings.json` laid over them).
+    let mutable bindings = Keybindings.defaults
+    /// Run after the shortcuts changed, so the menus and the palette show the new ones.
+    let onBindingsChanged = List<unit -> unit>()
+    /// While the shortcuts view waits for a new shortcut, every key press goes here instead of running a command.
+    let mutable keyCapture: (Key -> KeyModifiers -> unit) option = None
     /// Sidebar views other parts add: name -> (title, builder).
     let extraViews = Dictionary<string, string * (unit -> Control)>()
     let mutable runDiagnostics: FSharpened.Diagnostics.StructuredDiagnostic list = []
@@ -206,6 +212,10 @@ type Ui(env: HostEnv) =
     let statusPos = TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
     let statusLang = TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
     let statusGit = TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
+
+    let statusCursors =
+        TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
+
     let statusWatch = TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
 
     let statusProblems =
@@ -428,7 +438,7 @@ type Ui(env: HostEnv) =
 
         describe
             "Command palette input"
-            "Type to open a file, a greater-than sign for commands, a colon for a line, an at sign for a symbol."
+            "Type to open a file, a greater-than sign for commands, a colon for a line, an at sign for a symbol, a dollar sign for a snippet."
             paletteInput
 
         describe "Command palette results" "Up and Down choose, Enter runs, Escape closes." paletteList
@@ -450,6 +460,7 @@ type Ui(env: HostEnv) =
         Access.describe "Git branch and changes" "" statusGit |> ignore
         Access.describe "File watcher" "" statusWatch |> ignore
         Access.describe "Cursor position" "" statusPos |> ignore
+        Access.describe "Number of cursors" "" statusCursors |> ignore
         Access.describe "Language of the open file" "" statusLang |> ignore
         Access.describe "Problem counts" "" statusProblems |> ignore
 
@@ -498,6 +509,19 @@ type Ui(env: HostEnv) =
         and set v = gitEntries <- v
 
     member _.OnGitChanged = onGitChanged
+
+    member _.Bindings
+        with get () = bindings
+        and set v = bindings <- v
+
+    member _.OnBindingsChanged = onBindingsChanged
+
+    member _.KeyCapture
+        with get () = keyCapture
+        and set v = keyCapture <- v
+
+    /// The shortcuts of a command as text ("Ctrl+S"), "" when it has none.
+    member _.KeysFor(command: string) = Keybindings.shownFor bindings command
     member _.ExtraViews = extraViews
 
     member _.Hooks = hooks
@@ -615,6 +639,7 @@ type Ui(env: HostEnv) =
     member _.Squiggles = squiggles
     member _.StatusFolder = statusFolder
     member _.StatusGit = statusGit
+    member _.StatusCursors = statusCursors
     member _.StatusLang = statusLang
     member _.StatusPos = statusPos
     member _.StatusProblems = statusProblems

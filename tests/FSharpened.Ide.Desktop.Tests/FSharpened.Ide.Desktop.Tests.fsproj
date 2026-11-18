@@ -19,6 +19,8 @@
     <Compile Include="LspDecisionTests.fs" />
     <Compile Include="LspWindowTests.fs" />
     <Compile Include="GitWindowTests.fs" />
+    <Compile Include="EditingWindowTests.fs" />
+    <Compile Include="KeybindingWindowTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

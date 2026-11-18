@@ -92,5 +92,4 @@ type LspItem(item: LspCompletion) =
 type Command =
     { Id: string
       Title: string
-      Keys: string
       Run: unit -> unit }

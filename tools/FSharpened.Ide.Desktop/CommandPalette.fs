@@ -27,7 +27,7 @@ open TextMateSharp.Grammars
 open FSharpened.Ide
 open FSharpened.Ide.Host
 
-type CommandPalette(ui: Ui, commands: Commands) =
+type CommandPalette(ui: Ui, commands: Commands, editorFeatures: EditorFeatures) =
     let commands = commands.Commands
     let docs = ui.Docs
     let editor = ui.Editor
@@ -88,7 +88,32 @@ type CommandPalette(ui: Ui, commands: Commands) =
             paletteList.Items.Push row
             paletteActions <- paletteActions @ [ act ]
 
-        match q.Mode with
+        let snippetMode = raw.StartsWith "$"
+
+        match (if snippetMode then "snippet" else q.Mode) with
+        | "snippet" ->
+            let snippets = editorFeatures.Snippets.Available() |> List.toArray
+            let labels = snippets |> Array.map (fun s -> s.Label) |> Array.toList
+            let text = raw.Substring(1).Trim()
+
+            let ranked =
+                if text = "" then
+                    labels
+                    |> List.mapi (fun i t ->
+                        { Index = i
+                          Text = t
+                          Score = 0
+                          Positions = [] })
+                    |> List.truncate 60
+                else
+                    Fuzzy.rank text labels 60
+
+            for r in ranked do
+                let s = snippets[r.Index]
+
+                add (paletteRow r.Text r.Positions s.Detail) (fun () ->
+                    hidePalette ()
+                    editorFeatures.Snippets.Insert s)
         | "command" ->
             let titles = commands |> List.map (fun c -> c.Title)
 
@@ -107,7 +132,7 @@ type CommandPalette(ui: Ui, commands: Commands) =
             for r in ranked do
                 let c = commands[r.Index]
 
-                add (paletteRow r.Text r.Positions c.Keys) (fun () ->
+                add (paletteRow r.Text r.Positions (ui.KeysFor c.Id)) (fun () ->
                     hidePalette ()
                     c.Run())
         | "line" ->

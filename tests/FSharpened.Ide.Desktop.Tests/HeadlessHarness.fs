@@ -201,6 +201,27 @@ let withWindow (trusted: bool) (files: (string * string) list) (body: Session ->
         use s = new Session(ws)
         body s)
 
+/// Like `withWindow`, with a step that runs before the window is made (to put files in the data folder, say).
+let withPreparedWindow
+    (trusted: bool)
+    (files: (string * string) list)
+    (prepare: Workspace -> unit)
+    (body: Session -> unit)
+    =
+    onUi (fun () ->
+        use ws = new Workspace(files, trusted)
+        prepare ws
+        use s = new Session(ws)
+        body s)
+
+/// Types text into a control, as the keyboard's text input would.
+let typeText (target: InputElement) (text: string) =
+    let args =
+        TextInputEventArgs(RoutedEvent = InputElement.TextInputEvent, Text = text)
+
+    args.Source <- target
+    target.RaiseEvent args
+
 /// The text of a tree row's header.
 let rowText (item: obj) =
     match item with

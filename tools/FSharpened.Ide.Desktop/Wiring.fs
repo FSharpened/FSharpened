@@ -220,14 +220,20 @@ type Wiring
                 let terminalOwnsKey =
                     termView.IsFocused && not (TerminalKeys.windowKeeps e.Key e.KeyModifiers)
 
-                if not terminalOwnsKey then
-                    match Keymap.commandFor e.Key e.KeyModifiers editor.IsKeyboardFocusWithin with
-                    | Some id ->
-                        e.Handled <- true
-                        (command id).Run()
-                    | None ->
-                        if e.Key = Key.Escape && palette.IsVisible then
-                            hidePalette ()),
+                match ui.KeyCapture with
+                | Some capture ->
+                    // the shortcuts view is waiting for a key: it is not a shortcut now
+                    e.Handled <- true
+                    capture e.Key e.KeyModifiers
+                | None ->
+                    if not terminalOwnsKey then
+                        match Keymap.resolve ui.Bindings e.Key e.KeyModifiers editor.IsKeyboardFocusWithin with
+                        | Some id ->
+                            e.Handled <- true
+                            (command id).Run()
+                        | None ->
+                            if e.Key = Key.Escape && palette.IsVisible then
+                                hidePalette ()),
             RoutingStrategies.Tunnel
         )
 

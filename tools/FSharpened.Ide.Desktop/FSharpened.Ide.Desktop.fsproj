@@ -42,11 +42,15 @@
     <Compile Include="CodeActionFeature.fs" />
     <Compile Include="FormatFeature.fs" />
     <Compile Include="ServerFeatures.fs" />
+    <Compile Include="MultiCursorFeature.fs" />
+    <Compile Include="SnippetFeature.fs" />
+    <Compile Include="EditorFeatures.fs" />
     <Compile Include="DebugPanel.fs" />
     <Compile Include="Explorer.fs" />
     <Compile Include="SidebarViews.fs" />
     <Compile Include="FolderSession.fs" />
     <Compile Include="Commands.fs" />
+    <Compile Include="KeybindingsFeature.fs" />
     <Compile Include="CommandPalette.fs" />
     <Compile Include="Menus.fs" />
     <Compile Include="Layout.fs" />

@@ -173,53 +173,74 @@ module Status =
         | 2 -> Severity.Warning
         | _ -> Severity.Info
 
+/// The names the shortcut files use for keys, and the keys of the window's toolkit they stand for.
+module KeyChords =
+    let private special =
+        [ Key.Space, "space"
+          Key.Enter, "enter"
+          Key.Tab, "tab"
+          Key.Escape, "escape"
+          Key.Back, "backspace"
+          Key.Delete, "delete"
+          Key.Insert, "insert"
+          Key.Home, "home"
+          Key.End, "end"
+          Key.PageUp, "pageup"
+          Key.PageDown, "pagedown"
+          Key.Up, "up"
+          Key.Down, "down"
+          Key.Left, "left"
+          Key.Right, "right"
+          Key.OemComma, "comma"
+          Key.OemPeriod, "period"
+          Key.OemMinus, "minus"
+          Key.OemPlus, "equal"
+          Key.OemTilde, "backquote"
+          Key.OemSemicolon, "semicolon"
+          Key.OemQuestion, "slash"
+          Key.OemPipe, "backslash"
+          Key.OemOpenBrackets, "bracketleft"
+          Key.OemCloseBrackets, "bracketright"
+          Key.OemQuotes, "quote" ]
+
+    /// The name of a key as a chord writes it, or None for a key that cannot end a shortcut (a modifier, say).
+    let nameOf (key: Key) : string option =
+        if key >= Key.A && key <= Key.Z then
+            Some((char (int 'a' + int key - int Key.A)).ToString())
+        elif key >= Key.D0 && key <= Key.D9 then
+            Some((char (int '0' + int key - int Key.D0)).ToString())
+        elif key >= Key.F1 && key <= Key.F24 then
+            Some("f" + string (int key - int Key.F1 + 1))
+        else
+            special |> List.tryFind (fun (k, _) -> k = key) |> Option.map snd
+
+    /// The chord a key press makes, in the normal form of `Keybindings`, or None for a press that is no shortcut.
+    let chordOf (key: Key) (mods: KeyModifiers) : string option =
+        match nameOf key with
+        | None -> None
+        | Some name ->
+            let parts =
+                [ if mods.HasFlag KeyModifiers.Control then
+                      "ctrl"
+                  if mods.HasFlag KeyModifiers.Shift then
+                      "shift"
+                  if mods.HasFlag KeyModifiers.Alt then
+                      "alt"
+                  if mods.HasFlag KeyModifiers.Meta then
+                      "meta"
+                  name ]
+
+            Some(String.Join("+", parts))
+
 /// The window's shortcuts: a key and what is held down give a command id (see `Commands`).
 module Keymap =
-    /// The command a key press runs, or None. `editorFocused` is whether the editor has the keyboard focus (F2 renames
-    /// only there). The terminal's claim on keys is decided before this (`TerminalKeys.windowKeeps`).
-    let commandFor (key: Key) (mods: KeyModifiers) (editorFocused: bool) : string option =
-        let ctrl = mods.HasFlag KeyModifiers.Control
-        let shift = mods.HasFlag KeyModifiers.Shift
-        let alt = mods.HasFlag KeyModifiers.Alt
+    /// The command a key press runs in a table of shortcuts, or None. `editorFocused` is whether the editor has the
+    /// keyboard focus (F2 renames only there). The terminal's claim on keys is decided before this
+    /// (`TerminalKeys.windowKeeps`).
+    let resolve (table: Binding list) (key: Key) (mods: KeyModifiers) (editorFocused: bool) : string option =
+        KeyChords.chordOf key mods
+        |> Option.bind (fun chord -> Keybindings.resolve table chord editorFocused)
 
-        match key with
-        | Key.P when ctrl && shift -> Some "palette"
-        | Key.P when ctrl -> Some "quick-open"
-        | Key.G when ctrl && shift -> Some "git-view"
-        | Key.G when ctrl -> Some "goto-line"
-        | Key.O when ctrl && shift -> Some "goto-symbol"
-        | Key.O when ctrl -> Some "open-folder"
-        | Key.S when ctrl && shift -> Some "save-all"
-        | Key.S when ctrl -> Some "save"
-        | Key.N when ctrl -> Some "new-file"
-        | Key.W when ctrl -> Some "close-tab"
-        | Key.PageDown when ctrl -> Some "next-tab"
-        | Key.PageUp when ctrl -> Some "previous-tab"
-        | Key.D1 when ctrl -> Some "focus-editor"
-        | Key.D0 when ctrl -> Some "focus-explorer"
-        | Key.B when ctrl -> Some "toggle-sidebar"
-        | Key.J when ctrl -> Some "toggle-panel"
-        | Key.E when ctrl && shift -> Some "explorer"
-        | Key.F when ctrl && shift -> Some "find-files"
-        | Key.OemTilde when ctrl -> Some "terminal"
-        | Key.H when ctrl && shift -> Some "replace-in-files"
-        | Key.H when ctrl -> Some "replace-in-file"
-        | Key.M when ctrl && shift -> Some "problems"
-        | Key.Space when ctrl && shift -> Some "signature-help"
-        | Key.Space when ctrl -> Some "complete"
-        | Key.OemPeriod when ctrl -> Some "quick-fix"
-        | Key.F12 when shift -> Some "references"
-        | Key.F12 -> Some "definition"
-        | Key.F5 when ctrl -> Some "run"
-        | Key.F5 when shift -> Some "debug-stop"
-        | Key.F5 -> Some "debug-start"
-        | Key.F9 -> Some "toggle-breakpoint"
-        | Key.F10 -> Some "debug-step-over"
-        | Key.F11 when shift -> Some "debug-step-out"
-        | Key.F11 -> Some "debug-step-into"
-        | Key.F2 when editorFocused -> Some "rename-symbol"
-        | Key.F when shift && alt -> Some "format"
-        | Key.Z when alt -> Some "wrap"
-        | Key.OemPlus when ctrl -> Some "zoom-in"
-        | Key.OemMinus when ctrl -> Some "zoom-out"
-        | _ -> None
+    /// The same with the shortcuts the window ships with.
+    let commandFor (key: Key) (mods: KeyModifiers) (editorFocused: bool) : string option =
+        resolve Keybindings.defaults key mods editorFocused

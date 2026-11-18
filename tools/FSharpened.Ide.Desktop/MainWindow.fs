@@ -47,6 +47,8 @@ type Shell(env: HostEnv) =
     let serverFeatures =
         ServerFeatures(ui, appearance, statusBar, languageServers, runPanel, renameFeature)
 
+    let editorFeatures = EditorFeatures(ui)
+
     let debugPanel =
         DebugPanel(ui, appearance, languageServers, editorTabs, renameFeature)
 
@@ -67,6 +69,7 @@ type Shell(env: HostEnv) =
             runPanel,
             renameFeature,
             serverFeatures,
+            editorFeatures,
             gitFeature,
             debugPanel,
             explorer,
@@ -74,7 +77,8 @@ type Shell(env: HostEnv) =
             folderSession
         )
 
-    let commandPalette = CommandPalette(ui, commands)
+    let keybindings = KeybindingsFeature(ui, commands)
+    let commandPalette = CommandPalette(ui, commands, editorFeatures)
     let menus = Menus(ui, appearance, sidebarViews, folderSession, commands)
 
     let layout =
@@ -175,6 +179,18 @@ type Shell(env: HostEnv) =
 
     /// Git's gutter, blame and actions, for the tests and the screenshot switches.
     member _.Git = gitFeature
+
+    /// Several cursors and snippets, for the tests and the screenshot switches.
+    member _.Editing = editorFeatures
+
+    /// The person's shortcuts: their file, the view, and changing one (for the tests).
+    member _.Keybindings = keybindings
+
+    /// The shortcuts now in force.
+    member _.Bindings = ui.Bindings
+
+    /// A command's shortcuts as shown in the menus and the palette.
+    member _.Keys(command: string) = ui.KeysFor command
 
     /// The quick fixes the server offered at the caret, as (title, can be applied), and applying one by its title:
     /// for the tests and the screenshot switches.

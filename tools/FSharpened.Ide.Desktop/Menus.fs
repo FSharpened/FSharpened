@@ -44,9 +44,35 @@ type Menus(ui: Ui, appearance: Appearance, sidebarViews: SidebarViews, folderSes
     let command (id: string) =
         commands |> List.find (fun c -> c.Id = id)
 
+    /// The menu items that show a command's shortcut, to show the new one when it changes.
+    let shortcutItems = System.Collections.Generic.List<string * MenuItem>()
+
+    /// What a menu shows for a command's shortcut: the first chord, in the form the menu can parse.
+    let gestureOf (id: string) : KeyGesture option =
+        match ui.KeysFor id with
+        | "" -> None
+        | keys ->
+            try
+                Some(KeyGesture.Parse(keys.Split(", ")[0]))
+            with _ ->
+                None // a chord only shown in the palette, such as Ctrl+=, has no menu form
+
     let item (id: string) =
         let c = command id
-        menuItem (c.Title.Substring(c.Title.IndexOf ':' + 1).Trim()) c.Keys c.Run
+
+        let m =
+            menuItem (c.Title.Substring(c.Title.IndexOf ':' + 1).Trim()) ((ui.KeysFor id).Split(", ")[0]) c.Run
+
+        shortcutItems.Add((id, m))
+        m
+
+    do
+        ui.OnBindingsChanged.Add(fun () ->
+            for (id, m) in shortcutItems do
+                m.InputGesture <-
+                    match gestureOf id with
+                    | Some g -> g
+                    | None -> null)
 
     /// A menu item is named by its header, without the access-key underscore.
     let named (m: MenuItem) =

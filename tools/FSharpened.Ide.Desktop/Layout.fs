@@ -546,6 +546,7 @@ type Layout
         status.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength.Auto))
         let right = StackPanel(Orientation = Orientation.Horizontal, Spacing = 18.0)
         right.Children.Add statusProblems
+        right.Children.Add ui.StatusCursors
         right.Children.Add statusPos
         right.Children.Add statusLang
         Grid.SetColumn(right, 1)
@@ -582,6 +583,7 @@ type Layout
                   statusGit
                   statusWatch
                   statusRun
+                  ui.StatusCursors
                   statusPos
                   statusLang
                   statusProblems ] do

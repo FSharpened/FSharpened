@@ -119,6 +119,11 @@ type HostEnv(dataDir: string, shippedPacks: string) =
     /// The folder the app keeps settings, trust and the user's language packs in.
     member _.DataDir = dataDir
     member _.UserPacks = userPacks
+
+    /// The person's own keyboard shortcuts (VS Code's keybindings.json format) and snippet files.
+    member _.KeybindingsFile = Path.Combine(dataDir, "keybindings.json")
+
+    member _.UserSnippets = Path.Combine(dataDir, "snippets")
     member _.Trust = trust
     member _.Registry = registry
     member _.Box = box
