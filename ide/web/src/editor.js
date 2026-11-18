@@ -78,6 +78,11 @@ const highlight = HighlightStyle.define([
   { tag: [t.operator, t.punctuation], color: "var(--syn-op)" },
 ]);
 
+// CodeMirror 6.36 uses Chromium's EditContext API when it exists. With it, Select All then Delete in an empty file throws an
+// uncaught "Invalid change range 0 to 1 (in doc of length 0)" from its textupdate handler (found by the browser tests,
+// ide/e2e). The classic contenteditable path has no such bug and is what every other browser uses, so use it everywhere.
+EditorView.EDIT_CONTEXT = false;
+
 const theme = EditorView.theme({
   "&": { height: "100%", color: "var(--fg)", backgroundColor: "var(--ed-bg)", fontSize: "var(--ed-fs, 14px)" },
   ".cm-scroller": { fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace", lineHeight: "1.55" },

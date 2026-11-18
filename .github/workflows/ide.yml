@@ -1,7 +1,7 @@
 name: ide
 on:
   pull_request:
-    paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**', 'tools/site/**', '.github/workflows/ide.yml']
+    paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**', 'tools/site/**', 'site/**', '.github/workflows/ide.yml']
   push:
     branches: [main]
     paths: ['gateway/**', 'ide/**', 'tools/FSharpened.Ide/**', 'tools/FSharpened.Ide.Web/**', 'tests/FSharpened.Ide.Tests/**']
@@ -48,3 +48,45 @@ jobs:
         working-directory: ide/web
       - name: Bundle exists and is not trivially small
         run: test "$(wc -c < site/dist/ide.js)" -gt 100000
+  e2e:
+    # Browser tests of the built page (ADR-0024): Playwright, Chromium only, the page served from site/public, the gateway
+    # mocked, so nothing here reaches Compiler Explorer or Wandbox. Includes the axe accessibility checks.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            ide/web/package-lock.json
+            ide/e2e/package-lock.json
+      - run: dotnet tool restore
+      - run: npm ci --ignore-scripts
+        working-directory: ide/web
+      - run: npm run build
+        working-directory: ide/web
+      - name: Build the page the tests open
+        run: python tools/site/build.py --require-ide
+      - run: npm ci --ignore-scripts
+        working-directory: ide/e2e
+      - name: Chromium and its system libraries
+        run: npx playwright install --with-deps chromium
+        working-directory: ide/e2e
+      - name: Browser and accessibility tests
+        run: npm test
+        working-directory: ide/e2e
+      - name: Test results (screenshots and traces of failures)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ide-e2e-results
+          path: artifacts/ide-e2e/results/**
+          retention-days: 7
