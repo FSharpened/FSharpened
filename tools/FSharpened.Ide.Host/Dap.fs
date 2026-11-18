@@ -848,73 +848,75 @@ module Dap =
         try
             let tcp = spec.Transport = "tcp"
             let port = if tcp then freePort () else 0
-            let psi = ProcessStartInfo(spec.Adapter)
+            // found along the PATH (PATHEXT on Windows); a `.cmd` adapter runs through cmd.exe with quoted arguments
+            let argv =
+                spec.Adapter :: [ for a in spec.Args -> a.Replace("{port}", string port) ]
 
-            for a in spec.Args do
-                psi.ArgumentList.Add(a.Replace("{port}", string port))
+            match Launch.startInfo argv with
+            | Error e -> notInstalled e
+            | Ok psi ->
+                psi.UseShellExecute <- false
+                psi.CreateNoWindow <- true
+                psi.RedirectStandardInput <- true
+                psi.RedirectStandardOutput <- true
+                psi.RedirectStandardError <- true
+                let p = Process.Start psi
 
-            psi.UseShellExecute <- false
-            psi.CreateNoWindow <- true
-            psi.RedirectStandardInput <- true
-            psi.RedirectStandardOutput <- true
-            psi.RedirectStandardError <- true
-            let p = Process.Start psi
-
-            if isNull p then
-                notInstalled "it did not start"
-            else
-                let err = StringBuilder()
-
-                p.ErrorDataReceived.Add(fun e ->
-                    if not (isNull e.Data) then
-                        lock err (fun () ->
-                            if err.Length < 4000 then
-                                err.AppendLine e.Data |> ignore))
-
-                p.BeginErrorReadLine()
-
-                let errText () = lock err (fun () -> err.ToString())
-
-                if not tcp then
-                    Ok(
-                        DapSession(
-                            p,
-                            DapClient(p.StandardOutput.BaseStream, p.StandardInput.BaseStream, onEvent),
-                            spec,
-                            errText
-                        )
-                    )
+                if isNull p then
+                    notInstalled "it did not start"
                 else
-                    p.OutputDataReceived.Add ignore
-                    p.BeginOutputReadLine()
-                    let deadline = DateTime.UtcNow.AddSeconds 15.0
-                    let mutable stream: NetworkStream option = None
+                    let err = StringBuilder()
 
-                    while stream.IsNone && DateTime.UtcNow < deadline && not p.HasExited do
-                        try
-                            let c = new TcpClient()
-                            c.Connect(IPAddress.Loopback, port)
-                            c.NoDelay <- true
-                            stream <- Some(c.GetStream())
-                        with _ ->
-                            Thread.Sleep 100
+                    p.ErrorDataReceived.Add(fun e ->
+                        if not (isNull e.Data) then
+                            lock err (fun () ->
+                                if err.Length < 4000 then
+                                    err.AppendLine e.Data |> ignore))
 
-                    match stream with
-                    | Some s -> Ok(DapSession(p, DapClient(s, s, onEvent), spec, errText))
-                    | None ->
-                        (try
-                            if not p.HasExited then
-                                p.Kill true
-                         with _ ->
-                             ())
+                    p.BeginErrorReadLine()
 
-                        let e = (errText ()).Trim()
+                    let errText () = lock err (fun () -> err.ToString())
 
-                        notInstalled (
-                            if e <> "" then
-                                e.Split('\n')[0]
-                            else
-                                "it did not open its port"
+                    if not tcp then
+                        Ok(
+                            DapSession(
+                                p,
+                                DapClient(p.StandardOutput.BaseStream, p.StandardInput.BaseStream, onEvent),
+                                spec,
+                                errText
+                            )
                         )
+                    else
+                        p.OutputDataReceived.Add ignore
+                        p.BeginOutputReadLine()
+                        let deadline = DateTime.UtcNow.AddSeconds 15.0
+                        let mutable stream: NetworkStream option = None
+
+                        while stream.IsNone && DateTime.UtcNow < deadline && not p.HasExited do
+                            try
+                                let c = new TcpClient()
+                                c.Connect(IPAddress.Loopback, port)
+                                c.NoDelay <- true
+                                stream <- Some(c.GetStream())
+                            with _ ->
+                                Thread.Sleep 100
+
+                        match stream with
+                        | Some s -> Ok(DapSession(p, DapClient(s, s, onEvent), spec, errText))
+                        | None ->
+                            (try
+                                if not p.HasExited then
+                                    p.Kill true
+                             with _ ->
+                                 ())
+
+                            let e = (errText ()).Trim()
+
+                            notInstalled (
+                                if e <> "" then
+                                    e.Split('\n')[0]
+                                else
+                                    "it did not open its port"
+                            )
         with e ->
             notInstalled e.Message

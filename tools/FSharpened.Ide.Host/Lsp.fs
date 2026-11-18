@@ -649,34 +649,33 @@ module Lsp =
     /// Starts the server a pack names. The command is a bare program name looked up on the PATH, with the pack's
     /// arguments, and its standard error is discarded; None when it cannot be started (not installed).
     let start (server: ServerSpec) (onDiagnostics: string -> LspDiagnostic list -> unit) : Result<LspSession, string> =
-        try
-            let psi = ProcessStartInfo(server.Command)
-            server.Args |> List.iter psi.ArgumentList.Add
-            psi.UseShellExecute <- false
-            psi.CreateNoWindow <- true
-            psi.RedirectStandardInput <- true
-            psi.RedirectStandardOutput <- true
-            psi.RedirectStandardError <- true
-            let p = Process.Start psi
-
-            if isNull p then
-                Error(sprintf "%s did not start" server.Command)
+        let hint =
+            if server.Install <> "" then
+                " — get it from: " + server.Install
             else
-                p.ErrorDataReceived.Add ignore
-                p.BeginErrorReadLine()
+                ""
 
-                let client =
-                    LspClient(p.StandardOutput.BaseStream, p.StandardInput.BaseStream, onDiagnostics)
+        try
+            // found along the PATH (PATHEXT on Windows); a `.cmd` shim (npm's) runs through cmd.exe with quoted arguments
+            match Launch.startInfo (server.Command :: server.Args) with
+            | Error e -> Error(sprintf "%s could not be started (%s)%s" server.Command e hint)
+            | Ok psi ->
+                psi.UseShellExecute <- false
+                psi.CreateNoWindow <- true
+                psi.RedirectStandardInput <- true
+                psi.RedirectStandardOutput <- true
+                psi.RedirectStandardError <- true
+                let p = Process.Start psi
 
-                Ok(LspSession(p, client))
+                if isNull p then
+                    Error(sprintf "%s did not start" server.Command)
+                else
+                    p.ErrorDataReceived.Add ignore
+                    p.BeginErrorReadLine()
+
+                    let client =
+                        LspClient(p.StandardOutput.BaseStream, p.StandardInput.BaseStream, onDiagnostics)
+
+                    Ok(LspSession(p, client))
         with e ->
-            Error(
-                sprintf
-                    "%s could not be started (%s)%s"
-                    server.Command
-                    e.Message
-                    (if server.Install <> "" then
-                         " — get it from: " + server.Install
-                     else
-                         "")
-            )
+            Error(sprintf "%s could not be started (%s)%s" server.Command e.Message hint)
