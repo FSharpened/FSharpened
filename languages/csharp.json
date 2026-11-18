@@ -95,6 +95,23 @@
     "args": [
       "--interpreter=vscode"
     ],
-    "install": "https://github.com/Samsung/netcoredbg"
+    "install": "https://github.com/Samsung/netcoredbg/releases (unpack it and put netcoredbg on the PATH)",
+    "adapterId": "coreclr",
+    "request": "launch",
+    "build": {
+      "phase": "build",
+      "tool": "dotnet",
+      "args": [
+        "build",
+        "{projectfile}"
+      ]
+    },
+    "launch": {
+      "type": "coreclr",
+      "program": "{newest:bin/Debug/*/{project}.dll}",
+      "cwd": "{projectdir}",
+      "args": [],
+      "stopAtEntry": false
+    }
   }
 }
