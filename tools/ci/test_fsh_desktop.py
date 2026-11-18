@@ -367,6 +367,14 @@ class RealServersTests(unittest.TestCase):
         self.assertIn("this.Skip <-", src)
         self.assertNotIn("[<Fact>]", src, "every real-server test uses the skipping attribute")
 
+class HookEnvironmentTests(unittest.TestCase):
+    def test_stages_do_not_inherit_the_repository_a_git_hook_selects(self):
+        with mock.patch.dict(os.environ, {"GIT_DIR": ".git", "GIT_INDEX_FILE": "x", "GIT_WORK_TREE": "y", "KEEP_ME": "1"}):
+            env = ci.base_env()
+        for name in ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE"):
+            self.assertNotIn(name, env)
+        self.assertEqual(env["KEEP_ME"], "1")
+
 
 if __name__ == "__main__":
     unittest.main()
