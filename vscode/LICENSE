@@ -1,0 +1,7 @@
+SPDX-License-Identifier: Apache-2.0
+
+PLACEHOLDER: replace this file with the full, unmodified Apache License 2.0 text
+from https://www.apache.org/licenses/LICENSE-2.0.txt before any public release.
+(Tracked in TODO.md. The license decision itself is ADR-0013.)
+
+Copyright 2026 The FSharpened contributors

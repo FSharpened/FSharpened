@@ -181,7 +181,7 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(ci.PROFILES["full"], ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build",
                                               "test", "aot", "rust", "benchmarks"])
         self.assertEqual(ci.PROFILES["all"][:len(ci.PROFILES["full"])], ci.PROFILES["full"])
-        self.assertEqual(set(ci.PROFILES["all"]) - set(ci.PROFILES["full"]), {"web", "gateway", "hub", "site"})
+        self.assertEqual(set(ci.PROFILES["all"]) - set(ci.PROFILES["full"]), {"web", "gateway", "hub", "vscode", "site"})
         workflow = (ci.ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         self.assertIn("--profile full", workflow)
 
@@ -198,11 +198,29 @@ class ProfileTests(unittest.TestCase):
     def test_the_javascript_stages_match_the_folders_the_workflows_build(self):
         wf = ci.ROOT / ".github" / "workflows"
         text = "\n".join(p.read_text(encoding="utf-8") for p in wf.glob("*.yml"))
-        for folder in ("gateway", "ide/web", "worker"):
+        for folder in ("gateway", "ide/web", "worker", "vscode"):
             self.assertIn(f"working-directory: {folder}", text)
         self.assertIn("gateway/**", ci.STAGES["gateway"]["inputs"])
         self.assertIn("worker/**", ci.STAGES["hub"]["inputs"])
         self.assertIn("ide/web/**", ci.STAGES["web"]["inputs"])
+        self.assertIn("vscode/**", ci.STAGES["vscode"]["inputs"])
+
+    def test_the_vscode_stage_runs_what_vscode_yml_runs_and_is_cached_after_tools_restore(self):
+        spec = ci.STAGES["vscode"]
+        self.assertEqual(spec["deps"], ["tools-restore"])
+        self.assertIn("vscode", ci.CACHEABLE)
+        self.assertIn("vscode", ci.PROFILES["all"])
+        self.assertNotIn("vscode", ci.PROFILES["full"])
+        self.assertNotIn("vscode", ci.PROFILES["fast"])
+        text = (ci.ROOT / ".github" / "workflows" / "vscode.yml").read_text(encoding="utf-8")
+        for step in ("npm ci --ignore-scripts", "npm run typecheck", "npm run build", "npm test", "npm run package", "npm run verify", "dotnet tool restore"):
+            self.assertIn(step, text)
+        self.assertIn("contents: read", text)
+        self.assertNotIn("publish", text.lower().replace("never publish", ""), "the workflow must not publish")
+
+    def test_the_golden_report_the_dotnet_tests_read_is_an_input_of_the_dotnet_test_cache(self):
+        self.assertIn("vscode/test/fixtures/**", ci.CODE)
+        self.assertIn("out-test", ci.EXCLUDE_DIRS)
 
 
 class SelectStagesTests(unittest.TestCase):
@@ -311,13 +329,75 @@ class NodeStageTests(unittest.TestCase):
         return ci.Ctx(run_dir=pathlib.Path(self.tmp.name), env={"PATH": ""}, rid="linux-x64", require_aot=False, no_cache=True, require_node=require_node)
 
     def test_without_node_the_javascript_stages_skip_or_fail_when_required(self):
-        for stage in (ci.stage_web, ci.stage_gateway, ci.stage_hub):
+        for stage in (ci.stage_web, ci.stage_gateway, ci.stage_hub, ci.stage_vscode):
             self.assertEqual(stage(self.ctx(False)).status, ci.SKIP)
             self.assertEqual(stage(self.ctx(True)).status, ci.FAIL)
 
     def test_preflight_node_check_follows_the_same_rule(self):
         self.assertEqual(ci.check_node(self.ctx(False))[0], ci.WARN)
         self.assertEqual(ci.check_node(self.ctx(True))[0], ci.FAIL)
+
+
+class VscodeStageTests(unittest.TestCase):
+    """stage_vscode with npm replaced: what it runs, and how it judges the result."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.tmp.name)
+        (self.root / "vscode").mkdir()
+        (self.root / "vscode" / "package.json").write_text('{"version": "9.9.9"}', encoding="utf-8")
+        (self.root / "artifacts").mkdir()
+        self.ctx = ci.Ctx(run_dir=self.root, env={"PATH": os.environ.get("PATH", "")}, rid="linux-x64", require_aot=False, no_cache=True)
+        self.ran = []
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def patched(self, steps_out, script_rc=0, make_vsix=True):
+        def fake_steps(ctx, stage, folder, scripts):
+            self.ran.append(("steps", folder, scripts))
+            return None, steps_out
+
+        def fake_run(ctx, stage, cmd, timeout=900, cwd=None, append=False, env=None):
+            self.ran.append(("run", cmd[-1]))
+            if cmd[-1] == "package" and make_vsix:
+                (self.root / "artifacts" / "fsharpened-9.9.9.vsix").write_bytes(b"x" * 2500)
+            return script_rc, "boom\nfailed"
+
+        return (mock.patch.object(ci, "ROOT", self.root), mock.patch.object(ci, "node_ready", lambda c: None),
+                mock.patch.object(ci, "npm_steps", fake_steps), mock.patch.object(ci, "run_cmd", fake_run))
+
+    def run_stage(self, *a, **k):
+        p = self.patched(*a, **k)
+        with p[0], p[1], p[2], p[3]:
+            return ci.stage_vscode(self.ctx)
+
+    def test_it_typechecks_builds_tests_then_packs_and_verifies_in_that_order(self):
+        r = self.run_stage("# tests 50\n# pass 49\n# fail 0\n# skipped 1\n")
+        self.assertEqual(r.status, ci.PASS, r.detail)
+        self.assertEqual(self.ran[0], ("steps", "vscode", [["run", "typecheck"], ["run", "build"], ["test"]]))
+        self.assertEqual([x[1] for x in self.ran[1:]], ["package", "verify"])
+        self.assertIn("49 node tests passed (1 skipped)", r.detail)
+        self.assertIn("fsharpened-9.9.9.vsix", r.detail)
+        self.assertEqual(r.metrics["node_tests"], 49)
+
+    def test_a_failing_package_or_verify_fails_the_stage_with_the_output(self):
+        r = self.run_stage("# pass 3\n", script_rc=1)
+        self.assertEqual(r.status, ci.FAIL)
+        self.assertIn("npm run package failed", r.detail)
+        self.assertIn("boom", r.detail)
+
+    def test_no_vsix_or_no_tests_is_a_failure_not_a_pass(self):
+        self.assertEqual(self.run_stage("# pass 3\n", make_vsix=False).status, ci.FAIL)
+        self.assertEqual(self.run_stage("nothing ran\n").status, ci.FAIL)
+
+    def test_nothing_in_the_stage_or_its_scripts_can_publish(self):
+        import inspect
+        src = inspect.getsource(ci.stage_vscode)
+        self.assertNotIn("publish", src.replace("Packing never publishes: there is no publish path in this stage or in the scripts it runs.", ""))
+        scripts = ci.ROOT / "vscode" / "package.json"
+        self.assertNotIn("vsce publish", scripts.read_text(encoding="utf-8"))
+        self.assertNotIn("ovsx", scripts.read_text(encoding="utf-8"))
 
 
 class ResilientRunTests(unittest.TestCase):

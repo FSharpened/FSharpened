@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <Compile Include="SkeletonTests.fs" />
+    <Compile Include="DiagnosticReportTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

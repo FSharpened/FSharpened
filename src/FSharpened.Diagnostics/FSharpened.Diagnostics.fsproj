@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Compile Include="Diagnostics.fs" />
+    <Compile Include="Report.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -34,3 +34,4 @@ Proposed -> Accepted (human-approved) -> Superseded by ADR-N. Never edit an acce
 | 0021 | The IDE as a platform: projects, community, tooling, pre-compilation and a code-only agent (roadmap) |
 | 0022 | IDE parity with VS Code, and what "works with VS Code extensions and Copilot" can honestly mean |
 | 0023 | The desktop IDE is a native F# application, polyglot by fitness, with languages as data |
+| 0025 | FSharpened as a VS Code extension: a thin, local, trust-gated client for FsAutoComplete, Fantomas and `fsh` diagnostics |
