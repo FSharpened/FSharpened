@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="DesktopTests.fs" />
+    <Compile Include="DecisionTests.fs" />
     <Compile Include="HoverTests.fs" />
     <Compile Include="DebugViewTests.fs" />
     <Compile Include="GrammarTests.fs" />

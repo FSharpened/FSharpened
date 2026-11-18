@@ -40,16 +40,8 @@ type RenameFeature(ui: Ui, languageServers: LanguageServers, editorTabs: EditorT
     /// A new name given on the command line, so a screenshot can show the preview without a person typing.
     let mutable renameTo: string option = None
 
-    let fullPathOf (r: string) (rel: string) =
-        Path.Combine(r, rel.Replace('/', Path.DirectorySeparatorChar))
-
-    let relInside (r: string) (path: string) : string option =
-        let rel = Path.GetRelativePath(r, path).Replace('\\', '/')
-
-        if rel.StartsWith ".." || Path.IsPathRooted rel then
-            None
-        else
-            Some rel
+    let fullPathOf = Paths.fullPath
+    let relInside = Paths.relInside
 
     /// The text a rename plans against: the editor's when the file is open, otherwise what is on disk. A file outside
     /// the opened folder is never touched.
@@ -93,18 +85,7 @@ type RenameFeature(ui: Ui, languageServers: LanguageServers, editorTabs: EditorT
             sprintf "Renamed in %d file(s); %s" done' (String.Join("; ", failed))
 
     /// The identifier under a position, for when the server does not say what it is renaming.
-    let wordAt (text: string) (offset: int) : string =
-        let isId (c: char) = Char.IsLetterOrDigit c || c = '_'
-        let mutable a = min offset text.Length
-        let mutable b = a
-
-        while a > 0 && isId text[a - 1] do
-            a <- a - 1
-
-        while b < text.Length && isId text[b] do
-            b <- b + 1
-
-        text.Substring(a, b - a)
+    let wordAt = TextAt.wordAt
 
     let renameSymbolNow () =
         match ui.Root, ui.Active with

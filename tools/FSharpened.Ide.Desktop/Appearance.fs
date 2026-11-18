@@ -66,10 +66,7 @@ type Appearance(ui: Ui) =
 
     let packFor (rel: string) : LanguagePack option = Languages.forFile env.Registry rel
 
-    let rootName () =
-        match ui.Root with
-        | Some r -> Path.GetFileName(r.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-        | None -> ""
+    let rootName () = Paths.rootName ui.Root
 
     let applyEditorPrefs () =
         let e = ui.Prefs.Editor

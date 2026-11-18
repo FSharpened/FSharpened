@@ -21,6 +21,7 @@
     <Compile Include="Dialogs.fs" />
     <Compile Include="Gutter.fs" />
     <Compile Include="Model.fs" />
+    <Compile Include="Decisions.fs" />
     <Compile Include="Ui.fs" />
     <Compile Include="Appearance.fs" />
     <Compile Include="StatusBar.fs" />

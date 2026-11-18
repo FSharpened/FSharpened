@@ -40,7 +40,7 @@ type StatusBar(ui: Ui) =
             let p = editor.TextArea.Caret
             d.Line <- p.Line
             d.Column <- p.Column
-            statusPos.Text <- sprintf "Ln %d, Col %d" p.Line p.Column
+            statusPos.Text <- Status.position p.Line p.Column
 
             statusLang.Text <-
                 match d.Pack with
@@ -48,8 +48,7 @@ type StatusBar(ui: Ui) =
                 | None -> "Plain text"
 
             let trail = Symbols.enclosing d.Outline p.Line |> List.map (fun s -> s.Name)
-            let parts = (d.Rel.Split('/') |> Array.toList) @ trail
-            crumbs.Text <- String.Join("  ›  ", parts)
+            crumbs.Text <- Status.breadcrumb d.Rel trail
         | None ->
             statusPos.Text <- ""
             statusLang.Text <- ""
@@ -72,18 +71,7 @@ type StatusBar(ui: Ui) =
                 ui.GitBranch <- branch
                 ui.GitChanges <- changes
 
-                statusGit.Text <-
-                    match branch with
-                    | Some b ->
-                        sprintf
-                            "⎇ %s%s"
-                            b
-                            (if changes.IsEmpty then
-                                 ""
-                             else
-                                 sprintf "  ● %d" changes.Count)
-                    | None -> ""
-
+                statusGit.Text <- Status.git branch changes.Count
                 ui.RefreshTreeFn()
             }
             |> ignore

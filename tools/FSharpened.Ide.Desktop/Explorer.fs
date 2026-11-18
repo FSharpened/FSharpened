@@ -38,13 +38,8 @@ type Explorer(ui: Ui, editorTabs: EditorTabs) =
     let window = ui.Window
 
     // ---- file tree ---------------------------------------------------------------------------------
-    let childRel (parent: string) (name: string) =
-        if parent = "" then name else parent + "/" + name
-
-    let parentOf (rel: string) =
-        match rel.LastIndexOf '/' with
-        | -1 -> ""
-        | i -> rel.Substring(0, i)
+    let childRel = Paths.child
+    let parentOf = Paths.parent
 
     let refreshFileCache () =
         match ui.Root with

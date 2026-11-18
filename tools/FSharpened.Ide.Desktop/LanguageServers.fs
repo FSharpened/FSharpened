@@ -139,12 +139,7 @@ type LanguageServers(ui: Ui, problems: Problems, terminalPanel: TerminalPanel) =
                         say "No suggestions"
                     else
                         let doc = editor.Document
-                        let mutable start = editor.CaretOffset
-
-                        while start > 0
-                              && (Char.IsLetterOrDigit(doc.GetCharAt(start - 1)) || doc.GetCharAt(start - 1) = '_') do
-                            start <- start - 1
-
+                        let start = TextAt.completionStart doc.GetCharAt editor.CaretOffset
                         let win = CompletionWindow(editor.TextArea)
                         win.StartOffset <- start
 

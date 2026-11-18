@@ -144,34 +144,24 @@ type Wiring
         // type a closing bracket after an opening one, and step over it when it is typed again
         editor.TextArea.TextEntered.Add(fun e ->
             if ui.Prefs.Editor.AutoCloseBrackets && e.Text.Length = 1 then
-                let closing =
-                    match e.Text[0] with
-                    | '(' -> Some ')'
-                    | '[' -> Some ']'
-                    | '{' -> Some '}'
-                    | _ -> None
-
-                match closing with
+                match Brackets.closingFor e.Text with
                 | Some c ->
                     let doc = editor.Document
                     let at = editor.CaretOffset
-                    let next = if at < doc.TextLength then doc.GetCharAt at else '\n'
+                    let next = if at < doc.TextLength then Some(doc.GetCharAt at) else None
 
-                    if Char.IsWhiteSpace next || next = ')' || next = ']' || next = '}' then
+                    if Brackets.shouldInsert next then
                         doc.Insert(at, string c)
                         editor.CaretOffset <- at
                 | None -> ())
 
         editor.TextArea.TextEntering.Add(fun e ->
-            if
-                ui.Prefs.Editor.AutoCloseBrackets
-                && e.Text.Length = 1
-                && (e.Text = ")" || e.Text = "]" || e.Text = "}")
-            then
+            if ui.Prefs.Editor.AutoCloseBrackets && e.Text.Length = 1 then
                 let doc = editor.Document
                 let at = editor.CaretOffset
+                let next = if at < doc.TextLength then Some(doc.GetCharAt at) else None
 
-                if at < doc.TextLength && string (doc.GetCharAt at) = e.Text then
+                if Brackets.shouldStepOver e.Text next then
                     editor.CaretOffset <- at + 1
                     e.Handled <- true)
 
@@ -221,53 +211,18 @@ type Wiring
         window.AddHandler(
             InputElement.KeyDownEvent,
             EventHandler<KeyEventArgs>(fun _ e ->
-                let ctrl = e.KeyModifiers.HasFlag KeyModifiers.Control
-                let shift = e.KeyModifiers.HasFlag KeyModifiers.Shift
-                let alt = e.KeyModifiers.HasFlag KeyModifiers.Alt
-
-                let pick (id: string) =
-                    e.Handled <- true
-                    (command id).Run()
-
                 // a shell has its own use for most Ctrl keys: while it has the focus only a few shortcuts stay with the window
                 let terminalOwnsKey =
                     termView.IsFocused && not (TerminalKeys.windowKeeps e.Key e.KeyModifiers)
 
-                match e.Key with
-                | _ when terminalOwnsKey -> ()
-                | Key.P when ctrl && shift -> pick "palette"
-                | Key.P when ctrl -> pick "quick-open"
-                | Key.G when ctrl -> pick "goto-line"
-                | Key.O when ctrl && shift -> pick "goto-symbol"
-                | Key.O when ctrl -> pick "open-folder"
-                | Key.S when ctrl && shift -> pick "save-all"
-                | Key.S when ctrl -> pick "save"
-                | Key.N when ctrl -> pick "new-file"
-                | Key.W when ctrl -> pick "close-tab"
-                | Key.B when ctrl -> pick "toggle-sidebar"
-                | Key.J when ctrl -> pick "toggle-panel"
-                | Key.E when ctrl && shift -> pick "explorer"
-                | Key.F when ctrl && shift -> pick "find-files"
-                | Key.OemTilde when ctrl -> pick "terminal"
-                | Key.H when ctrl && shift -> pick "replace-in-files"
-                | Key.H when ctrl -> pick "replace-in-file"
-                | Key.M when ctrl && shift -> pick "problems"
-                | Key.Space when ctrl -> pick "complete"
-                | Key.F12 -> pick "definition"
-                | Key.F5 when ctrl -> pick "run"
-                | Key.F5 when shift -> pick "debug-stop"
-                | Key.F5 -> pick "debug-start"
-                | Key.F9 -> pick "toggle-breakpoint"
-                | Key.F10 -> pick "debug-step-over"
-                | Key.F11 when shift -> pick "debug-step-out"
-                | Key.F11 -> pick "debug-step-into"
-                | Key.F2 when editor.IsKeyboardFocusWithin -> pick "rename-symbol"
-                | Key.F when shift && alt -> pick "format"
-                | Key.Z when alt -> pick "wrap"
-                | Key.OemPlus when ctrl -> pick "zoom-in"
-                | Key.OemMinus when ctrl -> pick "zoom-out"
-                | Key.Escape when palette.IsVisible -> hidePalette ()
-                | _ -> ()),
+                if not terminalOwnsKey then
+                    match Keymap.commandFor e.Key e.KeyModifiers editor.IsKeyboardFocusWithin with
+                    | Some id ->
+                        e.Handled <- true
+                        (command id).Run()
+                    | None ->
+                        if e.Key = Key.Escape && palette.IsVisible then
+                            hidePalette ()),
             RoutingStrategies.Tunnel
         )
 

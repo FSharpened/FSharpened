@@ -64,14 +64,9 @@ type EditorTabs
                  | Some a -> Object.ReferenceEquals(a, d)
                  | None -> false)
 
-            let name = Path.GetFileName d.Rel
-
             let title =
                 TextBlock(
-                    Text =
-                        name
-                        + (if d.Dirty then " ●" else "")
-                        + (if d.MissingOnDisk then " (deleted on disk)" else ""),
+                    Text = Status.tabTitle d.Rel d.Dirty d.MissingOnDisk,
                     VerticalAlignment = VerticalAlignment.Center,
                     Foreground = (if isActive then ui.Roles.Fg else ui.Roles.Muted),
                     FontWeight = (if isActive then FontWeight.SemiBold else FontWeight.Normal)

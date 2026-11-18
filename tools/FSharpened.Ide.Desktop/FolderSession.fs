@@ -115,12 +115,15 @@ type FolderSession
                             touched <- true
 
                         match DiskWorkspace.readText r d.Rel with
-                        | Ok t when not d.Dirty && t <> d.Text ->
-                            d.Reload t
-                            d.LspDirty <- true
-                            reloaded <- Path.GetFileName d.Rel :: reloaded
-                        | Ok t when d.Dirty && t <> d.DiskText && d.KeptOverDisk <> Some t -> askConflict r d t
-                        | _ -> ()
+                        | Ok t ->
+                            match DiskSync.decide t d.Dirty d.Text d.DiskText d.KeptOverDisk with
+                            | Reload ->
+                                d.Reload t
+                                d.LspDirty <- true
+                                reloaded <- Path.GetFileName d.Rel :: reloaded
+                            | Ask -> askConflict r d t
+                            | Leave -> ()
+                        | Error _ -> ()
 
             if not reloaded.IsEmpty then
                 say (sprintf "Reloaded %s from disk" (String.Join(", ", List.rev reloaded)))

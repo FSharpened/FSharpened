@@ -39,25 +39,17 @@ type Problems(ui: Ui) =
         match ui.Root with
         | None -> None
         | Some r ->
-            let f = file.Replace('\\', '/')
-            let rr = r.Replace('\\', '/').TrimEnd('/') + "/"
-
-            let rel =
-                if f.StartsWith(rr, StringComparison.OrdinalIgnoreCase) then
-                    f.Substring rr.Length
-                elif f.StartsWith "./" then
-                    f.Substring 2
-                else
-                    f
-
-            match DiskWorkspace.resolve r rel with
-            | Ok p when File.Exists p -> Some rel
-            | _ ->
-                let name = Path.GetFileName f
-
-                ui.FileCache
-                |> List.tryFind (fun e -> e.Name = name)
-                |> Option.map (fun e -> e.Rel)
+            Paths.ofDiagnosticFile
+                r
+                file
+                (fun rel ->
+                    match DiskWorkspace.resolve r rel with
+                    | Ok p -> File.Exists p
+                    | _ -> false)
+                (fun name ->
+                    ui.FileCache
+                    |> List.tryFind (fun e -> e.Name = name)
+                    |> Option.map (fun e -> e.Rel))
 
     let renderProblems (list: FSharpened.Diagnostics.StructuredDiagnostic list) =
         ui.ProblemsList <- list
@@ -98,26 +90,12 @@ type Problems(ui: Ui) =
             row.Children.Add(TextBlock(Text = where, Foreground = ui.Roles.Muted))
             problemsBox.Items.Push row
 
-        let errors =
-            list
-            |> List.filter (fun d -> d.Severity = FSharpened.Diagnostics.Severity.Error)
-            |> List.length
-
-        let warns =
-            list
-            |> List.filter (fun d -> d.Severity = FSharpened.Diagnostics.Severity.Warning)
-            |> List.length
-
-        statusProblems.Text <- sprintf "✖ %d   ⚠ %d" errors warns
+        statusProblems.Text <- Status.problems list
 
 
     // ---- language servers and the problems list ---------------------------------------------------
     let toStructured (rel: string) (d: LspDiagnostic) : FSharpened.Diagnostics.StructuredDiagnostic =
-        let sev =
-            match d.Severity with
-            | 1 -> FSharpened.Diagnostics.Severity.Error
-            | 2 -> FSharpened.Diagnostics.Severity.Warning
-            | _ -> FSharpened.Diagnostics.Severity.Info
+        let sev = Status.severityOf d.Severity
 
         { FSharpened.Diagnostics.StructuredDiagnostic.create d.Code sev d.Message with
             Range =
