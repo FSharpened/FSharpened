@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Content Include="fake_dap.py" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="fake_lsp.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

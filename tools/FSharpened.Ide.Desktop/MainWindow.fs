@@ -40,6 +40,8 @@ type OpenDoc(rel: string, text: string, pack: LanguagePack option) =
     member val LspOpen = false with get, set
     /// The text changed since the language server last saw it.
     member val LspDirty = false with get, set
+    /// Where the breakpoints of this file are; anchors move with the text, so a breakpoint stays on its line.
+    member val Breakpoints = List<TextAnchor>()
     member d.Dirty = not d.Doc.UndoStack.IsOriginalFile
     member d.Text = d.Doc.Text
 
@@ -312,6 +314,31 @@ type Shell(env: HostEnv) =
     let mutable termHistoryAt = 0
     let mutable terminalShownFn: unit -> unit = ignore
 
+    // the debug panel: the call stack, the variables of the selected frame, and a console that also evaluates
+    let dbgStack = ListBox(Background = Brushes.Transparent)
+    let dbgVars = TreeView(Background = Brushes.Transparent)
+
+    let dbgConsole =
+        TextBox(
+            IsReadOnly = true,
+            FontFamily = monoFont,
+            AcceptsReturn = true,
+            BorderThickness = Thickness 0.0,
+            TextWrapping = TextWrapping.NoWrap
+        )
+
+    let dbgInput =
+        TextBox(
+            FontFamily = monoFont,
+            BorderThickness = Thickness(0.0, 1.0, 0.0, 0.0),
+            PlaceholderText = "Evaluate an expression while the program is paused, then press Enter"
+        )
+
+    let dbgStatus =
+        TextBlock(VerticalAlignment = VerticalAlignment.Center, Margin = Thickness(10.0, 0.0), FontSize = 12.0)
+
+    let dbgButtons = Dictionary<string, Button>()
+
     let paletteInput =
         TextBox(
             PlaceholderText = "Type to open a file, > for commands, : for a line, @ for a symbol",
@@ -349,6 +376,10 @@ type Shell(env: HostEnv) =
     let mutable refreshTreeFn: unit -> unit = ignore
     let mutable refreshSidebarFn: unit -> unit = ignore
     let mutable showPaletteFn: string -> unit = ignore
+    let mutable saveBreakpointsFn: OpenDoc -> unit = ignore
+    let mutable restoreBreakpointsFn: OpenDoc -> unit = ignore
+    let mutable refreshExecFn: unit -> unit = ignore
+    let mutable stopDebugFn: string -> unit = ignore
 
     let say (text: string) = statusRun.Text <- text
 
@@ -786,6 +817,8 @@ type Shell(env: HostEnv) =
                     startTerminal ())
 
     let stopServers () =
+        stopDebugFn "Debugger stopped"
+
         for kv in lspSessions do
             kv.Value.Stop()
 
@@ -1088,9 +1121,11 @@ type Shell(env: HostEnv) =
         rebuildTabs ()
         updateStatus ()
         updateSquiggles ()
+        refreshExecFn ()
         refreshSidebarFn ()
 
     and closeNow (d: OpenDoc) =
+        saveBreakpointsFn d
         let index = docs.IndexOf d
         docs.Remove d |> ignore
 
@@ -1170,6 +1205,7 @@ type Shell(env: HostEnv) =
                     match DiskWorkspace.readText r rel with
                     | Ok text ->
                         let d = OpenDoc(rel, text, packFor rel)
+                        restoreBreakpointsFn d
 
                         d.Doc.TextChanged.Add(fun _ ->
                             d.LspDirty <- true
@@ -1375,6 +1411,760 @@ type Shell(env: HostEnv) =
                 }
                 |> ignore
         | _ -> ()
+
+    // ---- rename (language server) ------------------------------------------------------------------
+    /// A new name given on the command line, so a screenshot can show the preview without a person typing.
+    let mutable renameTo: string option = None
+
+    let fullPathOf (r: string) (rel: string) =
+        Path.Combine(r, rel.Replace('/', Path.DirectorySeparatorChar))
+
+    let relInside (r: string) (path: string) : string option =
+        let rel = Path.GetRelativePath(r, path).Replace('\\', '/')
+
+        if rel.StartsWith ".." || Path.IsPathRooted rel then
+            None
+        else
+            Some rel
+
+    /// The text a rename plans against: the editor's when the file is open, otherwise what is on disk. A file outside
+    /// the opened folder is never touched.
+    let readForRename (r: string) (path: string) : Result<string, string> =
+        match relInside r path with
+        | None -> Error "is outside the open folder"
+        | Some rel ->
+            match docs |> Seq.tryFind (fun d -> d.Rel = rel) with
+            | Some d -> Ok d.Text
+            | None -> DiskWorkspace.readText r rel
+
+    /// Writes the planned changes: open files are edited in the editor (one undoable edit each, left unsaved), the
+    /// others go to disk through the workspace. Returns what happened, in words.
+    let applyRename (r: string) (changes: FileChange list) : string =
+        let failed = List<string>()
+        let mutable done' = 0
+
+        for c in changes do
+            match relInside r c.Path with
+            | None -> failed.Add(sprintf "%s is outside the open folder" c.Path)
+            | Some rel ->
+                match docs |> Seq.tryFind (fun d -> d.Rel = rel) with
+                | Some d ->
+                    if d.Text <> c.Before then
+                        failed.Add(sprintf "%s changed while the preview was open" rel)
+                    else
+                        use _edit = d.Doc.RunUpdate()
+
+                        for (a, b, n) in List.rev c.Spans do
+                            d.Doc.Replace(a, b - a, n)
+
+                        done' <- done' + 1
+                | None ->
+                    match DiskWorkspace.writeText r rel c.After with
+                    | Ok() -> done' <- done' + 1
+                    | Error e -> failed.Add(sprintf "%s: %s" rel e)
+
+        if failed.Count = 0 then
+            sprintf "Renamed in %s" (Edits.summary changes)
+        else
+            sprintf "Renamed in %d file(s); %s" done' (String.Join("; ", failed))
+
+    /// The identifier under a position, for when the server does not say what it is renaming.
+    let wordAt (text: string) (offset: int) : string =
+        let isId (c: char) = Char.IsLetterOrDigit c || c = '_'
+        let mutable a = min offset text.Length
+        let mutable b = a
+
+        while a > 0 && isId text[a - 1] do
+            a <- a - 1
+
+        while b < text.Length && isId text[b] do
+            b <- b + 1
+
+        text.Substring(a, b - a)
+
+    let renameSymbolNow () =
+        match root, active with
+        | Some r, Some d ->
+            match sessionOf d with
+            | None ->
+                syncLsp d // starts the server if the folder is trusted
+
+                say (
+                    sprintf
+                        "Rename needs a language server for %s; none is running yet"
+                        (match d.Pack with
+                         | Some p -> p.Name
+                         | None -> "this file")
+                )
+            | Some s when s.Client.RenameSupport = NoRename ->
+                Dialogs.info
+                    window
+                    roles
+                    "Rename is not available"
+                    (sprintf
+                        "The language server for %s does not support renaming symbols."
+                        (match d.Pack with
+                         | Some p -> p.Name
+                         | None -> "this file"))
+                |> ignore
+            | Some s ->
+                syncLsp d
+                let caret = editor.TextArea.Caret
+
+                let pos =
+                    { Line = caret.Line - 1
+                      Character = caret.Column - 1 }
+
+                let full = fullPathOf r d.Rel
+                let offset = editor.CaretOffset
+
+                task {
+                    let! prep = s.Client.PrepareRename(full, pos)
+
+                    match prep with
+                    | Error m -> do! Dialogs.info window roles "Cannot rename here" m
+                    | Ok p ->
+                        let text = d.Text
+
+                        let current =
+                            match p.Placeholder, p.Range with
+                            | Some n, _ -> n
+                            | None, Some rg ->
+                                let st = Edits.lineStarts text
+
+                                match Edits.offsetOf text st rg.Start, Edits.offsetOf text st rg.End with
+                                | Ok a, Ok b when b > a -> text.Substring(a, b - a)
+                                | _ -> wordAt text offset
+                            | None, None -> wordAt text offset
+
+                        let! name =
+                            match renameTo with
+                            | Some n -> Task.FromResult(Some n)
+                            | None ->
+                                Dialogs.ask
+                                    window
+                                    roles
+                                    "Rename symbol"
+                                    (sprintf "New name for “%s”:" current)
+                                    current
+                                    Edits.checkName
+
+                        match name with
+                        | Some n when n <> current ->
+                            let! res = s.Client.Rename(full, pos, n)
+
+                            match res with
+                            | Error m -> do! Dialogs.info window roles "Rename failed" m
+                            | Ok we ->
+                                match Edits.plan (readForRename r) we with
+                                | Error m -> do! Dialogs.info window roles "Rename failed" m
+                                | Ok [] -> say "The server found nothing to rename"
+                                | Ok changes ->
+                                    let rows =
+                                        changes
+                                        |> List.map (fun c ->
+                                            (match relInside r c.Path with
+                                             | Some rel -> rel
+                                             | None -> c.Path),
+                                            c.Count,
+                                            Edits.changedLines c.Before c.After)
+
+                                    let! yes =
+                                        Dialogs.preview
+                                            window
+                                            roles
+                                            (sprintf "Rename “%s” to “%s”" current n)
+                                            (sprintf
+                                                "%s. Files open in the editor change there and stay unsaved, so Undo works; the others are written now."
+                                                (Edits.summary changes))
+                                            rows
+                                            "Rename"
+
+                                    if yes then
+                                        say (applyRename r changes)
+                                        rebuildTabs ()
+                        | _ -> ()
+                }
+                |> ignore
+        | _ -> say "Open a file in a folder first"
+
+    // ---- debugging (Debug Adapter Protocol) --------------------------------------------------------
+    let mutable dbg: DapSession option = None
+    let mutable dbgGen = 0
+    let mutable dbgPhase = DebugView.Idle
+    let mutable dbgThread = 0
+    let mutable dbgOutDir = ""
+    let mutable dbgFrame: DapFrame option = None
+    let mutable dbgStop: (string * int) option = None
+    let closedBreakpoints = Dictionary<string, int list>()
+    let execLine = ExecutionLine()
+
+    let bpLinesOf (d: OpenDoc) : int list =
+        d.Breakpoints
+        |> Seq.filter (fun a -> not a.IsDeleted)
+        |> Seq.map (fun a -> a.Line)
+        |> Seq.distinct
+        |> Seq.sort
+        |> List.ofSeq
+
+    let breakpointLines (rel: string) : int list =
+        match docs |> Seq.tryFind (fun d -> d.Rel = rel) with
+        | Some d -> bpLinesOf d
+        | None ->
+            match closedBreakpoints.TryGetValue rel with
+            | true, l -> l
+            | _ -> []
+
+    /// Every file that has breakpoints, open or not, with its lines.
+    let allBreakpoints () : (string * int list) list =
+        [ for d in docs do
+              let l = bpLinesOf d
+
+              if not l.IsEmpty then
+                  yield d.Rel, l
+          for kv in closedBreakpoints do
+              if not (docs |> Seq.exists (fun d -> d.Rel = kv.Key)) && not kv.Value.IsEmpty then
+                  yield kv.Key, kv.Value ]
+
+    let mutable toggleBreakpointFn: int -> unit = ignore
+
+    let bpMargin =
+        BreakpointMargin(
+            (fun () ->
+                match active with
+                | Some d -> bpLinesOf d
+                | None -> []),
+            (fun line -> toggleBreakpointFn line)
+        )
+
+    let sessionBreakpoints (rel: string) =
+        match root, dbg with
+        | Some r, Some s when dbgPhase <> DebugView.Idle ->
+            s.Client.SetBreakpoints(fullPathOf r rel, breakpointLines rel) |> ignore
+        | _ -> ()
+
+    let toggleBreakpointAt (d: OpenDoc) (line: int) =
+        if line >= 1 && line <= d.Doc.LineCount then
+            let before = bpLinesOf d
+
+            if List.contains line (Breakpoints.toggle before line) then
+                let a = d.Doc.CreateAnchor(d.Doc.GetLineByNumber(line).Offset)
+                a.MovementType <- AnchorMovementType.AfterInsertion
+                d.Breakpoints.Add a
+            else
+                d.Breakpoints.RemoveAll(fun a -> a.IsDeleted || a.Line = line) |> ignore
+
+            bpMargin.InvalidateVisual()
+            sessionBreakpoints d.Rel
+
+    let toggleBreakpoint () =
+        match active with
+        | Some d -> toggleBreakpointAt d editor.TextArea.Caret.Line
+        | None -> say "Open a file to set a breakpoint"
+
+    do
+        toggleBreakpointFn <-
+            (fun line ->
+                match active with
+                | Some d -> toggleBreakpointAt d line
+                | None -> ())
+
+        editor.TextArea.LeftMargins.Insert(0, bpMargin)
+        editor.TextArea.TextView.BackgroundRenderers.Add execLine
+
+        themed (fun r ->
+            bpMargin.DotBrush <- r.Bad
+            bpMargin.ArrowBrush <- r.Warn
+            execLine.Brush <- SolidColorBrush(Color.FromArgb(70uy, 255uy, 214uy, 10uy)))
+
+        saveBreakpointsFn <-
+            (fun d ->
+                let l = bpLinesOf d
+
+                if l.IsEmpty then
+                    closedBreakpoints.Remove d.Rel |> ignore
+                else
+                    closedBreakpoints[d.Rel] <- l)
+
+        restoreBreakpointsFn <-
+            (fun d ->
+                match closedBreakpoints.TryGetValue d.Rel with
+                | true, lines ->
+                    closedBreakpoints.Remove d.Rel |> ignore
+
+                    for line in lines do
+                        if line >= 1 && line <= d.Doc.LineCount then
+                            let a = d.Doc.CreateAnchor(d.Doc.GetLineByNumber(line).Offset)
+                            a.MovementType <- AnchorMovementType.AfterInsertion
+                            d.Breakpoints.Add a
+                | _ -> ())
+
+    /// The band and arrow on the line the program stopped at, only while that file is the one shown.
+    let refreshExec () =
+        let line =
+            match dbgStop, active with
+            | Some(rel, l), Some d when d.Rel = rel -> l
+            | _ -> 0
+
+        execLine.Line <- line
+        bpMargin.StoppedLine <- line
+        editor.TextArea.TextView.InvalidateLayer KnownLayer.Background
+
+    do refreshExecFn <- refreshExec
+
+    let appendConsole (text: string) =
+        Dispatcher.UIThread.Post(fun () ->
+            dbgConsole.Text <-
+                DebugView.capConsole 200000 (dbgConsole.Text |> Option.ofObj |> Option.defaultValue "") text
+
+            dbgConsole.CaretIndex <- dbgConsole.Text.Length)
+
+    let setPhase (p: DebugView.Phase) (detail: string) =
+        dbgPhase <- p
+        dbgStatus.Text <- DebugView.statusText p detail
+
+        let enable (id: string) (v: bool) =
+            match dbgButtons.TryGetValue id with
+            | true, b -> b.IsEnabled <- v
+            | _ -> ()
+
+        enable "continue" (DebugView.canStep p)
+        enable "over" (DebugView.canStep p)
+        enable "into" (DebugView.canStep p)
+        enable "out" (DebugView.canStep p)
+        enable "pause" (DebugView.canPause p)
+        enable "stop" (DebugView.canStop p)
+        enable "start" (p = DebugView.Idle)
+
+        if p <> DebugView.Idle then
+            say (DebugView.statusText p detail)
+
+    /// Children of a scope or a structured value, fetched when its row is opened.
+    let rec variableRow (v: DapVariable) : TreeViewItem =
+        let item = TreeViewItem(Header = label (DebugView.variableLabel v))
+
+        if v.VarRef > 0 then
+            item.Items.Push(TreeViewItem(Header = muted "…"))
+            let loaded = ref false
+
+            item.PropertyChanged.Add(fun a ->
+                if
+                    a.Property = TreeViewItem.IsExpandedProperty
+                    && item.IsExpanded
+                    && not loaded.Value
+                then
+                    loaded.Value <- true
+                    loadChildren item v.VarRef)
+
+        item
+
+    and loadChildren (item: TreeViewItem) (reference: int) =
+        match dbg with
+        | Some s ->
+            task {
+                let! r = s.Client.Variables reference
+                item.Items.Clear()
+
+                match r with
+                | Ok vs ->
+                    for v in vs do
+                        item.Items.Push(variableRow v)
+                | Error m -> item.Items.Push(TreeViewItem(Header = muted m))
+            }
+            |> ignore
+        | None -> ()
+
+    let showVariables (f: DapFrame) =
+        match dbg with
+        | Some s ->
+            let gen = dbgGen
+
+            task {
+                let! scopes = s.Client.Scopes f.FrameId
+
+                if gen = dbgGen then
+                    dbgVars.Items.Clear()
+
+                    match scopes with
+                    | Ok list ->
+                        for sc in list do
+                            let row = TreeViewItem(Header = label sc.ScopeName)
+
+                            if sc.ScopeRef > 0 then
+                                row.Items.Push(TreeViewItem(Header = muted "…"))
+                                let loaded = ref false
+
+                                let load () =
+                                    if not loaded.Value then
+                                        loaded.Value <- true
+                                        loadChildren row sc.ScopeRef
+
+                                row.PropertyChanged.Add(fun a ->
+                                    if a.Property = TreeViewItem.IsExpandedProperty && row.IsExpanded then
+                                        load ())
+
+                                // the first scope (usually the locals) is open; a slow one waits to be asked for
+                                if not sc.Expensive && dbgVars.Items.Count = 0 then
+                                    row.IsExpanded <- true
+
+                            dbgVars.Items.Push row
+                    | Error m -> dbgVars.Items.Push(TreeViewItem(Header = muted m))
+            }
+            |> ignore
+        | None -> ()
+
+    let selectFrame (f: DapFrame) =
+        dbgFrame <- Some f
+
+        match root with
+        | Some r ->
+            match DebugView.relOfFrame r f with
+            | Some rel when f.FrameLine > 0 ->
+                dbgStop <- Some(rel, f.FrameLine)
+                openFile rel f.FrameLine 1
+                refreshExec ()
+            | _ ->
+                dbgStop <- None
+                refreshExec ()
+        | None -> ()
+
+        showVariables f
+
+    let showStack (threadId: int) =
+        match root, dbg with
+        | Some r, Some s ->
+            let gen = dbgGen
+
+            task {
+                let! frames = s.Client.StackTrace threadId
+
+                if gen = dbgGen then
+                    dbgStack.Items.Clear()
+
+                    match frames with
+                    | Ok list ->
+                        let rows =
+                            list
+                            |> List.map (fun f ->
+                                let t = TextBlock(Text = DebugView.frameLabel r f, Tag = f)
+
+                                themed (fun ro -> t.Foreground <- if f.FramePath = "" then ro.Muted else ro.Fg)
+
+                                t)
+
+                        for t in rows do
+                            dbgStack.Items.Push t
+
+                        // the top frame that is in the opened folder, else the first
+                        let pick =
+                            list
+                            |> List.tryFindIndex (fun f -> (DebugView.relOfFrame r f).IsSome && f.FrameLine > 0)
+                            |> Option.defaultValue 0
+
+                        if not rows.IsEmpty then
+                            dbgStack.SelectedIndex <- pick
+                    | Error m -> appendConsole (sprintf "Could not read the call stack: %s\n" m)
+            }
+            |> ignore
+        | _ -> ()
+
+    let clearStop () =
+        dbgStop <- None
+        dbgFrame <- None
+        dbgStack.Items.Clear()
+        dbgVars.Items.Clear()
+        refreshExec ()
+
+    /// Ends the session: asks the adapter to stop the program, kills it if it does not, removes the build output.
+    let endSession (note: string) =
+        let sess = dbg
+        let outDir = dbgOutDir
+        dbg <- None
+        dbgOutDir <- ""
+        dbgGen <- dbgGen + 1
+
+        match sess with
+        | Some s ->
+            Task.Run(fun () ->
+                (try
+                    s.Stop().Wait(5000) |> ignore
+                 with _ ->
+                     ())
+
+                if outDir <> "" then
+                    try
+                        Directory.Delete(outDir, true)
+                    with _ ->
+                        ())
+            |> ignore
+        | None ->
+            if outDir <> "" then
+                try
+                    Directory.Delete(outDir, true)
+                with _ ->
+                    ()
+
+        clearStop ()
+        setPhase DebugView.Idle ""
+
+        if note <> "" then
+            appendConsole (note + "\n")
+            say note
+
+    do
+        stopDebugFn <-
+            (fun note ->
+                if dbgPhase <> DebugView.Idle then
+                    endSession note)
+
+    let onDapEvent (gen: int) (e: DapEvent) =
+        Dispatcher.UIThread.Post(fun () ->
+            if gen = dbgGen then
+                match e with
+                | Stopped(thread, reason, text) ->
+                    dbgThread <- thread
+                    setPhase DebugView.Paused (DebugView.stopDetail reason text)
+                    showStack thread
+                | Continued _ ->
+                    if dbgPhase = DebugView.Paused then
+                        setPhase DebugView.Running ""
+                        clearStop ()
+                | Output(cat, text) ->
+                    if DebugView.showsOutput cat then
+                        appendConsole text
+                | Exited code -> appendConsole (sprintf "[the program exited with code %d]\n" code)
+                | Terminated -> endSession "Debug session ended"
+                | Closed -> endSession "The debug adapter closed"
+                | ThreadChanged _
+                | BreakpointChanged _
+                | Initialized -> ())
+
+    let installHint (spec: DebugSpec) =
+        sprintf
+            "The debug adapter “%s” is not installed or not on the PATH.%s"
+            spec.Adapter
+            (if spec.Install <> "" then
+                 "\n\nGet it: " + spec.Install
+             else
+                 "")
+
+    let startDebug () =
+        match root, active with
+        | Some r, Some d ->
+            match d.Pack |> Option.bind (fun p -> p.Debug |> Option.map (fun s -> p, s)) with
+            | None ->
+                Dialogs.info
+                    window
+                    roles
+                    "Debugging is not set up"
+                    (sprintf
+                        "%s has no debug adapter configured. A language pack adds one with a “debug” block (see docs/operations/desktop.md)."
+                        (match d.Pack with
+                         | Some p -> p.Name
+                         | None -> "This file"))
+                |> ignore
+            | Some(pack, spec) ->
+                if not (Dap.onPath spec.Adapter) then
+                    showPanel "debug"
+                    appendConsole (installHint spec + "\n")
+                    Dialogs.info window roles "Debug adapter not found" (installHint spec) |> ignore
+                else
+                    task {
+                        saveAll ()
+
+                        let! allowed =
+                            task {
+                                if env.Trust.IsTrusted r then
+                                    return true
+                                else
+                                    let! yes =
+                                        Dialogs.confirm
+                                            window
+                                            roles
+                                            "Trust this folder?"
+                                            (sprintf
+                                                "Debugging starts programs on this computer, with your permissions: the debug adapter and your code, from:\n\n%s\n\nOnly trust folders whose code you would run anyway. You can revoke this from the command palette."
+                                                r)
+                                            "Trust and debug"
+
+                                    if yes then
+                                        env.Trust.Trust r
+                                        syncLsp d
+
+                                    return yes
+                            }
+
+                        if allowed then
+                            dbgGen <- dbgGen + 1
+                            let gen = dbgGen
+                            dbgConsole.Text <- ""
+                            showPanel "debug"
+                            setPhase DebugView.Starting ""
+
+                            let outDir =
+                                Path.Combine(Path.GetTempPath(), "fsharpened-debug-" + Guid.NewGuid().ToString "N")
+
+                            Directory.CreateDirectory outDir |> ignore
+                            dbgOutDir <- outDir
+
+                            let fail (title: string) (msg: string) =
+                                appendConsole (msg + "\n")
+                                endSession ""
+                                Dialogs.info window roles title msg |> ignore
+
+                            match Plans.parseFlags (flagsBox.Text |> Option.ofObj |> Option.defaultValue "") with
+                            | Error e -> fail "Debug" e
+                            | Ok flags ->
+                                let ctx: PlanContext =
+                                    { Root = r
+                                      Entry = d.Rel
+                                      OutDir = outDir
+                                      Flags = flags
+                                      ExeSuffix = Runner.exeSuffix () }
+
+                                // 1. build, when the language needs it
+                                let! built =
+                                    task {
+                                        match spec.Build with
+                                        | None -> return Ok()
+                                        | Some step ->
+                                            match env.Box.Get step.Tool, DebugPlan.expandArgs ctx step.Args with
+                                            | _, Error e -> return Error e
+                                            | Some t, Ok args when t.Found ->
+                                                appendConsole (sprintf "Building with %s…\n" t.Label)
+
+                                                let! res =
+                                                    Task.Run(fun () ->
+                                                        Proc.run (t.Exe @ args) r None (TimeSpan.FromSeconds 180.0))
+
+                                                match res with
+                                                | Ok p when p.ExitCode = Some 0 -> return Ok()
+                                                | Ok p ->
+                                                    return
+                                                        Error(
+                                                            sprintf
+                                                                "The build failed, so nothing was started:\n%s%s"
+                                                                p.Stdout
+                                                                p.Stderr
+                                                        )
+                                                | Error e -> return Error e
+                                            | Some t, _ ->
+                                                return
+                                                    Error(
+                                                        sprintf
+                                                            "%s is not installed%s"
+                                                            t.Label
+                                                            (if t.Install <> "" then " (" + t.Install + ")" else "")
+                                                    )
+                                            | None, _ -> return Error(sprintf "the pack has no tool “%s”" step.Tool)
+                                    }
+
+                                match built with
+                                | Error e ->
+                                    if gen = dbgGen then
+                                        fail "Debug" e
+                                | Ok() when gen <> dbgGen -> ()
+                                | Ok() ->
+                                    match DebugPlan.expandConfiguration ctx spec.Configuration with
+                                    | Error e -> fail "Debug" e
+                                    | Ok config ->
+                                        // 2. start the adapter
+                                        appendConsole (sprintf "Starting %s…\n" spec.Adapter)
+
+                                        let! started = Task.Run(fun () -> Dap.start spec (onDapEvent gen))
+
+                                        match started with
+                                        | Error e -> fail "Debug adapter" e
+                                        | Ok sess ->
+                                            if gen <> dbgGen then
+                                                sess.Stop() |> ignore
+                                            else
+                                                dbg <- Some sess
+
+                                                let bps =
+                                                    allBreakpoints () |> List.map (fun (rel, l) -> fullPathOf r rel, l)
+
+                                                // 3. initialize, launch, breakpoints, configurationDone
+                                                let! begun = sess.Begin(config, bps)
+
+                                                if gen = dbgGen then
+                                                    match begun with
+                                                    | Error e -> fail "Debugging could not start" e
+                                                    | Ok() ->
+                                                        if dbgPhase = DebugView.Starting then
+                                                            setPhase DebugView.Running ""
+                    }
+                    |> ignore
+        | _ -> say "Open a file in a folder to debug it"
+
+    let debugStep (what: string) (act: DapClient -> int -> Task<Result<unit, string>>) =
+        match dbg with
+        | Some s when dbgPhase = DebugView.Paused ->
+            let thread = dbgThread
+            setPhase DebugView.Running ""
+            clearStop ()
+
+            task {
+                let! r = act s.Client thread
+
+                match r with
+                | Ok() -> ()
+                | Error m -> appendConsole (sprintf "%s failed: %s\n" what m)
+            }
+            |> ignore
+        | Some _ -> say "The program is not paused"
+        | None -> say "No debug session is running"
+
+    let debugContinue () =
+        debugStep "Continue" (fun c t -> c.Continue t)
+
+    let debugPause () =
+        match dbg with
+        | Some s when dbgPhase = DebugView.Running ->
+            task {
+                let! r = s.Client.Pause(max 1 dbgThread)
+
+                match r with
+                | Ok() -> ()
+                | Error m -> appendConsole (sprintf "Pause failed: %s\n" m)
+            }
+            |> ignore
+        | _ -> say "The program is not running"
+
+    let debugStop () =
+        if dbgPhase <> DebugView.Idle then
+            endSession "Debug session stopped"
+        else
+            say "No debug session is running"
+
+    let evaluateInput (text: string) =
+        match dbg with
+        | Some s when text.Trim() <> "" ->
+            let frame =
+                match dbgFrame with
+                | Some f -> f.FrameId
+                | None -> 0
+
+            appendConsole ("> " + text + "\n")
+
+            task {
+                let! r = s.Client.Evaluate(text, frame, "repl")
+
+                match r with
+                | Ok(v, _) -> appendConsole (v + "\n")
+                | Error m -> appendConsole (sprintf "error: %s\n" m)
+            }
+            |> ignore
+        | Some _ -> ()
+        | None -> appendConsole "There is no debug session. Start one with F5.\n"
+
+    /// F5: start debugging, or continue when the program is paused.
+    let debugStartOrContinue () =
+        match dbgPhase with
+        | DebugView.Idle -> startDebug ()
+        | DebugView.Paused -> debugContinue ()
+        | DebugView.Starting -> say "The debugger is still starting"
+        | DebugView.Running -> say "The program is running; use Pause or Stop"
 
     // ---- file tree ---------------------------------------------------------------------------------
     let childRel (parent: string) (name: string) =
@@ -2023,8 +2813,51 @@ type Shell(env: HostEnv) =
             Run = closeFolder }
           { Id = "run"
             Title = "Run: Run This File"
-            Keys = "F5"
+            Keys = "Ctrl+F5"
             Run = (fun () -> runCurrent Runner.defaultTimeoutSec) }
+          { Id = "debug-start"
+            Title = "Debug: Start Debugging"
+            Keys = "F5"
+            Run = debugStartOrContinue }
+          { Id = "debug-continue"
+            Title = "Debug: Continue"
+            Keys = ""
+            Run = debugContinue }
+          { Id = "debug-step-over"
+            Title = "Debug: Step Over"
+            Keys = "F10"
+            Run = (fun () -> debugStep "Step over" (fun c t -> c.Next t)) }
+          { Id = "debug-step-into"
+            Title = "Debug: Step Into"
+            Keys = "F11"
+            Run = (fun () -> debugStep "Step into" (fun c t -> c.StepIn t)) }
+          { Id = "debug-step-out"
+            Title = "Debug: Step Out"
+            Keys = "Shift+F11"
+            Run = (fun () -> debugStep "Step out" (fun c t -> c.StepOut t)) }
+          { Id = "debug-pause"
+            Title = "Debug: Pause"
+            Keys = ""
+            Run = debugPause }
+          { Id = "debug-stop"
+            Title = "Debug: Stop Debugging"
+            Keys = "Shift+F5"
+            Run = debugStop }
+          { Id = "toggle-breakpoint"
+            Title = "Debug: Toggle Breakpoint"
+            Keys = "F9"
+            Run = toggleBreakpoint }
+          { Id = "debug-panel"
+            Title = "Debug: Show Debug Panel"
+            Keys = ""
+            Run =
+              (fun () ->
+                  setPanelVisible true
+                  showPanel "debug") }
+          { Id = "rename-symbol"
+            Title = "Rename Symbol (language server)"
+            Keys = "F2"
+            Run = renameSymbolNow }
           { Id = "run-long"
             Title = "Run: Run This File (120 s limit)"
             Keys = ""
@@ -2429,6 +3262,21 @@ type Shell(env: HostEnv) =
               item "breadcrumbs" ]
 
         top "_Run" [ item "run"; item "run-long"; Separator(); item "revoke-trust" ]
+
+        top
+            "_Debug"
+            [ item "debug-start"
+              item "debug-continue"
+              item "debug-pause"
+              item "debug-stop"
+              Separator()
+              item "debug-step-over"
+              item "debug-step-into"
+              item "debug-step-out"
+              Separator()
+              item "toggle-breakpoint"
+              item "debug-panel" ]
+
         top "_Tools" [ item "refresh-tools"; item "reload-packs"; item "packs-folder" ]
         bar
 
@@ -2495,7 +3343,7 @@ type Shell(env: HostEnv) =
             runButton.Background <- r.Brand
             runButton.Foreground <- r.BrandFg)
 
-        ToolTip.SetTip(runButton, "Run this file (F5)")
+        ToolTip.SetTip(runButton, "Run this file (Ctrl+F5)")
         runButton.Click.Add(fun _ -> runCurrent Runner.defaultTimeoutSec)
         themed (restyleBox flagsBox)
         flagsBox.Margin <- Thickness(0.0, 4.0)
@@ -2550,7 +3398,7 @@ type Shell(env: HostEnv) =
 
         openBtn.Click.Add(fun _ -> openFolderDialog ())
         welcome.Children.Add openBtn
-        welcome.Children.Add(muted "Ctrl+Shift+P  commands      Ctrl+P  go to file      F5  run")
+        welcome.Children.Add(muted "Ctrl+Shift+P  commands      Ctrl+P  go to file      Ctrl+F5  run      F5  debug")
 
         let editorHost = Grid()
         editorHost.Children.Add welcome
@@ -2609,6 +3457,110 @@ type Shell(env: HostEnv) =
         headerButtons.Children.Add(tabButton "input" "INPUT" inputHost)
         headerButtons.Children.Add(tabButton "terminal" "TERMINAL" termHost)
 
+        // the debug panel: toolbar on top, then call stack | variables | console
+        let debugHost = DockPanel()
+
+        let tool (id: string) (text: string) (tip: string) (click: unit -> unit) =
+            let b = flat text tip click
+            dbgButtons[id] <- b
+            b
+
+        let toolbar = StackPanel(Orientation = Orientation.Horizontal)
+        toolbar.Children.Add(tool "start" "▶ Start" "Start debugging (F5)" debugStartOrContinue)
+        toolbar.Children.Add(tool "continue" "▶ Continue" "Continue (F5)" debugContinue)
+
+        toolbar.Children.Add(
+            tool "over" "⤼ Over" "Step over (F10)" (fun () -> debugStep "Step over" (fun c t -> c.Next t))
+        )
+
+        toolbar.Children.Add(
+            tool "into" "⤓ Into" "Step into (F11)" (fun () -> debugStep "Step into" (fun c t -> c.StepIn t))
+        )
+
+        toolbar.Children.Add(
+            tool "out" "⤒ Out" "Step out (Shift+F11)" (fun () -> debugStep "Step out" (fun c t -> c.StepOut t))
+        )
+
+        toolbar.Children.Add(tool "pause" "⏸ Pause" "Pause the program" debugPause)
+        toolbar.Children.Add(tool "stop" "⏹ Stop" "Stop debugging (Shift+F5)" debugStop)
+        toolbar.Children.Add dbgStatus
+        themed (fun r -> dbgStatus.Foreground <- r.Muted)
+        setPhase DebugView.Idle ""
+
+        let toolbarBorder =
+            Border(Child = toolbar, BorderThickness = Thickness(0.0, 0.0, 0.0, 1.0))
+
+        themed (fun r ->
+            toolbarBorder.BorderBrush <- r.Line
+            toolbarBorder.Background <- r.Card)
+
+        DockPanel.SetDock(toolbarBorder, Dock.Top)
+
+        let column (title: string) (body: Control) =
+            let head = muted title
+            head.FontSize <- 11.0
+            head.FontWeight <- FontWeight.SemiBold
+            head.Margin <- Thickness(10.0, 4.0)
+            let dock = DockPanel()
+            DockPanel.SetDock(head, Dock.Top)
+            dock.Children.Add head
+            dock.Children.Add body
+            dock
+
+        let consoleDock = DockPanel()
+        DockPanel.SetDock(dbgInput, Dock.Bottom)
+        consoleDock.Children.Add dbgInput
+        consoleDock.Children.Add dbgConsole
+
+        let debugGrid = Grid()
+        debugGrid.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength(1.0, GridUnitType.Star)))
+        debugGrid.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength 1.0))
+        debugGrid.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength(1.3, GridUnitType.Star)))
+        debugGrid.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength 1.0))
+        debugGrid.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength(1.6, GridUnitType.Star)))
+        let stackColumn = column "CALL STACK" dbgStack
+        let varsColumn = column "VARIABLES" dbgVars
+        let consoleColumn = column "DEBUG CONSOLE" consoleDock
+        Grid.SetColumn(stackColumn, 0)
+        Grid.SetColumn(varsColumn, 2)
+        Grid.SetColumn(consoleColumn, 4)
+        debugGrid.Children.Add stackColumn
+        debugGrid.Children.Add varsColumn
+        debugGrid.Children.Add consoleColumn
+
+        for c in [ 1; 3 ] do
+            let line = Border(Width = 1.0)
+            themed (fun r -> line.Background <- r.Line)
+            Grid.SetColumn(line, c)
+            debugGrid.Children.Add line
+
+        debugHost.Children.Add toolbarBorder
+        debugHost.Children.Add debugGrid
+
+        themed (fun r ->
+            dbgConsole.Background <- r.EditorBg
+            dbgConsole.Foreground <- r.Fg
+            dbgInput.Background <- r.EditorBg
+            dbgInput.Foreground <- r.Fg
+            dbgInput.BorderBrush <- r.Line)
+
+        headerButtons.Children.Add(tabButton "debug" "DEBUG" debugHost)
+
+        dbgStack.SelectionChanged.Add(fun _ ->
+            match dbgStack.SelectedItem with
+            | :? TextBlock as t ->
+                match t.Tag with
+                | :? DapFrame as f -> selectFrame f
+                | _ -> ()
+            | _ -> ())
+
+        dbgInput.KeyDown.Add(fun e ->
+            if e.Key = Key.Enter then
+                e.Handled <- true
+                let text = dbgInput.Text |> Option.ofObj |> Option.defaultValue ""
+                dbgInput.Text <- ""
+                evaluateInput text)
+
         let closePanel = flat "✕" "Close panel (Ctrl+J)" (fun () -> setPanelVisible false)
         DockPanel.SetDock(closePanel, Dock.Right)
 
@@ -2636,6 +3588,7 @@ type Shell(env: HostEnv) =
         panelContent.Children.Add problemsHost
         panelContent.Children.Add inputHost
         panelContent.Children.Add termHost
+        panelContent.Children.Add debugHost
         let panelBody = DockPanel()
         DockPanel.SetDock(headerBorder, Dock.Top)
         panelBody.Children.Add headerBorder
@@ -2905,7 +3858,10 @@ type Shell(env: HostEnv) =
         editorMenu.Items.Push(Separator())
         editorMenu.Items.Push(menuItem "Go to Symbol…" "Ctrl+Shift+O" (fun () -> showPaletteFn "@"))
         editorMenu.Items.Push(menuItem "Format Document" "Shift+Alt+F" formatCurrent)
-        editorMenu.Items.Push(menuItem "Run This File" "F5" (fun () -> runCurrent Runner.defaultTimeoutSec))
+        editorMenu.Items.Push(menuItem "Rename Symbol" "F2" renameSymbolNow)
+        editorMenu.Items.Push(menuItem "Toggle Breakpoint" "F9" toggleBreakpoint)
+        editorMenu.Items.Push(menuItem "Run This File" "Ctrl+F5" (fun () -> runCurrent Runner.defaultTimeoutSec))
+        editorMenu.Items.Push(menuItem "Start Debugging" "F5" debugStartOrContinue)
         editorMenu.Items.Push(menuItem "Command Palette…" "Ctrl+Shift+P" (fun () -> showPaletteFn ">"))
         editor.ContextMenu <- editorMenu
 
@@ -2967,7 +3923,14 @@ type Shell(env: HostEnv) =
                 | Key.M when ctrl && shift -> pick "problems"
                 | Key.Space when ctrl -> pick "complete"
                 | Key.F12 -> pick "definition"
-                | Key.F5 -> pick "run"
+                | Key.F5 when ctrl -> pick "run"
+                | Key.F5 when shift -> pick "debug-stop"
+                | Key.F5 -> pick "debug-start"
+                | Key.F9 -> pick "toggle-breakpoint"
+                | Key.F10 -> pick "debug-step-over"
+                | Key.F11 when shift -> pick "debug-step-out"
+                | Key.F11 -> pick "debug-step-into"
+                | Key.F2 when editor.IsKeyboardFocusWithin -> pick "rename-symbol"
                 | Key.F when shift && alt -> pick "format"
                 | Key.Z when alt -> pick "wrap"
                 | Key.OemPlus when ctrl -> pick "zoom-in"
@@ -3015,6 +3978,28 @@ type Shell(env: HostEnv) =
         searchBox.Text <- query
         replaceBox.Text <- replacement
         runSearch ()
+
+    /// Sets a breakpoint (1-based line) in a file of the folder, for the screenshot switches and the tests.
+    member _.SetBreakpoint(rel: string, line: int) =
+        match docs |> Seq.tryFind (fun d -> d.Rel = rel) with
+        | Some d ->
+            if not (List.contains line (bpLinesOf d)) then
+                toggleBreakpointAt d line
+        | None -> closedBreakpoints[rel] <- (Breakpoints.toggle (breakpointLines rel) line)
+
+    /// Puts the caret on a line and column (1-based) of the active file.
+    member _.SetCaret(line: int, col: int) =
+        editor.TextArea.Caret.Line <- line
+        editor.TextArea.Caret.Column <- col
+        editor.ScrollToLine line
+
+    /// The new name `rename-symbol` uses without asking, for the screenshot switches.
+    member _.RenameTo
+        with get () = renameTo
+        and set (v: string option) = renameTo <- v
+
+    /// The breakpoints now set, as (file, lines).
+    member _.Breakpoints = allBreakpoints ()
 
     member _.Say = say
     member _.TextMateReady = registryOptions

@@ -12,6 +12,7 @@ open System.Text.Json.Nodes
 open System.Text.RegularExpressions
 open System.Threading
 open System.Threading.Tasks
+open FSharpened.Platform
 
 /// A stack frame. Lines and columns are 1-based, as the client asks the adapter to count them.
 type DapFrame =
@@ -788,6 +789,29 @@ type DapSession(proc: Process, client: DapClient, spec: DebugSpec, stderr: unit 
         }
 
 module Dap =
+    /// Whether a program name can be found: on the PATH (with the executable suffixes of this system), so that a missing
+    /// adapter is known before a build is spent on it.
+    let onPath (name: string) : bool =
+        let dirs =
+            (Environment.GetEnvironmentVariable "PATH"
+             |> Option.ofObj
+             |> Option.defaultValue "")
+                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+
+        let suffixes =
+            match (RuntimeIdentity.detect ()).Os with
+            | Windows -> [ ""; ".exe"; ".cmd"; ".bat"; ".com" ]
+            | _ -> [ "" ]
+
+        dirs
+        |> Array.exists (fun d ->
+            suffixes
+            |> List.exists (fun x ->
+                try
+                    File.Exists(Path.Combine(d.Trim('"'), name + x))
+                with _ ->
+                    false))
+
     let private freePort () =
         let l = new TcpListener(IPAddress.Loopback, 0)
         l.Start()

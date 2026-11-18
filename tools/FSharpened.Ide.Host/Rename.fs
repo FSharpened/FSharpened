@@ -14,6 +14,9 @@ type FileChange =
         /// The file's text before and after.
         Before: string
         After: string
+        /// The edits as (start offset, end offset, new text) in the text before, in order: what an editor applies, last
+        /// one first, to change the file in place and keep Undo, the caret and the breakpoints working.
+        Spans: (int * int * string) list
     }
 
 /// Applying the edits of a language server to text. Pure: nothing here reads or writes a file, so every rule is tested
@@ -62,10 +65,10 @@ module Edits =
 
             Ok(min lineEnd (lineStart + p.Character))
 
-    /// Applies edits to a text: they are checked first, then applied from the last to the first so no offset moves.
-    /// Refused (nothing applied) when a range runs backwards, lies outside the text, or two ranges overlap. Several
-    /// insertions at the same position keep the order they were given in, as the protocol requires.
-    let apply (text: string) (edits: TextEdit list) : Result<string, string> =
+    /// Checks edits against a text and puts them in order: (start, end, new text) by offset, ascending.
+    /// Refused when a range runs backwards, lies outside the text, or two ranges overlap. Several insertions at the same
+    /// position keep the order they were given in, as the protocol requires.
+    let spans (text: string) (edits: TextEdit list) : Result<(int * int * string) list, string> =
         let starts = lineStarts text
 
         let resolved =
@@ -107,13 +110,36 @@ module Edits =
             | Some((a1, _, _, _), _) ->
                 let line = (starts |> Array.filter (fun s -> s <= a1) |> Array.length)
                 Error(sprintf "two edits overlap near line %d, so none was applied" line)
-            | None ->
-                let sb = StringBuilder(text)
+            | None -> Ok(items |> List.map (fun (a, b, _, n) -> a, b, n))
 
-                for (a, b, _, n) in List.rev items do
-                    sb.Remove(a, b - a).Insert(a, n) |> ignore
+    /// Applies edits to a text: they are checked first (see `spans`), then applied from the last to the first so no
+    /// offset moves. Nothing is applied when any edit is refused.
+    let apply (text: string) (edits: TextEdit list) : Result<string, string> =
+        spans text edits
+        |> Result.map (fun items ->
+            let sb = StringBuilder(text)
 
-                Ok(sb.ToString())
+            for (a, b, n) in List.rev items do
+                sb.Remove(a, b - a).Insert(a, n) |> ignore
+
+            sb.ToString())
+
+    /// The lines that differ between two texts of the same number of lines, as (1-based line, before, after); at most
+    /// 200. A rename keeps the line count; when a file's does not, the preview shows only the counts.
+    let changedLines (before: string) (after: string) : (int * string * string) list =
+        let split (t: string) =
+            t.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n')
+
+        let a = split before
+        let b = split after
+
+        if a.Length <> b.Length then
+            []
+        else
+            [ for i in 0 .. a.Length - 1 do
+                  if a[i] <> b[i] then
+                      yield i + 1, a[i].Trim(), b[i].Trim() ]
+            |> List.truncate 200
 
     /// Computes the new text of every file of a workspace edit, or refuses the whole edit. Nothing is written: the caller
     /// shows the preview, then writes. `read` gives a file's current text (the editor's, when it is open).
@@ -132,14 +158,20 @@ module Edits =
                     match read path with
                     | Error m -> Error(sprintf "%s: %s" (Path.GetFileName path) m)
                     | Ok before ->
-                        match apply before es with
+                        match spans before es with
                         | Error m -> Error(sprintf "%s: %s" (Path.GetFileName path) m)
-                        | Ok after ->
+                        | Ok sp ->
+                            let sb = StringBuilder(before)
+
+                            for (a, b, n) in List.rev sp do
+                                sb.Remove(a, b - a).Insert(a, n) |> ignore
+
                             Ok
                                 { Path = path
                                   Count = es.Length
                                   Before = before
-                                  After = after })
+                                  After = sb.ToString()
+                                  Spans = sp })
 
             match
                 results

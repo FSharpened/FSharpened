@@ -16,6 +16,11 @@ let private ok (r: Result<string, string>) =
     | Ok s -> s
     | Error e -> failwithf "expected success, got: %s" e
 
+let private ok' (r: Result<'a, string>) =
+    match r with
+    | Ok s -> s
+    | Error e -> failwithf "expected success, got: %s" e
+
 let private fails (r: Result<string, string>) =
     match r with
     | Error e -> e
@@ -285,3 +290,110 @@ let ``a server with rename but no prepareRename is not asked to prepare`` () =
             Assert.Equal(None, p.Range)
             Assert.Equal(None, p.Placeholder)
         | Error e -> failwith e)
+
+[<Fact>]
+let ``spans are the checked edits in order, and the preview lists the lines that changed`` () =
+    let text = "a foo\nb\nc foo foo\n"
+
+    let sp =
+        Edits.spans text [ edit (2, 6) (2, 9) "x"; edit (0, 2) (0, 5) "x"; edit (2, 2) (2, 5) "x" ]
+
+    Assert.Equal<(int * int * string) list>([ 2, 5, "x"; 10, 13, "x"; 14, 17, "x" ], ok' sp)
+
+    let after =
+        ok (Edits.apply text [ edit (2, 6) (2, 9) "x"; edit (0, 2) (0, 5) "x"; edit (2, 2) (2, 5) "x" ])
+
+    Assert.Equal("a x\nb\nc x x\n", after)
+
+    Assert.Equal<(int * string * string) list>(
+        [ 1, "a foo", "a x"; 3, "c foo foo", "c x x" ],
+        Edits.changedLines text after
+    )
+    // when the line count changes the preview does not guess
+    Assert.Empty(Edits.changedLines "a\nb" "a\nb\nc")
+
+// ---- the whole thing, through a started server process and files on disk ----------------------------------
+
+[<Fact>]
+let ``a rename goes from the caret to new text on disk, through a real server process`` () =
+    let py =
+        [ "python"; "python3" ]
+        |> List.tryFind (fun p ->
+            match Proc.run [ p; "-c"; "print(1)" ] (Path.GetTempPath()) None (System.TimeSpan.FromSeconds 10.0) with
+            | Ok r -> r.ExitCode = Some 0
+            | _ -> false)
+
+    match py with
+    | None -> () // no Python here, so the scripted server cannot run
+    | Some python ->
+        let root =
+            Path.Combine(Path.GetTempPath(), "fsh-ren-" + System.Guid.NewGuid().ToString "N")
+
+        Directory.CreateDirectory(Path.Combine(root, "src")) |> ignore
+        let main = Path.Combine(root, "src", "main.rs")
+        let util = Path.Combine(root, "src", "util.rs")
+
+        let mainText =
+            "mod util;\r\nfn main() {\r\n    let a = util::compute(3, 4);\r\n}\r\n"
+
+        let utilText = "pub fn compute(x: i32, y: i32) -> i32 {\n    x + y // compute\n}\n"
+        File.WriteAllText(main, mainText)
+        File.WriteAllText(util, utilText)
+
+        let spec: ServerSpec =
+            { Command = python
+              Args = [ Path.Combine(System.AppContext.BaseDirectory, "fake_lsp.py") ]
+              Install = "" }
+
+        match Lsp.start spec (fun _ _ -> ()) with
+        | Error e -> failwith e
+        | Ok session ->
+            try
+                let c = session.Client
+                Assert.True((c.Initialize root).Result)
+                Assert.Equal(RenameWithPrepare, c.RenameSupport)
+                // the editor's text, not the disk's, is what the server sees: the file is open and changed
+                let edited = mainText.Replace("(3, 4)", "(30, 40)")
+                c.DidOpen(main, "rust", edited)
+                let at = pos 2 20
+
+                match c.PrepareRename(main, at).Result with
+                | Ok p -> Assert.Equal(Some "compute", p.Placeholder)
+                | Error e -> failwith e
+
+                // a keyword is refused with the server's own words
+                match c.PrepareRename(main, pos 1 0).Result with
+                | Error e -> Assert.Contains("keyword", e)
+                | Ok _ -> failwith "a keyword should be refused"
+
+                match c.Rename(main, at, "total").Result with
+                | Error e -> failwith e
+                | Ok we ->
+                    let read (p: string) =
+                        if p = main then Ok edited else Ok(File.ReadAllText p)
+
+                    match Edits.plan read we with
+                    | Error e -> failwith e
+                    | Ok changes ->
+                        Assert.Equal(2, changes.Length)
+                        Assert.Equal("3 places in 2 files", Edits.summary changes)
+                        let m = changes |> List.find (fun x -> x.Path = main)
+                        let u = changes |> List.find (fun x -> x.Path = util)
+                        Assert.Equal(edited.Replace("compute", "total"), m.After)
+                        Assert.Equal(utilText.Replace("compute", "total"), u.After)
+                        // CRLF survives in the file that had it
+                        Assert.Contains("\r\n", m.After)
+                        // nothing was written by planning
+                        Assert.Equal(utilText, File.ReadAllText util)
+
+                        for ch in changes do
+                            File.WriteAllText(ch.Path, ch.After)
+
+                        Assert.Equal(utilText.Replace("compute", "total"), File.ReadAllText util)
+            finally
+                session.Stop()
+
+                try
+                    Directory.Delete(root, true)
+                with _ ->
+                    ()
