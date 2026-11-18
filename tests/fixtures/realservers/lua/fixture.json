@@ -1,0 +1,31 @@
+{
+  "id": "lua",
+  "pack": "lua",
+  "server": "lua-language-server",
+  "languageId": "lua",
+  "files": [
+    "main.lua",
+    "util.lua",
+    "bad.lua"
+  ],
+  "diagnostic": {
+    "file": "bad.lua"
+  },
+  "completion": {
+    "file": "main.lua",
+    "at": "util.gre|et",
+    "expect": "greet"
+  },
+  "definition": {
+    "file": "main.lua",
+    "at": "util.gre|et",
+    "expectFile": [
+      "util.lua"
+    ]
+  },
+  "hover": {
+    "file": "main.lua",
+    "at": "util.gre|et",
+    "contains": "greet"
+  }
+}

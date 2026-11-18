@@ -4,7 +4,7 @@
 One entrypoint used identically on a developer machine, in a git hook, and in GitHub Actions
 (Invariant: local and remote CI must not diverge). Standard library only; Windows, Linux, macOS.
 
-  python tools/ci/fsh_ci.py run [--profile fast|full|all|release] [--only S ...] [--skip S ...]
+  python tools/ci/fsh_ci.py run [--profile fast|full|all|release|verify] [--only S ...] [--skip S ...]
                                 [--no-cache] [--keep-going] [--jobs N] [--rid RID]
                                 [--require-aot] [--require-rust] [--require-node] [--ignore-resources] [--allow-dirty]
   python tools/ci/fsh_ci.py preflight      # checks only
@@ -892,6 +892,29 @@ def stage_bundle(ctx: Ctx) -> Result:
     return Result(PASS, f"{len(packages)} package(s) + {ctx.rid} binary, {total:.1f} MB, in {out_dir.relative_to(ROOT).as_posix()}", metrics={"files": len(files) + 2})
 
 
+def stage_realservers(ctx: Ctx) -> Result:
+    """Opt-in: the desktop IDE's language-server and debug-adapter clients against the real servers installed on this
+    machine (tools/ci/realservers.py). Servers that are not installed are reported skipped with an install hint, never
+    passed. Only in the `verify` profile; `full`, `all` and `release` never depend on a toolchain."""
+    report = ctx.run_dir / "realservers.json"
+    rc, out = run_cmd(ctx, "realservers", [sys.executable, "tools/ci/realservers.py", "--no-build", "--json", str(report)], timeout=2400)
+    try:
+        data = json.loads(report.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return Result(FAIL, "realservers.py wrote no result:\n" + tail(out, 12))
+    rows = data["servers"]
+    passed = [r["server"] for r in rows if r["status"] == "passed"]
+    failed = [r["server"] for r in rows if r["status"] == "failed"]
+    skipped = [r["server"] for r in rows if r["status"] == "skipped"]
+    metrics = {"passed": passed, "failed": failed, "skipped": skipped}
+    table = [l.rstrip() for l in out.split("\n--- dotnet test output", 1)[0].splitlines()[1:] if l.strip()]
+    if failed:
+        return Result(FAIL, "failed: " + ", ".join(failed) + "\n" + tail(out, 30), notes=table, metrics=metrics)
+    if not passed:
+        return Result(SKIP, f"no real server is installed ({len(skipped)} skipped; see realservers.log for the install hints)", notes=table, metrics=metrics)
+    return Result(PASS, f"{len(passed)} server(s) verified: {', '.join(passed)}; {len(skipped)} skipped (not installed)", notes=table, metrics=metrics)
+
+
 # stage name -> (function, deps, input globs for the cache key, exclusive dotnet lock, cacheable)
 # lazy: skipped when every stage that consumes it is satisfied from the cache. trivial: does not count as a consumer.
 CODE = ["src/**/*.fs", "src/**/*.fsproj", "tools/**/*.fs", "tools/**/*.fsproj", "tests/**/*.fs", "tests/**/*.fsproj",
@@ -912,6 +935,7 @@ STAGES: dict[str, dict] = {
     "rust": dict(fn=stage_rust, deps=["preflight"], inputs=None, excl=False),
     "benchmarks": dict(fn=stage_benchmarks, deps=["build"], inputs=None, excl=True, trivial=True),
     "pack": dict(fn=stage_pack, deps=["build", "test"], inputs=CODE, excl=True),
+    "realservers": dict(fn=stage_realservers, deps=["build"], inputs=None, excl=True),
     "desktop-package": dict(fn=stage_desktop_package, deps=["build", "test"], inputs=None, excl=True),
     "bundle": dict(fn=stage_bundle, deps=["pack", "aot", "test", "desktop-package"], inputs=None, excl=False),
     "web": dict(fn=stage_web, deps=["tools-restore"], inputs=WEB_INPUTS, excl=True),
@@ -927,11 +951,13 @@ PROFILES = {
     # everything GitHub runs across all its workflows: full, plus the browser IDE, gateway, hub and site jobs
     "all": FULL + ["web", "gateway", "hub", "site"],
     "release": FULL + ["pack", "desktop-package", "bundle"],
+    # opt-in: the IDE's language-server and debugger clients against real servers (never part of full, all or release)
+    "verify": ["preflight", "restore", "build", "realservers"],
 }
 # A cache hit is only trusted for stages whose outputs are not consumed by a later stage in the same run.
 CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot", "web", "gateway", "hub", "site"}
 # Stages that start dotnet or compile a lot: they wait (briefly) for memory before they begin.
-HEAVY = {"restore", "build", "test", "aot", "pack", "web", "desktop-package"}
+HEAVY = {"restore", "build", "test", "aot", "pack", "web", "desktop-package", "realservers"}
 
 
 # --------------------------------------------------------------------------- scheduler

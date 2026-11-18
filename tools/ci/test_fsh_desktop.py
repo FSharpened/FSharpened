@@ -1,6 +1,6 @@
 """Self-tests for the desktop packaging side of fsh-ci: the archive, the native-crate discovery, the self-test report
 check, the provenance record and the files under packaging/ and .github/workflows. Stdlib unittest only."""
-import gzip, hashlib, json, os, pathlib, sys, tarfile, tempfile, time, unittest, zipfile
+import contextlib, gzip, hashlib, io, json, os, pathlib, sys, tarfile, tempfile, time, unittest, zipfile
 import xml.etree.ElementTree as ET
 from unittest import mock
 
@@ -8,6 +8,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import fsh_ci as ci  # noqa: E402
 import fsh_desktop as desk  # noqa: E402
 import fsh_release as rel  # noqa: E402
+import realservers as rs  # noqa: E402
 
 ROOT = ci.ROOT
 
@@ -267,6 +268,104 @@ class WorkflowTests(unittest.TestCase):
                 self.assertRegex(line, r"uses: [\w./-]+@[0-9a-f]{40}\b", line)
         for word in ("secrets.", "gh release", "nuget push", "twine", "docker push", "npm publish", "signtool", "notarytool"):
             self.assertNotIn(word, text, word)
+
+    def test_realservers_workflow_is_manual_weekly_linux_read_only_and_pinned(self):
+        text = self.read("realservers.yml")
+        self.assertIn("workflow_dispatch:", text)
+        self.assertIn("schedule:", text)
+        self.assertIn("cron:", text)
+        self.assertIn("contents: read", text)
+        self.assertIn("ubuntu-latest", text)
+        self.assertNotIn("windows", text)
+        self.assertNotIn("macos", text)
+        self.assertIn("--profile verify", text)
+        self.assertNotIn("pull_request", text)
+        for line in text.splitlines():
+            if "uses:" in line:
+                self.assertRegex(line, r"uses: [\w./-]+@[0-9a-f]{40}\b", line)
+        for server in ("gopls", "rust-analyzer", "pyright", "typescript-language-server", "clangd", "lua-language-server"):
+            self.assertIn(server, text)
+
+class RealServersTests(unittest.TestCase):
+    def test_the_verify_profile_is_opt_in_and_never_part_of_the_others(self):
+        self.assertEqual(ci.PROFILES["verify"], ["preflight", "restore", "build", "realservers"])
+        for name in ("fast", "full", "all", "release"):
+            self.assertNotIn("realservers", ci.PROFILES[name], name)
+        self.assertEqual(ci.STAGES["realservers"]["deps"], ["build"])
+        self.assertNotIn("realservers", ci.CACHEABLE)
+        for stages in ci.PROFILES.values():
+            for s in stages:
+                for d in ci.STAGES[s]["deps"]:
+                    self.assertIn(d, stages)
+
+    def test_every_server_has_a_fixture_an_install_hint_and_a_pack(self):
+        names = [s.name for s in rs.SERVERS]
+        self.assertEqual(len(names), len(set(names)))
+        for want in ("gopls", "rust-analyzer", "pyright-langserver", "typescript-language-server", "clangd", "lua-language-server",
+                     "fsautocomplete", "netcoredbg", "dlv", "lldb-dap", "debugpy"):
+            self.assertIn(want, names)
+        for s in rs.SERVERS:
+            fixture = ROOT / "tests" / "fixtures" / "realservers" / s.fixture / "fixture.json"
+            self.assertTrue(fixture.is_file(), s.name)
+            data = json.loads(fixture.read_text(encoding="utf-8"))
+            self.assertTrue(s.install, s.name)
+            if s.kind == "lsp":
+                self.assertEqual(data["server"], s.name)
+                pack = json.loads((ROOT / "languages" / f"{data['pack']}.json").read_text(encoding="utf-8"))
+                self.assertEqual(pack["server"]["command"], s.name, "the fixture starts the server the language pack names")
+            else:
+                self.assertEqual(data["debug"]["adapter"], s.name)
+
+    def test_a_npm_cmd_shim_is_resolved_to_node_and_the_script(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = pathlib.Path(d)
+            (root / "node_modules" / "pyright").mkdir(parents=True)
+            (root / "node_modules" / "pyright" / "langserver.index.js").write_text("//", encoding="utf-8")
+            shim = root / "pyright-langserver.cmd"
+            shim.write_text('@ECHO off\r\nendLocal & goto #_undefined_# 2>NUL || & "%_prog%"  "%dp0%\\node_modules\\pyright\\langserver.index.js" %*\r\n', encoding="utf-8")
+            with mock.patch.object(rs.shutil, "which", lambda name, path=None: "C:/node/node.exe"):
+                cmd = rs.shim_command(shim)
+            self.assertEqual(cmd[0], "C:/node/node.exe")
+            self.assertTrue(cmd[1].endswith("langserver.index.js"))
+            shim.write_text("@echo off\r\nsomething else\r\n", encoding="utf-8")
+            with mock.patch.object(rs.shutil, "which", lambda name, path=None: "C:/node/node.exe"):
+                self.assertIsNone(rs.shim_command(shim))
+
+    def test_a_server_that_is_not_installed_is_skipped_never_passed(self):
+        detected = [rs.Detected(rs.SERVERS[0], None), rs.Detected(rs.SERVERS[1], "/bin/rust-analyzer")]
+        report = pathlib.Path(tempfile.mkdtemp())
+        (report / "rust.json").write_text(json.dumps({"id": "rust", "checks": [{"name": "initialize", "ok": True, "detail": "x"}, {"name": "hover", "ok": False, "detail": "none"}]}), encoding="utf-8")
+        rows, failed = rs.summarize(detected, report, 1, "")
+        self.assertEqual([r["status"] for r in rows], ["skipped", "failed"])
+        self.assertTrue(failed)
+        text = rs.render(rows)
+        self.assertIn("Install: " + rs.SERVERS[0].install, text)
+        self.assertIn("FAIL hover", text)
+
+    def test_an_installed_server_with_no_report_is_a_failure_not_a_pass(self):
+        rows, failed = rs.summarize([rs.Detected(rs.SERVERS[0], "/bin/gopls")], pathlib.Path(tempfile.mkdtemp()), 0, "")
+        self.assertEqual(rows[0]["status"], "failed")
+        self.assertTrue(failed)
+
+    def test_nothing_installed_is_a_clean_skip(self):
+        with mock.patch.object(rs, "detect", lambda p: [rs.Detected(s, None) for s in rs.SERVERS]), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(rs.main(["--no-build"]), 0)
+
+    def test_the_stage_reports_skip_when_nothing_was_exercised_and_fail_on_a_failure(self):
+        for rows, want in (([{"server": "gopls", "status": "skipped"}], ci.SKIP), ([{"server": "gopls", "status": "passed"}], ci.PASS),
+                           ([{"server": "gopls", "status": "failed"}], ci.FAIL)):
+            with tempfile.TemporaryDirectory() as d:
+                run = pathlib.Path(d)
+                (run / "realservers.json").write_text(json.dumps({"servers": rows}), encoding="utf-8")
+                ctx = ci.Ctx(run_dir=run, env={}, rid="win-x64", require_aot=False, no_cache=True)
+                with mock.patch.object(ci, "run_cmd", lambda *a, **k: (0, "real servers: 0 of 1 installed\nSKIPPED gopls")):
+                    self.assertEqual(ci.stage_realservers(ctx).status, want)
+
+    def test_the_real_server_tests_are_skipped_unless_asked_for(self):
+        src = (ROOT / "tests" / "FSharpened.Ide.Host.Tests" / "RealServers.fs").read_text(encoding="utf-8")
+        self.assertIn('"FSH_REAL_SERVERS"', src)
+        self.assertIn("this.Skip <-", src)
+        self.assertNotIn("[<Fact>]", src, "every real-server test uses the skipping attribute")
 
 
 if __name__ == "__main__":

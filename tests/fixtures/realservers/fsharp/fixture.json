@@ -1,0 +1,30 @@
+{
+  "id": "fsharp",
+  "pack": "fsharp",
+  "server": "fsautocomplete",
+  "languageId": "fsharp",
+  "files": [
+    "main.fsx",
+    "bad.fsx"
+  ],
+  "diagnostic": {
+    "file": "bad.fsx"
+  },
+  "completion": {
+    "file": "main.fsx",
+    "at": "List.ma|p",
+    "expect": "map"
+  },
+  "definition": {
+    "file": "main.fsx",
+    "at": "(gre|et \"world\")",
+    "expectFile": [
+      "main.fsx"
+    ]
+  },
+  "hover": {
+    "file": "main.fsx",
+    "at": "(gre|et \"world\")",
+    "contains": "greet"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "id": "c",
+  "pack": "c",
+  "server": "clangd",
+  "languageId": "c",
+  "files": [
+    "main.c",
+    "util.h",
+    "util.c",
+    "bad.c"
+  ],
+  "diagnostic": {
+    "file": "bad.c"
+  },
+  "completion": {
+    "file": "main.c",
+    "at": "pri|ntf",
+    "expect": "printf"
+  },
+  "definition": {
+    "file": "main.c",
+    "at": "gre|et(\"world\")",
+    "expectFile": [
+      "util.h",
+      "util.c"
+    ]
+  },
+  "hover": {
+    "file": "main.c",
+    "at": "gre|et(\"world\")",
+    "contains": "greet"
+  },
+  "debug": {
+    "adapter": "lldb-dap",
+    "build": [
+      [
+        "clang",
+        "-g",
+        "-O0",
+        "-o",
+        "fixture",
+        "main.c",
+        "util.c"
+      ]
+    ],
+    "program": "fixture",
+    "breakpoint": {
+      "file": "util.c",
+      "line": 4
+    },
+    "variable": {
+      "name": "name",
+      "contains": "world"
+    }
+  }
+}

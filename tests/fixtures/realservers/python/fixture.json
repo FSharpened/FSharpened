@@ -1,0 +1,43 @@
+{
+  "id": "python",
+  "pack": "python",
+  "server": "pyright-langserver",
+  "languageId": "python",
+  "files": [
+    "main.py",
+    "util.py",
+    "bad.py"
+  ],
+  "diagnostic": {
+    "file": "bad.py"
+  },
+  "completion": {
+    "file": "main.py",
+    "at": "util.gre|et",
+    "expect": "greet"
+  },
+  "definition": {
+    "file": "main.py",
+    "at": "util.gre|et",
+    "expectFile": [
+      "util.py"
+    ]
+  },
+  "hover": {
+    "file": "main.py",
+    "at": "util.gre|et",
+    "contains": "greet"
+  },
+  "debug": {
+    "adapter": "debugpy",
+    "program": "main.py",
+    "breakpoint": {
+      "file": "util.py",
+      "line": 3
+    },
+    "variable": {
+      "name": "name",
+      "contains": "world"
+    }
+  }
+}

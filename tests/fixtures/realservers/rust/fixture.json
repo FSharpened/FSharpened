@@ -1,0 +1,49 @@
+{
+  "id": "rust",
+  "pack": "rust",
+  "server": "rust-analyzer",
+  "languageId": "rust",
+  "files": [
+    "src/main.rs",
+    "src/util.rs",
+    "src/bad.rs"
+  ],
+  "diagnostic": {
+    "file": "src/bad.rs"
+  },
+  "completion": {
+    "file": "src/main.rs",
+    "at": "util::gre|et",
+    "expect": "greet"
+  },
+  "definition": {
+    "file": "src/main.rs",
+    "at": "util::gre|et",
+    "expectFile": [
+      "util.rs"
+    ]
+  },
+  "hover": {
+    "file": "src/main.rs",
+    "at": "util::gre|et",
+    "contains": "greet"
+  },
+  "debug": {
+    "adapter": "lldb-dap",
+    "build": [
+      [
+        "cargo",
+        "build"
+      ]
+    ],
+    "program": "target/debug/fixture",
+    "breakpoint": {
+      "file": "src/util.rs",
+      "line": 3
+    },
+    "variable": {
+      "name": "name",
+      "contains": "world"
+    }
+  }
+}
