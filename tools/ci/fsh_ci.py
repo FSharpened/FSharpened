@@ -53,7 +53,7 @@ import fsh_runtime as rt  # noqa: E402
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 STATE = ROOT / ".fsharpened" / "ci"
 SIX_RIDS = ["win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-x64", "osx-arm64"]
-EXCLUDE_DIRS = {".git", "bin", "obj", "artifacts", ".fsharpened", "node_modules", "__pycache__", ".vs", ".idea", "fable_out", "dist"}
+EXCLUDE_DIRS = {".git", "bin", "obj", "artifacts", ".fsharpened", "node_modules", "__pycache__", ".vs", ".idea", "fable_out", "dist", "out-test"}
 INDEX = rt.FileIndex(ROOT, EXCLUDE_DIRS)
 
 PASS, FAIL, SKIP, WARN, BLOCKED, CACHED = "pass", "fail", "skip", "warn", "blocked", "cached"
@@ -90,6 +90,11 @@ def augment_path(env: dict) -> dict:
 
 def base_env() -> dict:
     env = augment_path(dict(os.environ))
+    # A git hook runs with GIT_DIR (and friends) pointing at this repository. Stages that run tests which create their own
+    # throwaway repositories (or ask about a plain folder) would see this one instead, so the hook run would fail where
+    # a normal run passes.
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"):
+        env.pop(name, None)
     env.update(
         {
             "CI": "true",  # strict mode: warnings are errors (Directory.Build.props)
@@ -409,7 +414,7 @@ def check_memory(ctx):
 def check_node(ctx):
     node = which("node", ctx.env)
     if not node:
-        msg = "node not found (the web, gateway, hub and site stages need Node 20+)"
+        msg = "node not found (the web, gateway, hub, vscode and site stages need Node 20+)"
         return (FAIL if ctx.require_node else WARN), msg
     v = rt.tool_version(node, ["--version"], ctx.env)
     major = int(re.sub(r"[^\d].*", "", v.lstrip("v")) or 0)
@@ -732,6 +737,31 @@ def stage_hub(ctx: Ctx) -> Result:
     return Result(PASS, f"{m.group(1)} tests passed" if m else "type-check and tests passed", metrics={"vitest": int(m.group(1)) if m else 0})
 
 
+def stage_vscode(ctx: Ctx) -> Result:
+    """The VS Code extension (vscode/, ADR-0024): type-check, bundle, node tests (the real-Fantomas test runs when the
+    restored `dotnet fantomas` is available), pack the .vsix into artifacts/ and verify its contents. Mirrors vscode.yml.
+    Packing never publishes: there is no publish path in this stage or in the scripts it runs."""
+    skip = node_ready(ctx)
+    if skip:
+        return skip
+    bad, out = npm_steps(ctx, "vscode", "vscode", [["run", "typecheck"], ["run", "build"], ["test"]])
+    if bad:
+        return bad
+    passed = re.search(r"# pass (\d+)", out)
+    skipped = re.search(r"# skipped (\d+)", out)
+    for script in ("package", "verify"):
+        rc, o = run_cmd(ctx, "vscode", ["npm", "run", script], timeout=600, cwd=ROOT / "vscode", append=True)
+        if rc != 0:
+            return Result(FAIL, f"npm run {script} failed:\n" + tail(o, 15))
+    version = json.loads((ROOT / "vscode" / "package.json").read_text(encoding="utf-8"))["version"]
+    vsix = ROOT / "artifacts" / f"fsharpened-{version}.vsix"
+    if not vsix.is_file():
+        return Result(FAIL, f"{vsix.relative_to(ROOT)} was not produced")
+    n = int(passed.group(1)) if passed else 0
+    detail = f"{n} node tests passed" + (f" ({skipped.group(1)} skipped)" if skipped and skipped.group(1) != "0" else "") + f", {vsix.name} {vsix.stat().st_size // 1000} KB verified"
+    return Result(PASS if n else FAIL, detail if n else "no node tests ran", metrics={"node_tests": n, "vsix_bytes": vsix.stat().st_size})
+
+
 def stage_site(ctx: Ctx) -> Result:
     """The public site and hub console as they are deployed: icons up to date, the build, links and CSP-safe markup, and
     the service-worker behaviour tests. Mirrors site.yml."""
@@ -798,9 +828,11 @@ def stage_bundle(ctx: Ctx) -> Result:
 # lazy: skipped when every stage that consumes it is satisfied from the cache. trivial: does not count as a consumer.
 CODE = ["src/**/*.fs", "src/**/*.fsproj", "tools/**/*.fs", "tools/**/*.fsproj", "tests/**/*.fs", "tests/**/*.fsproj",
         "Directory.Build.props", "Directory.Packages.props", "global.json", "FSharpened.slnx",
-        "native/rust/**/*.rs", "native/rust/**/Cargo.toml", "native/rust/**/Cargo.lock"]
+        "native/rust/**/*.rs", "native/rust/**/Cargo.toml", "native/rust/**/Cargo.lock",
+        "vscode/test/fixtures/**"]  # the editor extension's golden diagnostics report is read by the .NET tests
 WEB_INPUTS = ["ide/web/**", "tools/FSharpened.Ide.Web/**", "tools/FSharpened.Ide/**", "global.json", ".config/dotnet-tools.json",
               "Directory.Build.props", "Directory.Packages.props"]
+VSCODE_INPUTS = ["vscode/**", "branding/icons/icon-512.png", "LICENSE", ".config/dotnet-tools.json", "global.json"]
 STAGES: dict[str, dict] = {
     "preflight": dict(fn=stage_preflight, deps=[], inputs=None, excl=False),
     "docs-drift": dict(fn=stage_docs_drift, deps=["preflight"], inputs=["**/*.md", "registry/**", "src/**/*.fsproj", ".agents/**", "tools/scripts/*.py"], excl=False),
@@ -818,6 +850,7 @@ STAGES: dict[str, dict] = {
     "web": dict(fn=stage_web, deps=["tools-restore"], inputs=WEB_INPUTS, excl=True),
     "gateway": dict(fn=stage_gateway, deps=["preflight"], inputs=["gateway/**"], excl=False),
     "hub": dict(fn=stage_hub, deps=["preflight"], inputs=["worker/**"], excl=False),
+    "vscode": dict(fn=stage_vscode, deps=["tools-restore"], inputs=VSCODE_INPUTS, excl=False),
     "site": dict(fn=stage_site, deps=["web"], inputs=["site/**", "tools/site/**", "branding/**", "worker/admin/**", *WEB_INPUTS], excl=False),
 }
 FULL = ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build", "test", "aot", "rust", "benchmarks"]
@@ -825,12 +858,12 @@ PROFILES = {
     "fast": ["preflight", "docs-drift", "selftest", "tools-restore", "format"],
     # what ci.yml runs on each of the six RIDs: keep this list identical to what GitHub's matrix expects
     "full": FULL,
-    # everything GitHub runs across all its workflows: full, plus the browser IDE, gateway, hub and site jobs
-    "all": FULL + ["web", "gateway", "hub", "site"],
+    # everything GitHub runs across all its workflows: full, plus the browser IDE, gateway, hub, VS Code extension and site jobs
+    "all": FULL + ["web", "gateway", "hub", "vscode", "site"],
     "release": FULL + ["pack", "bundle"],
 }
 # A cache hit is only trusted for stages whose outputs are not consumed by a later stage in the same run.
-CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot", "web", "gateway", "hub", "site"}
+CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot", "web", "gateway", "hub", "vscode", "site"}
 # Stages that start dotnet or compile a lot: they wait (briefly) for memory before they begin.
 HEAVY = {"restore", "build", "test", "aot", "pack", "web"}
 
@@ -1360,7 +1393,7 @@ def cmd_verify(args) -> int:
 
 
 WATCH_PATTERNS = ["**/*.fs", "**/*.fsproj", "**/*.md", "**/*.props", "**/*.json", "tools/ci/*.py", "tools/scripts/*.py", "native/rust/**",
-                  "ide/**", "gateway/**", "worker/**", "site/**", "tools/site/*.py", ".editorconfig", "global.json"]
+                  "ide/**", "gateway/**", "worker/**", "vscode/**", "site/**", "tools/site/*.py", ".editorconfig", "global.json"]
 
 
 def cmd_watch(args) -> int:
@@ -1419,7 +1452,7 @@ def add_run_options(r: argparse.ArgumentParser, default_profile: str = "full") -
     r.add_argument("--rid", help="override host RID for the AOT stage")
     r.add_argument("--require-aot", action="store_true", help="fail (not skip) when the NativeAOT toolchain is missing")
     r.add_argument("--require-rust", action="store_true", help="fail (not skip) when cargo is missing; also makes the Interop.Rust tests fail without it")
-    r.add_argument("--require-node", action="store_true", help="fail (not skip) when node is missing for the web, gateway, hub and site stages")
+    r.add_argument("--require-node", action="store_true", help="fail (not skip) when node is missing for the web, gateway, hub, vscode and site stages")
     r.add_argument("--ignore-resources", action="store_true", help="run even when free memory is below the safe minimum")
     r.add_argument("--allow-dirty", action="store_true", help="let the release bundle name a commit although tracked files are modified")
     r.add_argument("--hang-timeout", type=int, default=300, help="seconds one test may run before it is named as a hang and killed")

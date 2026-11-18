@@ -1,0 +1,155 @@
+{
+  "name": "fsharpened",
+  "displayName": "FSharpened",
+  "description": "F# language server, Fantomas formatting and FSharpened diagnostics for VS Code. Local-only: no network, no telemetry.",
+  "version": "0.0.1",
+  "publisher": "fsharpened",
+  "license": "Apache-2.0",
+  "private": true,
+  "repository": { "type": "git", "url": "https://github.com/FSharpened/FSharpened.git", "directory": "vscode" },
+  "bugs": { "url": "https://github.com/FSharpened/FSharpened/issues" },
+  "homepage": "https://github.com/FSharpened/FSharpened/blob/main/docs/operations/vscode.md",
+  "icon": "images/icon.png",
+  "categories": ["Programming Languages", "Linters", "Formatters"],
+  "keywords": ["F#", "fsharp", "fantomas", "fsautocomplete", "diagnostics"],
+  "engines": { "vscode": "^1.90.0", "node": ">=20" },
+  "main": "./dist/extension.js",
+  "type": "commonjs",
+  "extensionKind": ["workspace"],
+  "activationEvents": ["onLanguage:fsharp", "workspaceContains:**/*.fsproj"],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "FSharpened starts external programs (FsAutoComplete, Fantomas, the fsh CLI, Python for the local CI) found through settings, .config/dotnet-tools.json or PATH. None of that runs until you trust the workspace; syntax and the Doctor report still work.",
+      "restrictedConfigurations": [
+        "fsharpened.languageServer.path",
+        "fsharpened.languageServer.args",
+        "fsharpened.fantomas.path",
+        "fsharpened.fsh.path",
+        "fsharpened.python.path"
+      ]
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "The tools run as local processes on files on disk, so a virtual file system (vscode.dev, remote repositories) is not supported."
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "fsharp",
+        "aliases": ["F#", "FSharp", "fsharp"],
+        "extensions": [".fs", ".fsi", ".fsx", ".fsscript"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "commands": [
+      { "command": "fsharpened.runCi", "title": "Run local CI", "category": "FSharpened" },
+      { "command": "fsharpened.showCiReport", "title": "Show last CI report", "category": "FSharpened" },
+      { "command": "fsharpened.doctor", "title": "Doctor", "category": "FSharpened" },
+      { "command": "fsharpened.analyzeFile", "title": "Analyze current file", "category": "FSharpened" },
+      { "command": "fsharpened.formatDocument", "title": "Format document with Fantomas", "category": "FSharpened" },
+      { "command": "fsharpened.restartLanguageServer", "title": "Restart language server", "category": "FSharpened" },
+      { "command": "fsharpened.showOutput", "title": "Show output", "category": "FSharpened" }
+    ],
+    "configuration": {
+      "title": "FSharpened",
+      "properties": {
+        "fsharpened.languageServer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Start the FsAutoComplete language server for F# files (trusted workspaces only)."
+        },
+        "fsharpened.languageServer.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "FsAutoComplete executable. Empty: use the `fsautocomplete` tool from `.config/dotnet-tools.json` (run `dotnet tool restore`), then `fsautocomplete` on `PATH`."
+        },
+        "fsharpened.languageServer.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "scope": "machine-overridable",
+          "markdownDescription": "Extra command-line arguments for FsAutoComplete."
+        },
+        "fsharpened.languageServer.trace": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Trace the language client/server traffic into the FSharpened output channel."
+        },
+        "fsharpened.fantomas.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Fantomas executable. Empty: `dotnet fantomas` from `.config/dotnet-tools.json`, then `fantomas` on `PATH`. The workspace's `.editorconfig` is honoured."
+        },
+        "fsharpened.fantomas.formatOnSave": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Format F# files with Fantomas when they are saved. (`editor.formatOnSave` also works and uses the same formatter.)"
+        },
+        "fsharpened.fsh.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "The `fsh` command line (an executable, or `fsh.dll`, which is run with `dotnet`). Empty: `dotnet fsh` from `.config/dotnet-tools.json`, then `fsh` on `PATH`."
+        },
+        "fsharpened.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show FSharpened diagnostics (from `fsh analyze --format json`) as problems."
+        },
+        "fsharpened.diagnostics.runOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Analyze a file when it is saved."
+        },
+        "fsharpened.diagnostics.runOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Analyze a file when it is opened."
+        },
+        "fsharpened.python.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Python 3 used for `FSharpened: Run local CI`. Empty: the first of `python3`, `python`, `py` on `PATH`."
+        },
+        "fsharpened.ci.profile": {
+          "type": "string",
+          "enum": ["fast", "full", "all"],
+          "default": "fast",
+          "markdownDescription": "Profile for `FSharpened: Run local CI` (`python tools/ci/fsh_ci.py run --profile <profile>`). See docs/operations/local-ci.md."
+        },
+        "fsharpened.toolTimeoutSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "maximum": 600,
+          "description": "How long a formatting or analysis run may take before it is stopped."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node build.mjs",
+    "test": "node build.mjs --tests && node scripts/run-tests.mjs",
+    "package": "node scripts/package.mjs",
+    "verify": "node scripts/verify-vsix.mjs",
+    "smoke": "node scripts/smoke-vscode.mjs"
+  },
+  "dependencies": {
+    "vscode-jsonrpc": "8.2.0",
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "4.1.1",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}

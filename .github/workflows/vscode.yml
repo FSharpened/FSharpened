@@ -1,0 +1,46 @@
+name: vscode
+# Mirrors the `vscode` stage of tools/ci/fsh_ci.py (profile `all`): type-check, bundle, node tests, pack the .vsix, verify it.
+# The package is uploaded as a build artifact for review only. This workflow never publishes anything (AGENTS.md).
+on:
+  pull_request:
+    paths: ['vscode/**', 'src/FSharpened.Diagnostics/**', 'src/FSharpened.Analyzers/**', 'tools/FSharpened.Cli/**', 'branding/icons/icon-512.png', '.github/workflows/vscode.yml']
+  push:
+    branches: [main]
+    paths: ['vscode/**', 'src/FSharpened.Diagnostics/**', 'src/FSharpened.Analyzers/**', 'tools/FSharpened.Cli/**']
+permissions:
+  contents: read
+jobs:
+  extension:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          # Latest 9.0.x, as in ci.yml (older SDKs bundle an AOT compiler with known advisories).
+          dotnet-version: '9.0.x'
+      # The node tests include one that formats with the repo's own Fantomas (skipped where it is not restored).
+      - run: dotnet tool restore
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: vscode
+      - run: npm run typecheck
+        working-directory: vscode
+      - run: npm run build
+        working-directory: vscode
+      - run: npm test
+        working-directory: vscode
+      - run: npm run package
+        working-directory: vscode
+      - run: npm run verify
+        working-directory: vscode
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fsharpened-vsix
+          path: artifacts/*.vsix
+          if-no-files-found: error
+          retention-days: 14

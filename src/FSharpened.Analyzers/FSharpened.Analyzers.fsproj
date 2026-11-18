@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Compile Include="Pillar.fs" />
+    <Compile Include="PolicyRules.fs" />
   </ItemGroup>
 
   <ItemGroup>
