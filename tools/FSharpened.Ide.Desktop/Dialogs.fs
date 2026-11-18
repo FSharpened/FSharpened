@@ -131,3 +131,85 @@ let ask
         input.SelectAll())
 
     win.ShowDialog<string option>(owner)
+
+/// What a rename is about to change, file by file, and a question: true when the primary button was chosen. `files` are
+/// (name to show, number of changes, the lines that change as (line, before, after)).
+let preview
+    (owner: Window)
+    (roles: Palette.Roles)
+    (title: string)
+    (summary: string)
+    (files: (string * int * (int * string * string) list) list)
+    (primary: string)
+    : System.Threading.Tasks.Task<bool> =
+    let mutable win: Window = null
+    let yes = button roles primary true (fun () -> win.Close true)
+    let no = button roles "Cancel" false (fun () -> win.Close false)
+    let list = StackPanel()
+    list.Spacing <- 2.0
+
+    for (name, count, lines) in files do
+        let head = TextBlock()
+        head.Text <- sprintf "%s   (%d change%s)" name count (if count = 1 then "" else "s")
+        head.FontWeight <- FontWeight.SemiBold
+        head.Foreground <- roles.Fg
+        head.Margin <- Thickness(0.0, 8.0, 0.0, 2.0)
+        list.Children.Add head
+
+        if lines.IsEmpty then
+            let n = TextBlock()
+            n.Text <- "  (lines move in this file, so they are not listed)"
+            n.Foreground <- roles.Muted
+            list.Children.Add n
+
+        for (line, before, after) in lines |> List.truncate 12 do
+            let row = StackPanel()
+            row.Orientation <- Orientation.Horizontal
+            row.Spacing <- 8.0
+            row.Margin <- Thickness(12.0, 0.0, 0.0, 0.0)
+            let num = TextBlock()
+            num.Text <- string line
+            num.Foreground <- roles.Muted
+            num.Width <- 40.0
+            num.TextAlignment <- TextAlignment.Right
+            let b = TextBlock()
+            b.Text <- before
+            b.Foreground <- roles.Bad
+            b.TextDecorations <- TextDecorations.Strikethrough
+            b.FontFamily <- FontFamily "Cascadia Code, Consolas, Menlo, monospace"
+            let a = TextBlock()
+            a.Text <- "→  " + after
+            a.Foreground <- roles.Ok
+            a.FontFamily <- FontFamily "Cascadia Code, Consolas, Menlo, monospace"
+            row.Children.Add num
+            row.Children.Add b
+            row.Children.Add a
+            list.Children.Add row
+
+        if lines.Length > 12 then
+            let more = TextBlock()
+
+            more.Text <-
+                sprintf "  … and %d more line%s" (lines.Length - 12) (if lines.Length - 12 = 1 then "" else "s")
+
+            more.Foreground <- roles.Muted
+            list.Children.Add more
+
+    let scroll = ScrollViewer()
+    scroll.Content <- list
+    scroll.MaxHeight <- 340.0
+    scroll.HorizontalScrollBarVisibility <- Primitives.ScrollBarVisibility.Auto
+    let border = Border()
+    border.Child <- scroll
+    border.BorderBrush <- roles.Line
+    border.BorderThickness <- Thickness 1.0
+    border.Padding <- Thickness 8.0
+    border.Background <- roles.Code
+
+    let heading = message roles title
+    heading.FontWeight <- FontWeight.Bold
+    heading.FontSize <- 16.0
+
+    win <- shell owner title roles 720.0 (column [ heading; message roles summary; border; buttons [ no; yes ] ])
+    win.Title <- title
+    win.ShowDialog<bool>(owner)

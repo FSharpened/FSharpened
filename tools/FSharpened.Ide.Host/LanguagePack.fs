@@ -34,11 +34,32 @@ type ToolSpec =
       Version: string list
       Install: string }
 
-/// A language server or a debug adapter: a program to start and how to get it.
+/// A language server: a program to start and how to get it.
 type ServerSpec =
     { Command: string
       Args: string list
       Install: string }
+
+/// How to debug a language through a Debug Adapter Protocol server. Like everything in a pack it is data: it names a
+/// program from the PATH and a JSON template; nothing runs until the person starts a session in a trusted folder.
+type DebugSpec =
+    {
+        /// The adapter program, a bare name looked up on the PATH.
+        Adapter: string
+        Args: string list
+        Install: string
+        /// "stdio" (the adapter talks over its standard streams) or "tcp" (it listens on `{port}` and the IDE connects).
+        Transport: string
+        /// The `adapterID` sent in `initialize`.
+        AdapterId: string
+        /// "launch" or "attach".
+        Request: string
+        /// A step that builds the program first (phase build), run in the folder before the session starts.
+        Build: Step option
+        /// The arguments of the launch or attach request: a JSON object whose strings may hold placeholders
+        /// (`{file}`, `{root}`, `{dir}`, `{out}`, `{project}`, `{projectdir}`, `{newest:glob}` ...).
+        Configuration: string
+    }
 
 /// A language, as data (`fsharpened.language/1`). Adding a language is adding a file; a pack declares and runs nothing
 /// by itself (ADR-0023).
@@ -60,7 +81,7 @@ type LanguagePack =
         Run: Plan list
         Test: Plan list
         Format: Step option
-        Debug: ServerSpec option
+        Debug: DebugSpec option
         Tools: ToolSpec list
         /// Where the pack came from (a file path), for messages.
         Origin: string
@@ -77,6 +98,21 @@ module LanguagePack =
     let FormatId = "fsharpened.language/1"
 
     let placeholders = [ "entry"; "out"; "dir"; "root"; "name"; "flags" ]
+
+    /// What a debug block may use. `{newest:bin/*/x.dll}` (the newest file matching a glob under the project folder) is
+    /// also accepted; it is checked where it is expanded.
+    let debugPlaceholders =
+        [ "entry"
+          "file"
+          "out"
+          "dir"
+          "root"
+          "name"
+          "flags"
+          "project"
+          "projectdir"
+          "projectfile"
+          "port" ]
 
     exception private Bad of string
 
@@ -153,16 +189,22 @@ module LanguagePack =
         else
             bad "%s “%s” must be a bare program name, not a path" what s
 
-    let private checkPlaceholders (what: string) (s: string) =
+    let private checkPlaceholdersOf (allowed: string list) (what: string) (s: string) =
         for m in holderRe.Matches s do
-            if not (List.contains m.Groups[1].Value placeholders) then
+            let name = m.Groups[1].Value
+
+            if
+                not (List.contains name allowed)
+                && not (name.StartsWith "newest:" && List.contains "newest" allowed)
+            then
                 bad
                     "%s uses {%s}, which is not one of %s"
                     what
-                    m.Groups[1].Value
-                    (String.Join(", ", placeholders |> List.map (fun p -> "{" + p + "}")))
+                    name
+                    (String.Join(", ", allowed |> List.filter ((<>) "newest") |> List.map (fun p -> "{" + p + "}")))
 
-    let private parseStep
+    let private parseStepWith
+        (allowed: string list)
         (declared: Set<string>)
         (builtBefore: bool)
         (fixedPhase: StepPhase option)
@@ -186,11 +228,13 @@ module LanguagePack =
             | None -> bad "a step needs a tool"
 
         let args = strings e "args" 40 1000
-        args |> List.iter (checkPlaceholders "an argument")
+        args |> List.iter (checkPlaceholdersOf allowed "an argument")
 
         { Phase = phase
           Tool = tool
           Args = args }
+
+    let private parseStep = parseStepWith placeholders
 
     let private parsePlans (declared: Set<string>) (e: JsonElement) (n: string) : Plan list =
         items e n 8
@@ -281,6 +325,75 @@ module LanguagePack =
         { Command = cmd
           Args = strings e "args" 20 300
           Install = text e "install" 300 |> Option.defaultValue "" }
+
+    /// Every string in a JSON value, to check placeholders; also refuses control characters and deep nesting.
+    let rec private checkTemplate (allowed: string list) (depth: int) (v: JsonElement) =
+        if depth > 6 then
+            bad "“debug.launch” is nested too deeply"
+
+        match v.ValueKind with
+        | JsonValueKind.String ->
+            let s = v.GetString()
+
+            if s.Length > 400 then
+                bad "a string in “debug.launch” is longer than 400 characters"
+
+            if s |> Seq.exists (fun c -> c = '\000') then
+                bad "a string in “debug.launch” holds a control character"
+
+            checkPlaceholdersOf allowed "“debug.launch”" s
+        | JsonValueKind.Object ->
+            for p in v.EnumerateObject() do
+                checkTemplate allowed (depth + 1) p.Value
+        | JsonValueKind.Array ->
+            for x in v.EnumerateArray() do
+                checkTemplate allowed (depth + 1) x
+        | _ -> ()
+
+    let private parseDebug (declared: Set<string>) (e: JsonElement) : DebugSpec =
+        let adapter =
+            match text e "adapter" 64 with
+            | Some c -> program "the adapter" c
+            | None -> bad "“adapter” is needed"
+
+        let transport =
+            match text e "transport" 8 with
+            | None -> "stdio"
+            | Some("stdio" | "tcp" as t) -> t
+            | Some t -> bad "“debug.transport” is “%s” (use stdio or tcp)" t
+
+        let request =
+            match text e "request" 8 with
+            | None -> "launch"
+            | Some("launch" | "attach" as r) -> r
+            | Some r -> bad "“debug.request” is “%s” (use launch or attach)" r
+
+        let args = strings e "args" 20 300
+        args |> List.iter (checkPlaceholdersOf [ "port" ] "an adapter argument")
+
+        let configuration =
+            match prop e "launch" with
+            | None -> "{}"
+            | Some l when l.ValueKind = JsonValueKind.Object ->
+                checkTemplate ("newest" :: debugPlaceholders) 0 l
+                let raw = l.GetRawText()
+
+                if raw.Length > 4000 then
+                    bad "“debug.launch” is longer than 4000 characters"
+
+                raw
+            | Some _ -> bad "“debug.launch” must be an object"
+
+        { Adapter = adapter
+          Args = args
+          Install = text e "install" 300 |> Option.defaultValue ""
+          Transport = transport
+          AdapterId = text e "adapterId" 40 |> Option.defaultValue "fsharpened"
+          Request = request
+          Build =
+            prop e "build"
+            |> Option.map (parseStepWith ("newest" :: debugPlaceholders) declared false (Some Compile))
+          Configuration = configuration }
 
     let private parseRoot (origin: string) (root: JsonElement) : LanguagePack =
         if root.ValueKind <> JsonValueKind.Object then
@@ -394,7 +507,7 @@ module LanguagePack =
           Run = parsePlans declared root "run"
           Test = parsePlans declared root "test"
           Format = formatter
-          Debug = prop root "debug" |> Option.map (fun s -> parseServer s "adapter")
+          Debug = prop root "debug" |> Option.map (parseDebug declared)
           Tools = tools
           Origin = origin }
 

@@ -15,9 +15,11 @@
     <Compile Include="Palette.fs" />
     <Compile Include="Session.fs" />
     <Compile Include="Hover.fs" />
+    <Compile Include="DebugView.fs" />
     <Compile Include="Grammars.fs" />
     <Compile Include="TerminalView.fs" />
     <Compile Include="Dialogs.fs" />
+    <Compile Include="Gutter.fs" />
     <Compile Include="MainWindow.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
