@@ -49,8 +49,16 @@ let warnedSave = false;
 function flush() {
   clearTimeout(saveTimer);
   const r = store.save(cur);
-  if (!r.ok && !warnedSave) { warnedSave = true; toast(r.error); }
-  if (r.ok) warnedSave = false;
+  watchSave(r);
+}
+/** A write can fail now (localStorage) or when IndexedDB commits it (`done`); either way say so once, until a write works again. */
+function watchSave(r) {
+  const report = (res) => {
+    if (!res.ok && !warnedSave) { warnedSave = true; toast(res.error); refreshStorageNote(); }
+    if (res.ok) warnedSave = false;
+  };
+  report(r);
+  r.done?.then(report);
 }
 /** Typing saves after a short pause (a large project is not rewritten on every key); everything else saves at once. */
 function persist(now = false) {
@@ -208,7 +216,20 @@ function updateToolbar() {
   ui.fDownload.disabled = !row && !cur.active;
 }
 
+/** "Stored in this browser: 1.2 MB of about 3 GB", and a warning when the browser is nearly out of room for this site. */
+let warnedQuota = false;
+async function refreshStorageNote() {
+  const note = $("#p-storage");
+  if (!note || !store) return;
+  const q = await store.quota();
+  const where = store.kind === "indexeddb" ? "IndexedDB" : store.kind === "localStorage" && persistent ? "local storage (about 5 MB)" : "memory only";
+  const mb = (n) => (n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : Math.max(0.1, n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + " MB");
+  note.textContent = q && q.quota ? `Kept in this browser (${where}): ${mb(q.usage)} used of about ${mb(q.quota)} available to this site.` : `Kept in this browser (${where}).`;
+  if (q && q.quota && q.usage / q.quota > 0.8 && !warnedQuota) { warnedQuota = true; toast("The browser is nearly out of room for this site. Download projects you want to keep."); }
+}
+
 function renderProjects() {
+  refreshStorageNote();
   ui.plist.replaceChildren(...store.list().map((r) => {
     const n = r.project.files.length;
     const b = el("button", { type: "button", "data-id": r.id, "aria-current": String(r.id === cur.id) }, el("span", { class: "pn" }, r.project.name), el("span", { class: "pm" }, `${n} file${n === 1 ? "" : "s"} · ${new Date(r.updated).toLocaleDateString()}`));
@@ -538,7 +559,7 @@ function switchProject(id) {
   showSide("files");
 }
 
-function savedOrWarn(r) { if (!r.ok) toast(r.error); }
+function savedOrWarn(r) { watchSave(r); }
 
 function newProject() {
   ask({ label: "Name of the new, empty project", value: "", ok: "Create", commit(name) {
@@ -1000,10 +1021,16 @@ const app = {
 // ---------------------------------------------------------------- wiring
 async function init() {
   const storage = safe(() => { localStorage.setItem("fsharpened.ide.probe", "1"); localStorage.removeItem("fsharpened.ide.probe"); return localStorage; }, null);
-  persistent = !!storage;
-  backing = storage ?? memoryStorage();
-  store = createStore(Core, backing);
-  const { migrated } = store.load();
+  backing = storage ?? memoryStorage();           // settings, themes and snippets: small, kept in localStorage
+  // projects: IndexedDB (a far larger quota, and failures are reported), with localStorage as the fallback (store.js, ADR-0024)
+  store = createStore(Core, backing, Date.now, {
+    indexedDB: safe(() => window.indexedDB, undefined),
+    estimate: () => navigator.storage.estimate(),
+    persist: () => navigator.storage.persist(),
+  });
+  const { migrated, kind } = await store.load();
+  persistent = !!storage || kind === "indexeddb";
+  store.keepPersistent();                         // ask the browser not to evict the projects under storage pressure
   prefs = createPrefs(Core, backing);
   prefs.apply();
   editor = createEditor($("#editor"), {

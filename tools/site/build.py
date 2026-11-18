@@ -291,6 +291,7 @@ ide_body = """<div class="ide" id="ide">
       <button id="p-add" class="mini" type="button" title="Add files to the open project">Add files</button>
     </div>
     <p class="muted hint">Drop a .zip, files or a folder anywhere on the editor to import it.</p>
+    <p id="p-storage" class="muted hint"></p>
     <ul id="plist" class="plist"></ul>
     <div id="report" class="report" hidden></div>
   </div>
