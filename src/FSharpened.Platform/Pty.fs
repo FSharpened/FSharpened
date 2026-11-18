@@ -424,7 +424,20 @@ module internal PosixPty =
     extern nativeint ptsname(int fd)
 
     [<DllImport("fsh_libc", SetLastError = true)>]
-    extern int ioctl(int fd, uint64 request, byte[] argument)
+    // ioctl is variadic. Apple's arm64 ABI passes variadic arguments on the stack, not in registers, so a plain
+    // three-argument call hands the kernel garbage there. Eight register slots are filled and the ninth (the first
+    // stack slot) carries the same pointer, which reaches ioctl wherever each platform looks for it.
+    extern int ioctl(
+        int fd,
+        uint64 request,
+        byte[] a2,
+        byte[] a3,
+        byte[] a4,
+        byte[] a5,
+        byte[] a6,
+        byte[] a7,
+        byte[] onStack
+    )
 
     [<DllImport("fsh_libc", SetLastError = true)>]
     extern nativeint read(int fd, byte[] buffer, nativeint count)
@@ -504,6 +517,9 @@ module internal PosixPty =
         BitConverter.GetBytes(int16 rows).CopyTo(b, 0)
         BitConverter.GetBytes(int16 cols).CopyTo(b, 2)
         b
+
+    let private setWindowSize (fd: int) (size: byte[]) =
+        ioctl (fd, tiocswinsz, size, size, size, size, size, size, size) |> ignore
 
     let private utf8Z (s: string) : nativeint = Marshal.StringToCoTaskMemUTF8 s
 
@@ -601,7 +617,7 @@ module internal PosixPty =
 
             member _.Resize(cols: int, rows: int) =
                 if running then
-                    ioctl (master, tiocswinsz, winsize (max 1 cols) (max 1 rows)) |> ignore
+                    setWindowSize master (winsize (max 1 cols) (max 1 rows))
 
             member _.Kill() =
                 if running then
@@ -653,7 +669,7 @@ module internal PosixPty =
                     close master |> ignore
                     Error "could not find the pseudo-terminal's device"
                 else
-                    ioctl (master, tiocswinsz, winsize spec.Cols spec.Rows) |> ignore
+                    setWindowSize master (winsize spec.Cols spec.Rows)
 
                     let argv = wrap spec.Cwd spec.Argv |> List.map utf8Z |> Array.ofList
                     let argvz = Array.append argv [| 0n |]
