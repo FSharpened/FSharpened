@@ -783,6 +783,15 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(summary["rids_verified_locally"], [])
 
 
+class GitEnvironmentTests(unittest.TestCase):
+    def test_stages_do_not_inherit_the_repository_a_git_hook_points_at(self):
+        with mock.patch.dict(os.environ, {"GIT_DIR": "/somewhere/.git", "GIT_INDEX_FILE": "/somewhere/index", "GIT_WORK_TREE": "/w"}):
+            env = ci.base_env()
+        for name in ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE"):
+            self.assertNotIn(name, env)
+        self.assertEqual(env["CI"], "true")
+
+
 class HookTests(unittest.TestCase):
     def test_hooks_call_the_pipeline_with_the_hook_flag(self):
         for hook, profile in (("pre-commit", "fast"), ("pre-push", "full")):

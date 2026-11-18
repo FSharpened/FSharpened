@@ -88,8 +88,16 @@ def augment_path(env: dict) -> dict:
     return env
 
 
+# Git exports these to a hook so that `git` commands inside it act on the repository being pushed. A test that makes a plain
+# temporary folder and asks git about it must not be answered with this repository's branch (the Host tooling test did).
+GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                     "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_QUARANTINE_PATH", "GIT_NAMESPACE")
+
+
 def base_env() -> dict:
     env = augment_path(dict(os.environ))
+    for name in GIT_LOCATION_VARS:
+        env.pop(name, None)
     env.update(
         {
             "CI": "true",  # strict mode: warnings are errors (Directory.Build.props)
