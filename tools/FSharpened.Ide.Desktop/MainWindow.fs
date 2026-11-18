@@ -40,16 +40,25 @@ type OpenDoc(rel: string, text: string, pack: LanguagePack option) =
     member val LspOpen = false with get, set
     /// The text changed since the language server last saw it.
     member val LspDirty = false with get, set
+    /// The file is gone from disk (deleted or renamed outside the IDE); the tab stays so the text is not lost.
+    member val MissingOnDisk = false with get, set
+    /// The text of the file on disk that the user already chose to keep their own version over.
+    member val KeptOverDisk: string option = None with get, set
+    /// What the IDE last read from or wrote to the file. A change on disk that equals it is the IDE's own save.
+    member val DiskText = text with get, set
     member d.Dirty = not d.Doc.UndoStack.IsOriginalFile
     member d.Text = d.Doc.Text
 
     /// Replaces the text with what is on disk and forgets the undo history.
     member d.Reload(text: string) =
+        d.DiskText <- text
         d.Doc.Text <- text
         d.Doc.UndoStack.ClearAll()
         d.Doc.UndoStack.MarkAsOriginalFile()
 
-    member d.MarkSaved() = d.Doc.UndoStack.MarkAsOriginalFile()
+    member d.MarkSaved() =
+        d.DiskText <- d.Doc.Text
+        d.Doc.UndoStack.MarkAsOriginalFile()
 
 /// Wavy-looking underlines for the language server's problems, drawn behind the text.
 type Squiggles() =
@@ -101,7 +110,9 @@ type Shell(env: HostEnv) =
     let mutable fileCache: Entry list = []
     let mutable running = false
     let mutable problemsList: FSharpened.Diagnostics.StructuredDiagnostic list = []
-    let mutable watcher: FileSystemWatcher option = None
+    let mutable watcher: RunningWatch option = None
+    let mutable watchSub: IDisposable option = None
+    let mutable lastSearchEngine = ""
     let mutable quitting = false
     let expanded = HashSet<string>()
     let mutable gitBranch: string option = None
@@ -235,6 +246,7 @@ type Shell(env: HostEnv) =
     let statusPos = TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
     let statusLang = TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
     let statusGit = TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
+    let statusWatch = TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
 
     let statusProblems =
         TextBlock(Text = "", VerticalAlignment = VerticalAlignment.Center)
@@ -978,7 +990,10 @@ type Shell(env: HostEnv) =
 
             let title =
                 TextBlock(
-                    Text = name + (if d.Dirty then " ●" else ""),
+                    Text =
+                        name
+                        + (if d.Dirty then " ●" else "")
+                        + (if d.MissingOnDisk then " (deleted on disk)" else ""),
                     VerticalAlignment = VerticalAlignment.Center,
                     Foreground = (if isActive then roles.Fg else roles.Muted),
                     FontWeight = (if isActive then FontWeight.SemiBold else FontWeight.Normal)
@@ -1622,7 +1637,9 @@ type Shell(env: HostEnv) =
             searchSummary.Text <- "Searching…"
 
             task {
-                let! result = Task.Run(fun () -> Search.run opts inc exc (Replace.gather r openText))
+                let! found = Task.Run(fun () -> FolderSearch.runDefault r opts inc exc openText)
+                let result = found.Result
+                lastSearchEngine <- FolderSearch.engineLabel found.Engine
 
                 searchResults.Items.Clear()
 
@@ -1631,10 +1648,15 @@ type Shell(env: HostEnv) =
                 else
                     searchSummary.Text <-
                         sprintf
-                            "%d results in %d files%s"
+                            "%d results in %d files%s · %s search"
                             result.Total
                             result.Files.Length
                             (if result.Truncated then " (more not shown)" else "")
+                            (match found.Engine with
+                             | NativeEngine -> "native"
+                             | ManagedEngine _ -> "managed")
+
+                    ToolTip.SetTip(searchSummary, lastSearchEngine)
 
                     for f in result.Files do
                         searchResults.Items.Push(
@@ -1708,7 +1730,8 @@ type Shell(env: HostEnv) =
             let openText = [ for d in docs -> d.Rel, d.Text ]
 
             task {
-                let! result = Task.Run(fun () -> Search.run opts inc exc (Replace.gather r openText))
+                let! found = Task.Run(fun () -> FolderSearch.runDefault r opts inc exc openText)
+                let result = found.Result
 
                 if result.Error <> "" then
                     searchSummary.Text <- result.Error
@@ -1844,62 +1867,134 @@ type Shell(env: HostEnv) =
                     fillOutline ())
 
     // ---- folder -----------------------------------------------------------------------------------
+    let conflictOpen = HashSet<string>()
+
+    /// A file with unsaved edits changed on disk: ask which side wins. Keeping the editor's version is remembered for
+    /// that disk text, so the same outside change does not ask again.
+    let askConflict (r: string) (d: OpenDoc) (diskText: string) =
+        if conflictOpen.Add d.Rel then
+            task {
+                let! reload =
+                    Dialogs.confirm
+                        window
+                        roles
+                        "File changed on disk"
+                        (sprintf
+                            "“%s” was changed outside the IDE, and it has unsaved edits here.\n\nReload it from disk and lose the edits, or keep the editor's version (saving then overwrites the disk)?"
+                            (Path.GetFileName d.Rel))
+                        "Reload from disk"
+
+                conflictOpen.Remove d.Rel |> ignore
+
+                if reload && docs.Contains d then
+                    match DiskWorkspace.readText r d.Rel with
+                    | Ok t ->
+                        d.Reload t
+                        d.LspDirty <- true
+                        d.KeptOverDisk <- None
+                        d.MissingOnDisk <- false
+                        say (sprintf "Reloaded %s from disk" (Path.GetFileName d.Rel))
+                    | Error _ -> ()
+                else
+                    d.KeptOverDisk <- Some diskText
+
+                rebuildTabs ()
+            }
+            |> ignore
+
+    /// Brings the open files in line with the disk: an unmodified one is reloaded, a modified one asks, a deleted one
+    /// stays open and is marked. `paths` limits the look to those files; None looks at every open file.
+    let syncOpenFiles (paths: Set<string> option) =
+        match root with
+        | Some r ->
+            let mutable reloaded = []
+            let mutable touched = false
+
+            for d in docs |> Seq.toList do
+                if paths.IsNone || paths.Value.Contains d.Rel then
+                    match DiskWorkspace.resolve r d.Rel with
+                    | Ok full when not (File.Exists full) ->
+                        if not d.MissingOnDisk then
+                            d.MissingOnDisk <- true
+                            touched <- true
+                            say (sprintf "%s was deleted or moved on disk" (Path.GetFileName d.Rel))
+                    | _ ->
+                        if d.MissingOnDisk then
+                            d.MissingOnDisk <- false
+                            touched <- true
+
+                        match DiskWorkspace.readText r d.Rel with
+                        | Ok t when not d.Dirty && t <> d.Text ->
+                            d.Reload t
+                            d.LspDirty <- true
+                            reloaded <- Path.GetFileName d.Rel :: reloaded
+                        | Ok t when d.Dirty && t <> d.DiskText && d.KeptOverDisk <> Some t -> askConflict r d t
+                        | _ -> ()
+
+            if not reloaded.IsEmpty then
+                say (sprintf "Reloaded %s from disk" (String.Join(", ", List.rev reloaded)))
+
+            if touched || not reloaded.IsEmpty then
+                rebuildTabs ()
+        | None -> ()
+
+    /// Something changed on disk that the IDE did not do itself: refresh the explorer, git and quick open, and the
+    /// open files it touches.
+    let onDiskChanged (r: string) (change: DiskChange) =
+        if root = Some r then
+            match change with
+            | SomePaths paths ->
+                if paths.Count = 1 then
+                    say (sprintf "%s changed on disk" (Seq.head paths))
+                else
+                    say (sprintf "%d files changed on disk" paths.Count)
+
+                syncOpenFiles (Some paths)
+            | Everything ->
+                say "Many files changed on disk"
+                syncOpenFiles None
+
+            refreshGit ()
+            refreshFileCache ()
+
     let stopWatching () =
+        watchSub |> Option.iter (fun s -> s.Dispose())
+        watchSub <- None
+
         match watcher with
         | Some w ->
-            w.EnableRaisingEvents <- false
-            w.Dispose()
+            w.Watcher.Dispose()
             watcher <- None
         | None -> ()
 
-    let refreshTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds 500.0)
-
-    let syncOpenFiles () =
-        match root with
-        | Some r ->
-            for d in docs do
-                if not d.Dirty then
-                    match DiskWorkspace.readText r d.Rel with
-                    | Ok t when t <> d.Text -> d.Reload t
-                    | _ -> ()
-        | None -> ()
+        statusWatch.Text <- ""
 
     let startWatching (r: string) =
         stopWatching ()
 
         try
-            let w =
-                new FileSystemWatcher(
-                    r,
-                    IncludeSubdirectories = true,
-                    NotifyFilter =
-                        (NotifyFilters.FileName
-                         ||| NotifyFilters.DirectoryName
-                         ||| NotifyFilters.LastWrite)
+            let running = FolderWatch.start true r
+            watcher <- Some running
+
+            watchSub <-
+                Some(
+                    FolderWatch.subscribe running (fun change ->
+                        Dispatcher.UIThread.Post(fun () -> onDiskChanged r change))
                 )
 
-            let relevant (p: string) =
-                let s = p.Replace('\\', '/')
+            statusWatch.Text <-
+                match running.Engine with
+                | NativeWatch -> "👁 native"
+                | PollingWatch _ -> "👁 polling"
 
-                not (
-                    DiskWorkspace.ignoredDirs
-                    |> Set.exists (fun d -> s.Contains("/" + d + "/") || s.EndsWith("/" + d))
-                )
-
-            let poke (e: FileSystemEventArgs) =
-                if relevant e.FullPath then
-                    Dispatcher.UIThread.Post(fun () ->
-                        refreshTimer.Stop()
-                        refreshTimer.Start())
-
-            w.Changed.Add poke
-            w.Created.Add poke
-            w.Deleted.Add poke
-            w.Renamed.Add(fun e -> poke e)
-            w.EnableRaisingEvents <- true
-            watcher <- Some w
-        with _ ->
-            ()
+            ToolTip.SetTip(
+                statusWatch,
+                "Watching the folder for changes made outside the IDE: "
+                + FolderWatch.engineLabel running.Engine
+            )
+        with e ->
+            statusWatch.Text <- "👁 off"
+            ToolTip.SetTip(statusWatch, "The folder is not watched: " + e.Message)
 
     let openFolder (path: string) =
         if Directory.Exists path then
@@ -2728,12 +2823,15 @@ type Shell(env: HostEnv) =
         let left = DockPanel(LastChildFill = true)
         statusFolder.Margin <- Thickness(0.0, 0.0, 18.0, 0.0)
         statusGit.Margin <- Thickness(0.0, 0.0, 18.0, 0.0)
+        statusWatch.Margin <- Thickness(0.0, 0.0, 18.0, 0.0)
         statusRun.TextTrimming <- TextTrimming.CharacterEllipsis
         statusRun.Margin <- Thickness(0.0, 0.0, 18.0, 0.0)
         DockPanel.SetDock(statusFolder, Dock.Left)
         DockPanel.SetDock(statusGit, Dock.Left)
+        DockPanel.SetDock(statusWatch, Dock.Left)
         left.Children.Add statusFolder
         left.Children.Add statusGit
+        left.Children.Add statusWatch
         left.Children.Add statusRun
         Grid.SetColumn(left, 0)
         status.Children.Add left
@@ -2743,7 +2841,14 @@ type Shell(env: HostEnv) =
         themed (fun r ->
             statusBorder.Background <- r.Brand
 
-            for t in [ statusFolder; statusGit; statusRun; statusPos; statusLang; statusProblems ] do
+            for t in
+                [ statusFolder
+                  statusGit
+                  statusWatch
+                  statusRun
+                  statusPos
+                  statusLang
+                  statusProblems ] do
                 t.Foreground <- r.BrandFg
                 t.FontSize <- 12.0)
 
@@ -2790,12 +2895,6 @@ type Shell(env: HostEnv) =
                 updateStatus ()
                 refreshSidebarFn ()
             | None -> ())
-
-        refreshTimer.Tick.Add(fun _ ->
-            refreshTimer.Stop()
-            refreshGit ()
-            refreshFileCache ()
-            syncOpenFiles ())
 
         editor.TextArea.Caret.PositionChanged.Add(fun _ -> updateStatus ())
 
@@ -2993,7 +3092,11 @@ type Shell(env: HostEnv) =
         let tv = editor.TextArea.TextView
 
         sprintf
-            "editor bounds=%A visible=%b docLen=%d textView bounds=%A visualLines=%b fg=%A bg=%A fontSize=%f lineNumbers=%b"
+            "watch=%s search=%s editor bounds=%A visible=%b docLen=%d textView bounds=%A visualLines=%b fg=%A bg=%A fontSize=%f lineNumbers=%b"
+            (match watcher with
+             | Some w -> FolderWatch.engineLabel w.Engine
+             | None -> "none")
+            lastSearchEngine
             editor.Bounds
             editor.IsVisible
             editor.Document.TextLength

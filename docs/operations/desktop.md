@@ -13,10 +13,10 @@ Switches: `--folder DIR`, `--file REL`, `--theme ID`, `--command ID` (a palette 
 |---|---|---|
 | Layout, colour roles, nine themes (two high-contrast), settings | yes | yes (same F# `Themes` module; syntax colours come from the nearest bundled TextMate theme) |
 | Command palette, quick open, go to line and symbol, ranking | yes | yes (same `Fuzzy` and `Symbols` modules) |
-| Search in files, outline, breadcrumbs, status bar | yes | yes, and **replace in files** (include and exclude patterns, case, whole word, regex; a file open in the editor is searched and changed as it is there, so Undo works) |
+| Search in files, outline, breadcrumbs, status bar | yes | yes, and **replace in files** (include and exclude patterns, case, whole word, regex; a file open in the editor is searched and changed as it is there, so Undo works). Search runs in **Rust** when the library is there (see below), in managed code otherwise |
 | Find and replace in the open file | yes | yes (Ctrl+F, Ctrl+H) |
 | Right-click menus (editor, tree, tabs) | yes | yes |
-| Files | browser storage | **real folders**: open with the native dialog, save, create, rename, delete (permanent, asks first), file watching |
+| Files | browser storage | **real folders**: open with the native dialog, save, create, rename, delete (permanent, asks first), file watching: the explorer, git status and open tabs follow changes made outside the IDE (see below) |
 | Run | remote compilers (18 languages) | **local toolchain**, any language with a pack and an installed tool |
 | Problems | from compiler output | from compiler output (core parsers for the 18, generic `file:line:col` parsers for the rest) **and** from language servers |
 | Git | no | branch, changed-file count, coloured tree |
@@ -25,6 +25,25 @@ Switches: `--folder DIR`, `--file REL`, `--theme ID`, `--command ID` (a palette 
 | Terminal | no | a **real pseudo-terminal** (ConPTY on Windows, a pty on Linux) running your own shell in the opened folder (Ctrl+`): colours, full-screen programs (vim, less, top), line editing, Ctrl+C, arrows, resize, scrollback, copy and paste. Falls back to line mode on pipes if no pseudo-terminal can be made |
 | Debugger, split editors, minimap | no | **not yet** |
 | VS Code extensions, GitHub Copilot | no | **no** (ADR-0022 stands: extension code is not hosted) |
+
+## File watching and fast search (Rust, PLAN P7.8)
+`native/rust/fsh-watch` is a small C-ABI library the Host binds through `FSharpened.Interop.Rust` (`tools/FSharpened.Ide.Host/NativeLib.fs`; the build, the ABI and the tests are in [rust.md](rust.md)). The IDE works without it.
+
+| | With the library (`cargo` was on the PATH when the IDE was built) | Without it |
+|---|---|---|
+| Watching | the operating system's own notifications (ReadDirectoryChangesW, inotify, FSEvents), recursive, debounced into batches and merged per path (create then change is one *created*; remove then create is one *changed*, the atomic-save pattern); `.git`, `node_modules`, `bin`, `obj`, `target` and the other folders the explorer hides are ignored | a polling watcher: the folder is read every 2 seconds and compared with the last look (renames show as a deletion plus a creation); it never misses a change, it only notices it later and reads the whole folder to do so |
+| Search in files | files are read on several threads, `.gitignore` is honoured, binary, oversize and non-UTF-8 files are skipped, results come back in explorer order | the managed engine over the same rules, without `.gitignore` |
+
+The status bar shows which one is running (`👁 native` or `👁 polling`, hover for the reason when it is polling), and the search panel's summary ends with `native search` or `managed search`.
+
+What a change made outside the IDE does:
+- **Explorer, quick open and Git status** refresh.
+- **An open file with no unsaved edits** is reloaded from disk (status line: *Reloaded x from disk*).
+- **An open file with unsaved edits** asks: *Reload from disk* (the edits are lost) or keep the editor's version (saving then overwrites the disk). The question is not repeated for the same disk text. The IDE's own saves are recognised and never ask.
+- **A file deleted or moved on disk** stays open, its tab says *(deleted on disk)*, and saving writes it again.
+- Too many changes at once, or events the system dropped, make the IDE look at every open file and the whole folder again.
+
+Search differences the native engine makes on purpose: `.gitignore` files are honoured, and a regular expression is read in Rust's syntax (no look-around or back-references). A pattern it cannot compile is handed to the managed engine, which reads .NET's syntax, so a pattern that works in the managed engine keeps working. Text in open editor tabs is always searched as it is in the editor, whichever engine ran.
 
 ## Trust and limits
 - Opening a folder runs nothing. The first **Run**, the first language server start and the first **terminal** in a folder ask for trust (the terminal runs whatever is typed into it). The answer is remembered per folder in the data folder (`trust.json`). *Run → Revoke Trust for This Folder* withdraws it.
@@ -54,8 +73,9 @@ Highlighting uses TextMate grammars. TextMateSharp brings most; the app adds the
 - The terminal's known limits: mouse reporting to programs, double-width and double-height lines, sixel images, hyperlinks (OSC 8) and a user-chosen cursor shape are not supported; wide characters follow a fixed table; the shell inherits the IDE's environment, so `NO_COLOR` is honoured and turns its colours off; a shell exit shows `[... ended with code N]` and *Terminal: Restart* starts a new one. If the pseudo-terminal cannot be created (an old Windows without ConPTY, a locked-down Linux) or `FSH_TERMINAL=pipe` is set, the panel falls back to the old line mode on pipes (typed text is edited locally, with history; no colours, no full-screen programs, no Ctrl+C) and says so.
 - On Windows a language server installed as a `.cmd` shim (typical for npm packages) cannot be started; it needs an `.exe`.
 - The language-server client is checked against a scripted server and a fake in tests, and against a scripted Python server in the real window. It has **not** been run against gopls, rust-analyzer or others on this machine (none was installed).
+- The native watcher and search were run in the real window on Windows x64 (an external change reached the explorer and an open tab, a native search listed results). Linux, macOS and the other Windows RID are the CI matrix's job; the watcher's FSEvents and inotify paths are covered by the same Rust tests but were not run here.
 - Only a Windows build was run here; the six-RID matrix (CI) is the check for Linux and macOS. The window has no automated UI test; `--screenshot` was used by hand.
 - Syntax colours are the bundled TextMate theme nearest to the chosen theme, not the exact website palette.
 
 ## Polyglot design
-F# for the UI, core, host, language-pack engine and language-server client. The pseudo-terminal is P/Invoke from `FSharpened.Platform` (not Rust: two small native APIs did not need a crate). Rust (through `FSharpened.Interop.Rust`) remains the choice for file watching and fast search, not built yet. Language servers, compilers, formatters and debuggers are each language's own tools. Go is supported as a language through its pack; a Go agent for remote or container hosts is a candidate, not part of v1. See ADR-0023 for the reasoning.
+F# for the UI, core, host, language-pack engine and language-server client. The pseudo-terminal is P/Invoke from `FSharpened.Platform` (not Rust: two small native APIs did not need a crate). Rust (through `FSharpened.Interop.Rust`) is used for file watching and fast search (`native/rust/fsh-watch`, with managed fallbacks). Language servers, compilers, formatters and debuggers are each language's own tools. Go is supported as a language through its pack; a Go agent for remote or container hosts is a candidate, not part of v1. See ADR-0023 for the reasoning.
