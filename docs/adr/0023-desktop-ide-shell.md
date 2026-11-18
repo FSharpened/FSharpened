@@ -22,7 +22,8 @@ So three requirements decide the design:
 | Part | Language | Why this one |
 |---|---|---|
 | UI, core, host, language-pack engine, language-server client | **F#** | one typed core shared with the website; the project's purpose |
-| Terminal (pseudo-terminal), file watching, fast project search | **Rust**, behind the C ABI through `FSharpened.Interop.Rust` (ADR-0019) | `portable-pty`, `notify` and the `ignore` walker are the best portable implementations; the interop pillar exists to be used |
+| File watching, fast project search | **Rust**, behind the C ABI through `FSharpened.Interop.Rust` (ADR-0019) | `notify` and the `ignore` walker are the best portable implementations; the interop pillar exists to be used |
+| Terminal (pseudo-terminal) | **F#**, P/Invoke in `FSharpened.Platform` (amended 2026-11-17) | ConPTY (`CreatePseudoConsole`) on Windows and `posix_openpt` plus `posix_spawn` on Linux and macOS are a few dozen calls each; no native build step, and the platform split stays in the one project the hard rules allow it in. `portable-pty` stays an option if a case needs it |
 | Any language server, compiler, debugger, formatter | **whatever the language ships** (gopls, rust-analyzer, clangd, pyright, ...) | started as processes from the pack; this is how "all languages" works |
 | Website only | TypeScript or JavaScript (Fable output, CodeMirror) | not part of the desktop app |
 | A remote or container agent (not built) | **Go** is the candidate | a static single binary that runs anywhere; plugs in over the same JSON-RPC protocol, so it needs no change to the app |

@@ -11,10 +11,10 @@ open FSharpened.Platform
 /// The shell a terminal panel starts.
 type ShellChoice = { Name: string; Argv: string list }
 
-/// A line-oriented terminal: the user's own shell with its input and output on pipes (ADR-0023). It is **not** a
-/// pseudo-terminal: full-screen programs (vim, top), colours, and Ctrl+C do not work; each line typed is sent to the
-/// shell, and what it prints comes back with the escape sequences removed. A real pseudo-terminal is the Rust work in
-/// PLAN P7.8.
+/// Terminal helpers. The line-oriented `TermSession` below is the fallback (ADR-0023): the user's own shell with its
+/// input and output on pipes. It is **not** a pseudo-terminal: full-screen programs (vim, top), colours, and Ctrl+C do
+/// not work; each line typed is sent to the shell, and what it prints comes back with the escape sequences removed.
+/// The real thing is `PtySession` in TermBackend.fs, which uses this module only to choose the shell.
 module Terminal =
     // a verbatim string of regex escapes: \x1b is the escape character and \x07 the bell
     let private sequence =
@@ -65,6 +65,23 @@ module Terminal =
                   Argv = [ "bash"; "--noprofile"; "--norc" ] }
             | _ -> { Name = "sh"; Argv = [ "sh" ] }
 
+    /// The shell to start on a pseudo-terminal. A real terminal needs no flag to make the shell read commands from
+    /// standard input (the pipe session's `-Command -`); a shell on a terminal is interactive by itself, so the person's
+    /// own profile and prompt load.
+    let chooseInteractive (os: Os) (exists: string -> bool) (envShell: string option) : ShellChoice =
+        match os with
+        | Windows ->
+            if exists "pwsh.exe" then
+                { Name = "PowerShell"
+                  Argv = [ "pwsh.exe"; "-NoLogo" ] }
+            elif exists "powershell.exe" then
+                { Name = "Windows PowerShell"
+                  Argv = [ "powershell.exe"; "-NoLogo" ] }
+            else
+                { Name = "Command Prompt"
+                  Argv = [ "cmd.exe" ] }
+        | _ -> chooseShell os exists envShell
+
     /// Whether a program name resolves on the PATH, or an absolute path is a file.
     let onPath (name: string) : bool =
         if Path.IsPathRooted name then
@@ -87,7 +104,14 @@ module Terminal =
     let defaultShell () : ShellChoice =
         chooseShell (RuntimeIdentity.detect ()).Os onPath (Environment.GetEnvironmentVariable "SHELL" |> Option.ofObj)
 
-/// One running shell. Output arrives on a pool thread through `onOutput`; `onExit` is called once with the exit code.
+    /// The shell for this computer, for a pseudo-terminal.
+    let defaultInteractiveShell () : ShellChoice =
+        chooseInteractive
+            (RuntimeIdentity.detect ()).Os
+            onPath
+            (Environment.GetEnvironmentVariable "SHELL" |> Option.ofObj)
+
+/// One running shell on pipes. Output arrives on a pool thread through `onOutput`; `onExit` is called once with the exit code.
 type TermSession(shell: ShellChoice, cwd: string, onOutput: string -> unit, onExit: int -> unit) =
     let mutable proc: Process = null
     let mutable stopped = false

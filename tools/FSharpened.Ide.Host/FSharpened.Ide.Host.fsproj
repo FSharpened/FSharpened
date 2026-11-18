@@ -13,7 +13,10 @@
     <Compile Include="Trust.fs" />
     <Compile Include="DiskWorkspace.fs" />
     <Compile Include="Replace.fs" />
+    <Compile Include="Vt.fs" />
+    <Compile Include="TermKeys.fs" />
     <Compile Include="Terminal.fs" />
+    <Compile Include="TermBackend.fs" />
     <Compile Include="Git.fs" />
     <Compile Include="Lsp.fs" />
     <Compile Include="Interpret.fs" />
