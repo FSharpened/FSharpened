@@ -55,6 +55,11 @@ module Proc =
             let psi = ProcessStartInfo(exe)
             args |> List.iter psi.ArgumentList.Add
             psi.WorkingDirectory <- cwd
+            // a git hook (the pre-push check) points GIT_DIR at its own repository; a program started here, `git status`
+            // of a folder the person opened included, must look at its own folder, not at that one
+            for v in [ "GIT_DIR"; "GIT_WORK_TREE"; "GIT_INDEX_FILE"; "GIT_PREFIX"; "GIT_COMMON_DIR" ] do
+                psi.Environment.Remove v |> ignore
+
             psi.UseShellExecute <- false
             psi.CreateNoWindow <- true
             psi.RedirectStandardInput <- true

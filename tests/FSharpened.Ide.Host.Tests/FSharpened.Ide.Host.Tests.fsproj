@@ -12,6 +12,13 @@
     <Compile Include="TerminalTests.fs" />
     <Compile Include="RunTests.fs" />
     <Compile Include="ToolingTests.fs" />
+    <Compile Include="RenameTests.fs" />
+    <Compile Include="DapTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="fake_dap.py" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="fake_lsp.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
