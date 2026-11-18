@@ -1,0 +1,5 @@
+{
+  "format": "fsharpened.desktop-package/1",
+  "comment": "Inputs of the desktop archive built by `fsh_ci.py run --profile release` (stage desktop-package). Every cdylib crate under native/rust is built for the host RID and shipped in runtimes/<rid>/native, except the names listed here.",
+  "nativeExclude": ["fsh-interop-example"]
+}

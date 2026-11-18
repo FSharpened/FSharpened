@@ -47,6 +47,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fsh_desktop as desk  # noqa: E402
 import fsh_release as rel  # noqa: E402
 import fsh_runtime as rt  # noqa: E402
 
@@ -754,6 +755,92 @@ def stage_site(ctx: Ctx) -> Result:
     return Result(PASS, f"site built and checked, {m.group(1) if m else '?'} service-worker tests passed")
 
 
+def stage_desktop_package(ctx: Ctx) -> Result:
+    """Publish the desktop IDE for the host RID as a self-contained folder, add the Rust libraries it loads, smoke-run it
+    without a window (`--selftest`), and archive it with a deterministic file order and timestamps. Publishes nothing:
+    signing, notarisation and installers are human gates (packaging/README.md)."""
+    rid = ctx.rid
+    work = ctx.run_dir / "desktop"
+    app_dir = work / "app"
+    shutil.rmtree(work, ignore_errors=True)
+    app_dir.mkdir(parents=True)
+    rc, out = run_cmd(ctx, "desktop-package", ["dotnet", "publish", "tools/FSharpened.Ide.Desktop", "-c", "Release", "-r", rid, "--self-contained", "true",
+                                               "-p:CI=true", "-p:ContinuousIntegrationBuild=true", "-p:DebugType=none", "-p:DebugSymbols=false",
+                                               "-o", str(app_dir), "-nologo"], timeout=1800)
+    if rc != 0:
+        return Result(FAIL, tail(out, 15))
+    exe = app_dir / desk.exe_name(rid)
+    if not exe.exists():
+        return Result(FAIL, f"the published program is missing: {exe.name}")
+    notes: list[str] = []  # things that make the package less than it should be (a warning)
+    info: list[str] = []  # plain facts for the report
+    # the Rust libraries the app loads, for this RID only, where the native resolver looks (runtimes/<rid>/native)
+    config = desk.load_config(ROOT)
+    crates = desk.native_crates(ROOT, config.get("nativeExclude", []))
+    native: list[str] = []
+    if crates and not which("cargo", ctx.env):
+        if ctx.require_rust:
+            return Result(FAIL, "cargo not found (--require-rust); the desktop app's native libraries cannot be built")
+        notes.append("cargo not found: " + ", ".join(c.name for c in crates) + " not built, so the package lacks them")
+    elif crates:
+        env = dict(ctx.env)
+        env["CARGO_TARGET_DIR"] = str(work / "rust-target")
+        target = app_dir / "runtimes" / rid / "native"
+        target.mkdir(parents=True, exist_ok=True)
+        for c in crates:
+            rc, out = run_cmd(ctx, "desktop-package", ["cargo", "build", "--release", "--locked", "--manifest-path", str(c.manifest)], timeout=1800, append=True, env=env)
+            built = work / "rust-target" / "release" / desk.native_library_file(rid, c.stem)
+            if rc != 0 or not built.exists():
+                return Result(FAIL, f"cargo build failed for {c.name}:\n" + tail(out, 12))
+            shutil.copy2(built, target / built.name)
+            native.append(built.name)
+    else:
+        info.append("no Rust library is loaded by the app at this commit")
+    # ship what the app reads at run time next to the program: the fsproj copies these; fail loudly if it did not
+    expected_packs = len([p for p in (ROOT / "languages").glob("*.json") if not p.name.startswith("_")])
+    expected_grammars = len(list((ROOT / "grammars").glob("*.tmLanguage.json")))
+    for folder, n in (("languages", expected_packs), ("grammars", expected_grammars)):
+        got = len(list((app_dir / folder).glob("*.json"))) if (app_dir / folder).is_dir() else 0
+        if got < n:
+            return Result(FAIL, f"{folder}/ in the published app has {got} files, the repository has {n}")
+    for extra in ("LICENSE", "LICENSE.md", "NOTICE"):
+        if (ROOT / extra).is_file():
+            shutil.copy2(ROOT / extra, app_dir / extra)
+    # smoke: the packaged program must start, load its packs and grammars, list a folder and load its native libraries
+    env = dict(ctx.env)
+    env["FSHARPENED_DATA"] = str(work / "data")
+    rc, out = run_cmd(ctx, "desktop-package", [str(exe), "--selftest"], timeout=120, append=True, env=env)
+    report = desk.parse_selftest(out)
+    if rc != 0 or report is None:
+        return Result(FAIL, "the packaged app's --selftest failed:\n" + tail(out, 10))
+    problems = desk.check_selftest(report, rid, expected_packs, expected_grammars)
+    if problems:
+        return Result(FAIL, "the packaged app's --selftest reported:\n" + "\n".join(problems))
+    # a real window, best effort: needs a display, so a headless Linux runner skips it and says so
+    window = "skipped"
+    if rid.startswith("linux") and not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
+        window = "skipped (no display)"
+    else:
+        shot = work / "window.png"
+        work_folder = work / "folder"
+        work_folder.mkdir()
+        (work_folder / "hello.fsx").write_text('printfn "hi"\n', encoding="utf-8")
+        rc, out = run_cmd(ctx, "desktop-package", [str(exe), "--folder", str(work_folder), "--screenshot", str(shot), "--delay", "3"], timeout=120, append=True, env=env)
+        window = "passed" if rc == 0 and shot.exists() and shot.stat().st_size > 1000 else "failed"
+        if window == "failed":
+            notes.append("the window smoke (--screenshot) did not produce a picture; --selftest passed")
+    epoch = desk.commit_epoch(int((git_lines("log", "-1", "--format=%ct") or ["0"])[0]))
+    version = desk.read_version((ROOT / "Directory.Build.props").read_text(encoding="utf-8"))
+    archive = work / desk.archive_name(version, rid)
+    count = desk.write_archive(app_dir, archive, f"{desk.ARCHIVE_PREFIX}-{version}-{rid}", epoch)
+    size = archive.stat().st_size
+    metrics = {"archive": archive.name, "archive_bytes": size, "entries": count, "rid": rid, "version": version,
+               "selftest": "passed", "window_smoke": window, "native_libraries": native, "trimmed": False, "native_aot": False,
+               "archive_sha256": rel.sha256_file(archive)}
+    detail = f"{archive.name}, {size / 1e6:.1f} MB, {count} files, selftest passed, window smoke {window}" + "".join("; " + n for n in info + notes)
+    return Result(WARN if notes else PASS, detail, notes=notes, metrics=metrics)
+
+
 def stage_bundle(ctx: Ctx) -> Result:
     """Collect this run's packages and native binary into artifacts/release/<commit>-<rid>/ with SHA256SUMS,
     provenance.json and release notes, then verify the folder. Publishes nothing."""
@@ -777,6 +864,17 @@ def stage_bundle(ctx: Ctx) -> Result:
         return Result(FAIL, f"the native binary is missing ({exe}); the bundle needs this run's aot stage")
     (out_dir / ctx.rid).mkdir()
     shutil.copy2(exe, out_dir / ctx.rid / exe_name)
+    desktop = ctx.results.get("desktop-package")
+    desktop_meta = None
+    if desktop is None or desktop.status not in (PASS, WARN) or not desktop.metrics.get("archive"):
+        return Result(FAIL, "the desktop archive is missing; the bundle needs this run's desktop-package stage")
+    archive = ctx.run_dir / "desktop" / desktop.metrics["archive"]
+    if not archive.exists():
+        return Result(FAIL, f"the desktop archive is missing ({archive})")
+    (out_dir / "desktop").mkdir()
+    shutil.copy2(archive, out_dir / "desktop" / archive.name)
+    desktop_meta = {k: desktop.metrics[k] for k in ("archive", "archive_bytes", "archive_sha256", "rid", "version", "selftest", "window_smoke", "native_libraries", "trimmed", "native_aot")}
+    desktop_meta["path"] = f"desktop/{archive.name}"
     changelog = ROOT / "CHANGELOG.md"
     notes = rel.changelog_section(changelog.read_text(encoding="utf-8")) if changelog.exists() else ""
     (out_dir / rel.NOTES).write_text(f"# Release notes for {commit[:10]}\n\n{notes or '(nothing under [Unreleased] in CHANGELOG.md)'}\n", encoding="utf-8", newline="\n")
@@ -784,7 +882,7 @@ def stage_bundle(ctx: Ctx) -> Result:
     stages = {n: {"status": r.status, "seconds": round(r.duration, 1), "metrics": r.metrics} for n, r in ctx.results.items()}
     prov = rel.build_provenance(commit=commit, branch=branch, dirty=bool(git_lines("status", "--porcelain", "--untracked-files=no")), sdk=ctx.sdk_version,
                                 rid=ctx.rid, python=platform.python_version(), profile=ctx.profile, stages=stages,
-                                rids_verified=[ctx.rid], files=files)
+                                rids_verified=[ctx.rid], files=files, desktop=desktop_meta)
     (out_dir / rel.PROVENANCE).write_text(json.dumps(prov, indent=1), encoding="utf-8", newline="\n")
     rel.write_checksums(out_dir)
     problems = rel.verify_bundle(out_dir, commit)
@@ -814,7 +912,8 @@ STAGES: dict[str, dict] = {
     "rust": dict(fn=stage_rust, deps=["preflight"], inputs=None, excl=False),
     "benchmarks": dict(fn=stage_benchmarks, deps=["build"], inputs=None, excl=True, trivial=True),
     "pack": dict(fn=stage_pack, deps=["build", "test"], inputs=CODE, excl=True),
-    "bundle": dict(fn=stage_bundle, deps=["pack", "aot", "test"], inputs=None, excl=False),
+    "desktop-package": dict(fn=stage_desktop_package, deps=["build", "test"], inputs=None, excl=True),
+    "bundle": dict(fn=stage_bundle, deps=["pack", "aot", "test", "desktop-package"], inputs=None, excl=False),
     "web": dict(fn=stage_web, deps=["tools-restore"], inputs=WEB_INPUTS, excl=True),
     "gateway": dict(fn=stage_gateway, deps=["preflight"], inputs=["gateway/**"], excl=False),
     "hub": dict(fn=stage_hub, deps=["preflight"], inputs=["worker/**"], excl=False),
@@ -827,12 +926,12 @@ PROFILES = {
     "full": FULL,
     # everything GitHub runs across all its workflows: full, plus the browser IDE, gateway, hub and site jobs
     "all": FULL + ["web", "gateway", "hub", "site"],
-    "release": FULL + ["pack", "bundle"],
+    "release": FULL + ["pack", "desktop-package", "bundle"],
 }
 # A cache hit is only trusted for stages whose outputs are not consumed by a later stage in the same run.
 CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot", "web", "gateway", "hub", "site"}
 # Stages that start dotnet or compile a lot: they wait (briefly) for memory before they begin.
-HEAVY = {"restore", "build", "test", "aot", "pack", "web"}
+HEAVY = {"restore", "build", "test", "aot", "pack", "web", "desktop-package"}
 
 
 # --------------------------------------------------------------------------- scheduler

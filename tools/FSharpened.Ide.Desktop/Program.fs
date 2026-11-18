@@ -160,5 +160,9 @@ type App() =
 [<EntryPoint>]
 [<STAThread>]
 let main argv =
-    App.Options <- parse argv
-    AppBuilder.Configure<App>().UsePlatformDetect().LogToTrace().StartWithClassicDesktopLifetime(argv)
+    // `--selftest`: check the package without a window (used by the release bundle); see Selftest.fs
+    if Array.contains "--selftest" argv then
+        Selftest.run ()
+    else
+        App.Options <- parse argv
+        AppBuilder.Configure<App>().UsePlatformDetect().LogToTrace().StartWithClassicDesktopLifetime(argv)

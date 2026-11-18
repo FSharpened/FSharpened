@@ -51,3 +51,6 @@ So three requirements decide the design:
 - **Avalonia with an embedded browser editor (Monaco in a web view).** Hybrid; the native editor is simpler and keeps the process model clean.
 - **A Go or Rust host for everything.** Loses the shared typed core and the purpose of the project; used only where a library is clearly better (Rust, item 5).
 - **Hard-coding each language in F#.** The website does this for its 18 and it does not scale to "all languages"; the desktop reads packs instead.
+
+## Amendment (2026-11-18): distribution inputs and the self-test
+Item 9 stands (installers, signing, notarisation and release are human gates). What changed: the release pipeline now produces an **unsigned, self-contained archive** of the desktop app per RID (plain self-contained .NET; trimming and NativeAOT were not attempted, because the F# code, Avalonia's run-time XAML loading and TextMateSharp use reflection and nothing has been checked under the trimmer), smoke-run by a new `--selftest` switch that needs no display. `packaging/` holds installer **descriptions** (WiX, MSIX, `.desktop`, AppStream, AppImage script, `Info.plist`) and the human steps; none is built by CI. `docs/operations/desktop.md` keeps the packaging facts and limits.

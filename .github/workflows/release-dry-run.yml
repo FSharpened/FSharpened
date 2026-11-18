@@ -1,0 +1,69 @@
+name: release-dry-run
+# A rehearsal of the release, for a person to review. Manual only. It builds the release bundle on each RID with
+# the same program a developer runs locally (python tools/ci/fsh_ci.py run --profile release), checks it with
+# `verify`, and uploads the bundles as workflow artifacts. It has NO publishing step, no secrets and no signing:
+# publishing, signing and notarisation are human gates (AGENTS.md, packaging/README.md).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-dry-run-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,     runner: windows-latest,   experimental: false }
+          - { rid: win-arm64,   runner: windows-11-arm,   experimental: true }
+          - { rid: linux-x64,   runner: ubuntu-latest,    experimental: false }
+          - { rid: linux-arm64, runner: ubuntu-24.04-arm, experimental: false }
+          - { rid: osx-x64,     runner: macos-15-intel,   experimental: true }   # macOS is deferred (docs/operations/desktop.md)
+          - { rid: osx-arm64,   runner: macos-latest,     experimental: true }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: '9.0.x'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11'
+      - name: Rust toolchain (stable)
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup default stable
+          cargo --version
+      - name: fsh-ci release profile (NativeAOT and Rust required)
+        run: python tools/ci/fsh_ci.py run --profile release --ci --require-aot --require-rust --jobs 2
+      - name: Verify the bundle against its checksums
+        run: python tools/ci/fsh_ci.py verify --strict-head
+      - name: Job summary
+        if: always()
+        shell: bash
+        run: |
+          latest=$(ls -d .fsharpened/ci/runs/* 2>/dev/null | tail -1)
+          [ -n "$latest" ] && cat "$latest/report.md" >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-bundle-${{ matrix.rid }}
+          path: artifacts/release/**
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: release-dry-run-logs-${{ matrix.rid }}
+          path: .fsharpened/ci/runs/**
+          retention-days: 7

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=FSharpened
+GenericName=Code editor
+Comment=A native F# IDE with a language per file
+Exec=FSharpened.Ide.Desktop %F
+Icon=fsharpened
+Terminal=false
+Categories=Development;IDE;TextEditor;
+MimeType=text/x-fsharp;text/plain;
+StartupWMClass=FSharpened.Ide.Desktop

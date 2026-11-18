@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- App bundle metadata for a person who builds FSharpened.app from the osx archive, signs and notarises it
+     (packaging/README.md). macOS is deferred in this project: nothing here was run. {{VERSION}} is the app version. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>FSharpened</string>
+  <key>CFBundleDisplayName</key><string>FSharpened</string>
+  <key>CFBundleIdentifier</key><string>io.fsharpened.desktop</string>
+  <key>CFBundleExecutable</key><string>FSharpened.Ide.Desktop</string>
+  <key>CFBundleShortVersionString</key><string>{{VERSION}}</string>
+  <key>CFBundleVersion</key><string>{{VERSION}}</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>LSMinimumSystemVersion</key><string>11.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>

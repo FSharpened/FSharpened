@@ -6,7 +6,7 @@ A native window written in F# (Avalonia 12, AvaloniaEdit, TextMateSharp). It loo
 ```bash
 dotnet run --project tools/FSharpened.Ide.Desktop -- path/to/folder
 ```
-Switches: `--folder DIR`, `--file REL`, `--theme ID`, `--command ID` (a palette command, repeatable), `--palette TEXT`, `--search TEXT` and `--replace-with TEXT` (fill the search panel and run it), `--late-command ID` (a command run just before the screenshot, once language servers are up), `--terminal-line TEXT` (a line sent to the terminal), `--screenshot FILE.png [--delay SECONDS] [--size WxH]` (draws the real window to a PNG and quits; used to check the app without a person). The environment variable `FSHARPENED_DATA` moves the settings, trust list and your language packs to another folder (portable use, clean tests).
+Switches: `--folder DIR`, `--file REL`, `--theme ID`, `--command ID` (a palette command, repeatable), `--palette TEXT`, `--search TEXT` and `--replace-with TEXT` (fill the search panel and run it), `--late-command ID` (a command run just before the screenshot, once language servers are up), `--terminal-line TEXT` (a line sent to the terminal), `--selftest` (no window: loads the shipped packs and grammars, lists a temporary folder, loads the native libraries shipped for this RID, prints one JSON line, exits 0 or 1; the release pipeline uses it to prove a packaged copy is whole), `--screenshot FILE.png [--delay SECONDS] [--size WxH]` (draws the real window to a PNG and quits; used to check the app without a person). The environment variable `FSHARPENED_DATA` moves the settings, trust list and your language packs to another folder (portable use, clean tests).
 
 ## What is in it
 | Area | Web IDE | Desktop IDE |
@@ -48,12 +48,20 @@ Placeholders: `{entry}` `{out}` `{dir}` `{root}` `{name}` and `{flags}` (an argu
 ## Grammars
 Highlighting uses TextMate grammars. TextMateSharp brings most; the app adds the ones it lacks from `grammars/*.tmLanguage.json` (shipped: Haskell, OCaml, Elixir, Kotlin, Scala, Zig, TOML). A grammar's `scopeName` is what a language pack's `scope` names. Put a `.tmLanguage.json` file in `FSharpened/grammars` under the data folder to add a language or replace a shipped grammar (yours wins); files starting with `_`, files that are not JSON and files with no `scopeName` are ignored. Restart the app after adding one.
 
+## Packaging
+`python tools/ci/fsh_ci.py run --profile release` publishes the app (`desktop-package` stage) and archives it as `fsharpened-desktop-<version>-<rid>.zip` (Windows) or `.tar.gz` (Linux, macOS) inside the release bundle ([Release](release.md) lists what is and is not an artefact). Unpack it anywhere and run `FSharpened.Ide.Desktop`; `languages/`, `grammars/` and `runtimes/<rid>/native` sit next to it.
+
+- **Self-contained, plain.** `dotnet publish -c Release -r <rid> --self-contained`, a folder (not single-file), no debug symbols. About 74 MB as a zip on win-x64. **Not trimmed and not NativeAOT**, as a decision rather than a measurement: the app uses `printf` and other reflection in F#, loads `AvaloniaEdit.xaml` styles by URI at run time, and TextMateSharp reads grammars through reflection-based JSON, and none of this was tried under the trimmer. Trimming Avalonia needs compiled bindings and trim annotations in this code first; that is future work, not a switch.
+- **Native libraries.** Every `cdylib` crate under `native/rust` is built for the host RID with `cargo build --release --locked` and copied to `runtimes/<rid>/native`, where `NativeResolver` looks. `packaging/desktop.json` excludes the reference crate `fsh-interop-example`, so at this commit **no Rust library is shipped** (the app loads none yet); the code path was checked once by building and loading that crate. Without `cargo` the stage warns and the package lacks the libraries (`--require-rust` makes it fail).
+- **Smoke.** The packaged program runs `--selftest` (required) and, where a display exists, a `--screenshot` window (best effort; headless Linux skips it and the report says so).
+- **Installers are inputs only.** `packaging/` has a WiX file, an MSIX manifest, a Linux `.desktop` and AppStream file with an AppImage script, and a macOS `Info.plist`, with a README of the human steps. None was built or run here, and code signing, notarisation and store accounts are human gates.
+
 ## Known limits (checked, not guessed)
 - Haskell, OCaml, Elixir, Kotlin, Scala, Zig and TOML have no grammar in TextMateSharp, so the app ships its own small ones (`grammars/`). They colour comments, strings, numbers, keywords and types, not every construct of the language; a better grammar dropped into `FSharpened/grammars` replaces them.
 - The terminal has no pseudo-terminal, so a program that needs a real terminal behaves badly in it, and Ctrl+C cannot interrupt a running command (use *Terminal: Restart*). That needs the Rust work in PLAN P7.8.
 - On Windows a language server installed as a `.cmd` shim (typical for npm packages) cannot be started; it needs an `.exe`.
 - The language-server client is checked against a scripted server and a fake in tests, and against a scripted Python server in the real window. It has **not** been run against gopls, rust-analyzer or others on this machine (none was installed).
-- Only a Windows build was run here; the six-RID matrix (CI) is the check for Linux and macOS. The window has no automated UI test; `--screenshot` was used by hand.
+- The packaged archive was built and smoke-run on win-x64 only; Linux and macOS archives come from the same code but were not run here (the `release-dry-run.yml` workflow is the way to try them). Only a Windows build was run here; the six-RID matrix (CI) is the check for Linux and macOS. The window has no automated UI test; `--screenshot` was used by hand.
 - Syntax colours are the bundled TextMate theme nearest to the chosen theme, not the exact website palette.
 
 ## Polyglot design
