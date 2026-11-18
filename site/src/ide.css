@@ -286,3 +286,13 @@ dialog.dlg[open]{display:flex}
 @media (pointer:coarse){.ctx-item{min-height:2.75rem}.pal-row{min-height:2.75rem}.srtoggles button{min-height:2.25rem;min-width:2.25rem}.stbtn{min-height:2rem}}
 @media (forced-colors:active){.ctx-item:hover,.ctx-item:focus,.pal-row.on{forced-color-adjust:none;background:Highlight;color:HighlightText}.srtoggles button[aria-pressed=true]{forced-color-adjust:none;background:Highlight;color:HighlightText}.ol-row[aria-current=true]{border-left-color:Highlight}dialog.pal,dialog.dlg,.ctx{border-color:CanvasText}mark{background:Mark;color:MarkText}}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
+.pipe{padding:0 .6rem .4rem}.pipe h3{margin:.5rem .15rem .1rem;font-size:.8125rem}
+.pipelist{margin:0 0 .25rem;padding:0 0 0 1.4rem;font-size:.8125rem}.pipelist li{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin-bottom:.25rem}
+.pipelist .mini.link{border-color:transparent;text-decoration:underline;overflow-wrap:anywhere;text-align:left}
+.pipelist .bad{color:var(--bad);font-size:.75rem}
+.pipe .toolbar{padding:.25rem 0}.pipe-support{font-size:.75rem;margin:.25rem 0 .5rem}.pipe-support summary{cursor:pointer}
+.support{border-collapse:collapse;width:100%;font-size:.6875rem}.support th,.support td{border-top:1px solid var(--line);padding:.2rem .3rem;text-align:left;vertical-align:top}
+.runinfo p{margin:.1rem 0;font-size:.75rem;overflow-wrap:anywhere}
+.steps{list-style:none;margin:0 0 .5rem;padding:0;font-size:.8125rem}.step{margin:.15rem 0}.step summary{cursor:pointer}
+.step-mark{display:inline-block;width:1.2em;font-weight:700}.step.ok .step-mark{color:var(--ok)}.step.fail .step-mark{color:var(--bad)}.step-path{font-weight:600}.step .step-sum{color:var(--mut)}
+.step pre{margin:.25rem 0 .5rem 1.4rem}

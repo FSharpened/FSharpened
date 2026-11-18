@@ -102,6 +102,9 @@ export function buildCommands(app) {
     { id: "view.resetSettings", title: "Reset Settings to Defaults", category: "Preferences", run: () => app.resetSettings() },
     // ---- run
     { id: "run.run", title: "Run", category: "Run", keys: "Mod+Enter", run: () => app.run() },
+    { id: "run.pipeline", title: "Run Pipeline", category: "Run", when: () => app.pipelineSteps().length > 0, run: () => app.runPipeline() },
+    { id: "file.pipelineAdd", title: "Add File to Pipeline", category: "File", when: () => hasSource() && !app.inPipeline(app.activePath()), run: () => app.pipelineAdd(app.activePath()) },
+    { id: "file.pipelineRemove", title: "Remove File from Pipeline", category: "File", when: () => app.inPipeline(app.activePath()), run: () => app.pipelineRemovePath(app.activePath()) },
     { id: "run.snapshot", title: "Save Statepoint (Snapshot)", category: "Run", keys: "Mod+S", run: () => app.snapshot() },
     { id: "run.share", title: "Copy Share Link", category: "Run", run: () => app.share() },
     { id: "run.copyOutput", title: "Copy Output", category: "Run", run: () => app.copyOutput("out") },

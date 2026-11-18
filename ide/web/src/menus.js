@@ -67,7 +67,7 @@ export function treeMenu(cmds, app, row) {
   );
   if (!row.isFolder) items.push({ label: "Duplicate", run: () => app.duplicatePath(row.path) });
   items.push({ label: row.isFolder ? "Delete Folder" : "Delete", keys: fmtKeys("Delete"), danger: true, run: () => app.deletePath(row.path) }, "-");
-  if (!row.isFolder && row.language) items.push({ label: row.path === app.entryPath() ? "Run Entry File (current)" : "Set as Run Entry File", disabled: row.path === app.entryPath(), run: () => app.setEntry(row.path) }, "-");
+  if (!row.isFolder && row.language) items.push({ label: row.path === app.entryPath() ? "Run Entry File (current)" : "Set as Run Entry File", disabled: row.path === app.entryPath(), run: () => app.setEntry(row.path) }, app.inPipeline(row.path) ? { label: "Remove from Pipeline", run: () => app.pipelineRemovePath(row.path) } : { label: "Add to Pipeline", run: () => app.pipelineAdd(row.path) }, "-");
   items.push({ label: "Copy Path", run: () => app.copyPath(row.path) });
   if (!row.isFolder) items.push({ label: "Copy Contents", run: () => app.copyContents(row.path) });
   items.push({ label: row.isFolder ? "Download Folder as .zip" : "Download", run: () => app.downloadPath(row.path) }, "-", { label: `Search in ${row.isFolder ? "This Folder" : folder ? "This Folder" : "Project"}…`, run: () => app.openSearch("", folder) });

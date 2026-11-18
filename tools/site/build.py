@@ -292,6 +292,17 @@ ide_body = """<div class="ide" id="ide">
     </div>
     <p class="muted hint">Drop a .zip, files or a folder anywhere on the editor to import it.</p>
     <p id="p-storage" class="muted hint"></p>
+    <section class="pipe" aria-labelledby="pipe-h">
+      <h3 id="pipe-h">Pipeline</h3>
+      <p id="pipe-hint" class="muted hint"></p>
+      <ol id="pipe-list" class="pipelist"></ol>
+      <div class="toolbar" role="toolbar" aria-label="Pipeline actions">
+        <button id="pipe-add" class="mini" type="button" title="Add the open file as the next step">Add open file</button>
+        <button id="pipe-run" class="mini" type="button" title="Run every step in order">Run pipeline</button>
+        <button id="pipe-clear" class="mini" type="button">Clear</button>
+      </div>
+      <details class="pipe-support"><summary>Which languages can run several files</summary><div id="pipe-support"></div></details>
+    </section>
     <ul id="plist" class="plist"></ul>
     <div id="report" class="report" hidden></div>
   </div>
@@ -333,7 +344,7 @@ ide_body = """<div class="ide" id="ide">
       <button data-p="timeline" aria-selected="false" role="tab" type="button">Timeline <span id="tcount" class="badge"></span></button>
       <button data-p="stdin" aria-selected="false" role="tab" type="button">Input</button>
     </div>
-    <div class="panel" data-p="output"><div id="summary" role="status"></div><pre id="stdout" tabindex="0"></pre><pre id="stderr" class="err" tabindex="0"></pre></div>
+    <div class="panel" data-p="output"><div id="summary" role="status"></div><div id="runinfo" class="runinfo"></div><ol id="steps" class="steps" hidden></ol><pre id="stdout" tabindex="0"></pre><pre id="stderr" class="err" tabindex="0"></pre></div>
     <div class="panel" data-p="problems" hidden><div id="problems"></div></div>
     <div class="panel" data-p="timeline" hidden><p class="muted">Every run and snapshot is a <strong>statepoint</strong> of the whole project, from FSharpened.Statepoints. Restore rolls back; Fork branches without touching the source.</p><ul id="timeline"></ul><div id="diff" hidden></div></div>
     <div class="panel" data-p="stdin" hidden><label for="stdin">Standard input for your program</label><textarea id="stdin" rows="6" spellcheck="false"></textarea></div>
