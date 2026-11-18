@@ -295,6 +295,13 @@ class RustStageTests(unittest.TestCase):
         self.assertTrue(any(p.startswith("native/rust") for p in ci.CODE))
         self.assertTrue((ci.ROOT / ci.RUST_CRATE).is_file())
 
+    def test_every_crate_under_native_rust_is_run(self):
+        crates = ci.rust_crates()
+        self.assertIn(ci.RUST_CRATE, crates)
+        self.assertIn("native/rust/fsh-watch/Cargo.toml", crates)
+        for crate in crates:
+            self.assertTrue((ci.ROOT / crate).with_name("Cargo.lock").is_file(), crate + " needs a committed Cargo.lock (--locked)")
+
     def test_rust_is_in_the_full_profile_but_not_the_fast_one(self):
         self.assertIn("rust", ci.PROFILES["full"])
         self.assertNotIn("rust", ci.PROFILES["fast"])
