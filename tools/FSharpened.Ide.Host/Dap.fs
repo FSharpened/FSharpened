@@ -490,6 +490,25 @@ type DapClient(fromAdapter: Stream, toAdapter: Stream, onEvent: DapEvent -> unit
             | Error m -> return Error m
         }
 
+    member private this.SendBreakpoints(rest: (string * int list) list) : Task<unit> =
+        match rest with
+        | [] -> Task.FromResult()
+        | (file, lines) :: more ->
+            task {
+                let! _ = this.SetBreakpoints(file, lines)
+                return! this.SendBreakpoints more
+            }
+
+    member private this.Configure(breakpoints: (string * int list) list) : Task<unit> =
+        task {
+            do! this.SendBreakpoints breakpoints
+            let! _ = this.SetExceptionBreakpoints []
+
+            if this.SupportsConfigurationDone then
+                let! _ = this.ConfigurationDone()
+                ()
+        }
+
     /// The whole start-up: `initialize`, then `launch` or `attach`, then (when the adapter says it is ready) the
     /// breakpoints, `configurationDone`, and the answer to `launch`. Breakpoints are (file, lines) pairs.
     member this.Begin
@@ -504,30 +523,21 @@ type DapClient(fromAdapter: Stream, toAdapter: Stream, onEvent: DapEvent -> unit
                 let started = this.Start(request, configuration)
                 let! _ = Task.WhenAny(this.InitializedEvent, started, Task.Delay(TimeSpan.FromSeconds 15.0))
 
-                if
-                    started.IsCompleted
-                    && (match started.Result with
-                        | Error _ -> true
-                        | _ -> false)
-                then
-                    return
-                        (match started.Result with
-                         | Error m -> Error(sprintf "%s failed: %s" request m)
-                         | _ -> Ok())
-                else
-                    for (file, lines) in breakpoints do
-                        let! _ = this.SetBreakpoints(file, lines)
-                        ()
+                let refused =
+                    if started.IsCompleted then
+                        match started.Result with
+                        | Error m -> Some m
+                        | _ -> None
+                    else
+                        None
 
-                    let! _ = this.SetExceptionBreakpoints []
+                match refused with
+                | Some m -> return Error(sprintf "%s failed: %s" request m)
+                | None ->
+                    do! this.Configure breakpoints
+                    let! answer = started
 
-                    if this.SupportsConfigurationDone then
-                        let! _ = this.ConfigurationDone()
-                        ()
-
-                    let! done' = started
-
-                    match done' with
+                    match answer with
                     | Error m -> return Error(sprintf "%s failed: %s" request m)
                     | Ok _ -> return Ok()
         }
