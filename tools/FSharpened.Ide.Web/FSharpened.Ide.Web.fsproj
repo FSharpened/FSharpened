@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Include="Api.fs" />
+    <Compile Include="CompletionApi.fs" />
   </ItemGroup>
 
   <ItemGroup>

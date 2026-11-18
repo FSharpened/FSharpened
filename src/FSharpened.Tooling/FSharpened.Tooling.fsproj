@@ -6,6 +6,12 @@
 
   <ItemGroup>
     <Compile Include="Pillar.fs" />
+    <Compile Include="Completion\Types.fs" />
+    <Compile Include="Completion\Context.fs" />
+    <Compile Include="Completion\StaticProvider.fs" />
+    <Compile Include="Completion\Chain.fs" />
+    <Compile Include="Completion\MiniJson.fs" />
+    <Compile Include="Completion\WorkersAi.fs" />
   </ItemGroup>
 
   <ItemGroup>

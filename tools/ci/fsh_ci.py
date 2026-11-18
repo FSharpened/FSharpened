@@ -732,6 +732,19 @@ def stage_hub(ctx: Ctx) -> Result:
     return Result(PASS, f"{m.group(1)} tests passed" if m else "type-check and tests passed", metrics={"vitest": int(m.group(1)) if m else 0})
 
 
+def stage_ai(ctx: Ctx) -> Result:
+    """The Workers AI worker (ADR-0026): type-check and vitest, all against a mocked `AI` binding. Mirrors ai.yml.
+    Nothing here calls Cloudflare or a model, and nothing deploys."""
+    skip = node_ready(ctx)
+    if skip:
+        return skip
+    bad, out = npm_steps(ctx, "ai", "ai", [["run", "typecheck"], ["test"]])
+    if bad:
+        return bad
+    m = re.search(r"Tests\s+(\d+) passed", rt.strip_ansi(out))
+    return Result(PASS, f"{m.group(1)} tests passed" if m else "type-check and tests passed", metrics={"vitest": int(m.group(1)) if m else 0})
+
+
 def stage_site(ctx: Ctx) -> Result:
     """The public site and hub console as they are deployed: icons up to date, the build, links and CSP-safe markup, and
     the service-worker behaviour tests. Mirrors site.yml."""
@@ -818,6 +831,7 @@ STAGES: dict[str, dict] = {
     "web": dict(fn=stage_web, deps=["tools-restore"], inputs=WEB_INPUTS, excl=True),
     "gateway": dict(fn=stage_gateway, deps=["preflight"], inputs=["gateway/**"], excl=False),
     "hub": dict(fn=stage_hub, deps=["preflight"], inputs=["worker/**"], excl=False),
+    "ai": dict(fn=stage_ai, deps=["preflight"], inputs=["ai/**"], excl=False),
     "site": dict(fn=stage_site, deps=["web"], inputs=["site/**", "tools/site/**", "branding/**", "worker/admin/**", *WEB_INPUTS], excl=False),
 }
 FULL = ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build", "test", "aot", "rust", "benchmarks"]
@@ -826,11 +840,11 @@ PROFILES = {
     # what ci.yml runs on each of the six RIDs: keep this list identical to what GitHub's matrix expects
     "full": FULL,
     # everything GitHub runs across all its workflows: full, plus the browser IDE, gateway, hub and site jobs
-    "all": FULL + ["web", "gateway", "hub", "site"],
+    "all": FULL + ["web", "gateway", "hub", "ai", "site"],
     "release": FULL + ["pack", "bundle"],
 }
 # A cache hit is only trusted for stages whose outputs are not consumed by a later stage in the same run.
-CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot", "web", "gateway", "hub", "site"}
+CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot", "web", "gateway", "hub", "ai", "site"}
 # Stages that start dotnet or compile a lot: they wait (briefly) for memory before they begin.
 HEAVY = {"restore", "build", "test", "aot", "pack", "web"}
 
@@ -1360,7 +1374,7 @@ def cmd_verify(args) -> int:
 
 
 WATCH_PATTERNS = ["**/*.fs", "**/*.fsproj", "**/*.md", "**/*.props", "**/*.json", "tools/ci/*.py", "tools/scripts/*.py", "native/rust/**",
-                  "ide/**", "gateway/**", "worker/**", "site/**", "tools/site/*.py", ".editorconfig", "global.json"]
+                  "ide/**", "gateway/**", "worker/**", "ai/**", "site/**", "tools/site/*.py", ".editorconfig", "global.json"]
 
 
 def cmd_watch(args) -> int:

@@ -37,7 +37,7 @@ export function createWorkbench(app) {
 
   // ---------------------------------------------------------------- commands and the palette
   const cmds = buildCommands(Object.assign(app, {
-    openQuick, openSearch, goToDefinition, pickSnippet, pickTabSize, pickTheme, pickProject, openSettings, openShortcuts, resetSettings, zoom, clip, importVsCode,
+    openQuick, openSearch, goToDefinition, pickSnippet, pickTabSize, pickTheme, pickProject, openSettings, openShortcuts, resetSettings, zoom, clip, importVsCode, enableAi,
     importSettingsFile: importVsCode,
   }));
   let recent = (safe(() => JSON.parse(app.storage.getItem(RECENT)), []) ?? []).filter((x) => typeof x === "string").slice(0, 8);
@@ -193,6 +193,23 @@ export function createWorkbench(app) {
     prefs.update({ fontSize: size });
     toast(`Editor font size ${prefs.settings.fontSize}px`);
   }
+  /** AI completion is opt-in. Turning it on shows what is sent and where, and needs an explicit OK. */
+  function enableAi({ keepState = false } = {}) {
+    const ai = app.ai;
+    app.ask({
+      label: keepState
+        ? "AI completion endpoint (https, or http on localhost)"
+        : "Turn on AI completion? It sends a window of about 6,000 characters around the caret of the open file (never other files, and nothing that looks like a secret) to the endpoint below, which runs Cloudflare Workers AI. Suggestions are a model's output: check them. It is off until you say yes, and you can turn it off at any time. Endpoint:",
+      value: ai.state.endpoint, ok: keepState ? "Save" : "Enable",
+      commit(url) {
+        const err = ai.setEndpoint(url);
+        if (err) return err;
+        if (!keepState) ai.setEnabled(true);
+        toast(keepState ? "AI completion endpoint saved" : "AI completion is on. Press Alt+\\ in the editor for a suggestion");
+        return "";
+      },
+    });
+  }
   function resetSettings() { prefs.reset(); toast("Settings are back to their defaults"); }
   async function importVsCode() {
     app.setSide(true, false);
@@ -336,6 +353,7 @@ export function createWorkbench(app) {
     if (mod && !e.shiftKey && !e.altKey && k === ",") return handle(openSettings);
     if (palette.isOpen()) return;
     if (k === "F12" && inEditor) return handle(goToDefinition);
+    if (e.altKey && !mod && !e.shiftKey && k === "\\" && inEditor) return handle(() => cmds.get("ai.suggest").run());
     if (e.altKey && !mod && !e.shiftKey && k === "z" && inEditor) return handle(() => cmds.get("view.wrap").run());
     if (!mod && !e.altKey && !e.shiftKey && !typing(t)) {
       if (k === "F2" && (t?.closest("#tree") || inEditor)) return handle(() => (t.closest("#tree") ? app.renameSelected() : app.renameActive()));

@@ -181,7 +181,7 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(ci.PROFILES["full"], ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build",
                                               "test", "aot", "rust", "benchmarks"])
         self.assertEqual(ci.PROFILES["all"][:len(ci.PROFILES["full"])], ci.PROFILES["full"])
-        self.assertEqual(set(ci.PROFILES["all"]) - set(ci.PROFILES["full"]), {"web", "gateway", "hub", "site"})
+        self.assertEqual(set(ci.PROFILES["all"]) - set(ci.PROFILES["full"]), {"web", "gateway", "hub", "ai", "site"})
         workflow = (ci.ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         self.assertIn("--profile full", workflow)
 
@@ -198,10 +198,11 @@ class ProfileTests(unittest.TestCase):
     def test_the_javascript_stages_match_the_folders_the_workflows_build(self):
         wf = ci.ROOT / ".github" / "workflows"
         text = "\n".join(p.read_text(encoding="utf-8") for p in wf.glob("*.yml"))
-        for folder in ("gateway", "ide/web", "worker"):
+        for folder in ("gateway", "ide/web", "worker", "ai"):
             self.assertIn(f"working-directory: {folder}", text)
         self.assertIn("gateway/**", ci.STAGES["gateway"]["inputs"])
         self.assertIn("worker/**", ci.STAGES["hub"]["inputs"])
+        self.assertIn("ai/**", ci.STAGES["ai"]["inputs"])
         self.assertIn("ide/web/**", ci.STAGES["web"]["inputs"])
 
 
@@ -311,7 +312,7 @@ class NodeStageTests(unittest.TestCase):
         return ci.Ctx(run_dir=pathlib.Path(self.tmp.name), env={"PATH": ""}, rid="linux-x64", require_aot=False, no_cache=True, require_node=require_node)
 
     def test_without_node_the_javascript_stages_skip_or_fail_when_required(self):
-        for stage in (ci.stage_web, ci.stage_gateway, ci.stage_hub):
+        for stage in (ci.stage_web, ci.stage_gateway, ci.stage_hub, ci.stage_ai):
             self.assertEqual(stage(self.ctx(False)).status, ci.SKIP)
             self.assertEqual(stage(self.ctx(True)).status, ci.FAIL)
 

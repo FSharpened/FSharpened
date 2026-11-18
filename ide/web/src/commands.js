@@ -100,6 +100,11 @@ export function buildCommands(app) {
     { id: "view.theme", title: "Color Theme…", category: "Preferences", run: () => app.pickTheme() },
     { id: "view.settings", title: "Open Settings", category: "Preferences", keys: "Mod+,", run: () => app.openSettings() },
     { id: "view.resetSettings", title: "Reset Settings to Defaults", category: "Preferences", run: () => app.resetSettings() },
+    // ---- AI completion (opt-in, off by default; ADR-0026)
+    { id: "ai.suggest", title: "Suggest Inline Completion (AI)", category: "AI", keys: "Alt+\\", when: hasSource, run: () => app.ai.request() },
+    { id: "ai.enable", title: "Enable AI Completion…", category: "AI", when: () => !app.ai.state.enabled, run: () => app.enableAi() },
+    { id: "ai.disable", title: "Disable AI Completion", category: "AI", when: () => app.ai.state.enabled, run: () => { app.ai.setEnabled(false); app.ai.dismiss(); app.toast("AI completion is off. Nothing is sent."); } },
+    { id: "ai.endpoint", title: "Set AI Completion Endpoint…", category: "AI", run: () => app.enableAi({ keepState: true }) },
     // ---- run
     { id: "run.run", title: "Run", category: "Run", keys: "Mod+Enter", run: () => app.run() },
     { id: "run.snapshot", title: "Save Statepoint (Snapshot)", category: "Run", keys: "Mod+S", run: () => app.snapshot() },
