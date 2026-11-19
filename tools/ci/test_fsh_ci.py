@@ -21,6 +21,17 @@ class VersionTests(unittest.TestCase):
         self.assertIn(ci.host_rid(), ci.SIX_RIDS)
 
 
+class EnvTests(unittest.TestCase):
+    def test_stages_do_not_inherit_git_repository_location(self):
+        # a git hook exports GIT_DIR; tests that expect a plain folder must not see the repository
+        leaked = {name: "leak" for name in ci.GIT_LOCATION_VARS}
+        with mock.patch.dict(os.environ, leaked):
+            env = ci.base_env()
+        for name in ci.GIT_LOCATION_VARS:
+            self.assertNotIn(name, env)
+        self.assertEqual(env["CI"], "true")
+
+
 class HashTests(unittest.TestCase):
     def test_hash_is_deterministic_and_input_sensitive(self):
         a = ci.hash_inputs(["registry/pillars.json"], extra="x")
