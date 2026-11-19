@@ -344,6 +344,7 @@ ide_body = """<div class="ide" id="ide">
       <button data-p="timeline" aria-selected="false" role="tab" type="button">Timeline <span id="tcount" class="badge"></span></button>
       <button data-p="stdin" aria-selected="false" role="tab" type="button">Input</button>
     </div>
+    <p id="livenote" class="muted livenote" role="status" hidden></p>
     <div class="panel" data-p="output"><div id="summary" role="status"></div><div id="runinfo" class="runinfo"></div><ol id="steps" class="steps" hidden></ol><pre id="stdout" tabindex="0"></pre><pre id="stderr" class="err" tabindex="0"></pre></div>
     <div class="panel" data-p="problems" hidden><div id="problems"></div></div>
     <div class="panel" data-p="timeline" hidden><p class="muted">Every run and snapshot is a <strong>statepoint</strong> of the whole project, from FSharpened.Statepoints. Restore rolls back; Fork branches without touching the source.</p><ul id="timeline"></ul><div id="diff" hidden></div></div>
@@ -360,7 +361,7 @@ ide_body = """<div class="ide" id="ide">
     <button id="st-eol" class="stbtn" type="button" title="Change the end-of-line sequence of this file">LF</button>
     <span class="stenc">UTF-8</span>
   </span>
-  <span class="muted note">Runs on <a href="https://godbolt.org" rel="noopener">Compiler Explorer</a> and <a href="https://wandbox.org" rel="noopener">Wandbox</a> sandboxes. Your code is sent to the one that serves your language when you press Run; do not paste secrets.</span></div>
+  <span class="muted note">Runs on <a href="https://godbolt.org" rel="noopener">Compiler Explorer</a> and <a href="https://wandbox.org" rel="noopener">Wandbox</a> sandboxes. Your code is sent to the one that serves your language when you press Run, and, only if you turn on Live check in Settings, after you pause typing; do not paste secrets.</span></div>
 <dialog id="palette" class="pal" aria-labelledby="pal-title">
   <h2 id="pal-title" class="sr-only">Command palette</h2>
   <input id="pal-input" type="text" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Type to search">
@@ -381,6 +382,8 @@ ide_body = """<div class="ide" id="ide">
       <label class="setcheck"><input id="set-ws" type="checkbox"> Show whitespace</label>
       <label class="setcheck"><input id="set-close" type="checkbox"> Close brackets and quotes automatically</label>
       <label class="setcheck"><input id="set-crumbs" type="checkbox"> Breadcrumbs above the editor</label>
+      <label class="setcheck"><input id="set-live" type="checkbox" aria-describedby="set-live-note"> Live check: ask the compiler as I type</label>
+      <p id="set-live-note" class="muted hint">Off by default. When on, a moment after you stop typing your code is sent to Compiler Explorer or Wandbox and <em>run</em> there, the same as pressing Run, so errors show as you write. At most 4 checks a minute share the gateway's limit with Run; it pauses when asked to, and an edit cancels the check in progress.</p>
       <p class="muted hint">Settings stay in this browser. Colour themes from VS Code can be added in the VS Code tab.</p>
     </div>
     <div class="dlgfoot"><button type="button" id="set-reset" class="mini">Reset to defaults</button><button type="button" id="set-shortcuts" class="mini">Keyboard shortcuts</button><button value="close" class="mini">Close</button></div>

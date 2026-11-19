@@ -53,9 +53,31 @@ const VIEWS = {
     await ide.page.locator("#btn-run").click();
     await expect(ide.page.locator("#stdout")).toContainText("Hello");
   },
+  "live check on, with a squiggle and a problem": async (ide) => {
+    await ide.page.locator("#btn-settings").click();
+    await ide.page.locator("#set-live").check();
+    await ide.page.keyboard.press("Escape");
+    ide.gateway.reply = () => ({ status: 200, body: okRun("", { buildFailed: true, buildOutput: "<source>:1:5: error: expected ';'\n", exitCode: 1 }) });
+    await ide.page.locator("#f-new").click();
+    await ide.answer("bad.c");
+    await ide.setText("int a\n");
+    await ide.page.locator('.ptabs [data-p="problems"]').click();
+    await expect(ide.page.locator("#problems .prob")).toHaveCount(1, { timeout: 8000 });
+    await expect(ide.page.locator("#livenote")).toContainText("Checked on");
+  },
+  "outline with declarations": async (ide) => {
+    await ide.page.locator("#f-new").click();
+    await ide.answer("shapes.js");
+    await ide.setText("function area() {}\nclass Shape {}\n");
+    await ide.showSide("outline");
+    await expect(ide.page.locator(".spanel[data-s=outline] .ol-row").first()).toBeVisible();
+  },
   "command palette": async (ide) => { await ide.palette("theme"); await expect(ide.page.locator("#pal-list [role=option]").first()).toBeVisible(); },
   "settings dialog": async (ide) => { await ide.page.locator("#btn-settings").click(); await expect(ide.page.locator("#settings")).toBeVisible(); },
   "file context menu": async (ide) => {
+    // scroll the row into view first and let the scroll settle: a scroll while a menu is open closes it, by design
+    await ide.treeItem("main.rs").scrollIntoViewIfNeeded();
+    await ide.page.waitForTimeout(150);
     await ide.treeItem("main.rs").click({ button: "right" });
     await expect(ide.page.locator('[role="menu"]').first()).toBeVisible();
   },

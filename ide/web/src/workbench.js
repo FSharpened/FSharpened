@@ -193,7 +193,7 @@ export function createWorkbench(app) {
     prefs.update({ fontSize: size });
     toast(`Editor font size ${prefs.settings.fontSize}px`);
   }
-  function resetSettings() { prefs.reset(); toast("Settings are back to their defaults"); }
+  function resetSettings() { app.setLiveCheck(false, false); prefs.reset(); toast("Settings are back to their defaults"); }
   async function importVsCode() {
     app.setSide(true, false);
     app.showSide("extensions");
@@ -203,7 +203,7 @@ export function createWorkbench(app) {
 
   // ---------------------------------------------------------------- settings and shortcut dialogs
   const setDlg = $("#settings"), scDlg = $("#shortcuts");
-  const field = { theme: $("#set-theme"), font: $("#set-font"), tab: $("#set-tab"), spaces: $("#set-spaces"), wrap: $("#set-wrap"), lines: $("#set-lines"), ws: $("#set-ws"), close: $("#set-close"), crumbs: $("#set-crumbs") };
+  const field = { theme: $("#set-theme"), font: $("#set-font"), tab: $("#set-tab"), spaces: $("#set-spaces"), wrap: $("#set-wrap"), lines: $("#set-lines"), ws: $("#set-ws"), close: $("#set-close"), crumbs: $("#set-crumbs"), live: $("#set-live") };
   field.font.min = String(limits.fontMin); field.font.max = String(limits.fontMax);
   field.tab.min = String(limits.tabMin); field.tab.max = String(limits.tabMax);
 
@@ -215,7 +215,7 @@ export function createWorkbench(app) {
     field.font.value = String(s.fontSize);
     field.tab.value = String(s.tabSize);
     field.spaces.checked = s.insertSpaces; field.wrap.checked = s.wordWrap; field.lines.checked = s.lineNumbers;
-    field.ws.checked = s.renderWhitespace; field.close.checked = s.autoCloseBrackets; field.crumbs.checked = s.breadcrumbs;
+    field.ws.checked = s.renderWhitespace; field.close.checked = s.autoCloseBrackets; field.crumbs.checked = s.breadcrumbs; field.live.checked = app.liveCheckOn();
     const t = prefs.theme();
     const ratio = t.vars?.fg && t.vars["ed-bg"] ? Core.themeContrast(t.vars.fg, t.vars["ed-bg"]) : 0;
     $("#set-theme-note").textContent = t.id === "auto" ? "Follows the site's light or dark setting (the sun/moon button in the header)." : `Text on the editor background: ${ratio.toFixed(1)} to 1${ratio >= 7 ? " (meets AAA)" : ratio >= 4.5 ? " (meets AA)" : " (below the WCAG AA level of 4.5)"}.`;
@@ -230,7 +230,8 @@ export function createWorkbench(app) {
   field.ws.addEventListener("change", () => apply({ renderWhitespace: field.ws.checked }));
   field.close.addEventListener("change", () => apply({ autoCloseBrackets: field.close.checked }));
   field.crumbs.addEventListener("change", () => apply({ breadcrumbs: field.crumbs.checked }));
-  $("#set-reset").addEventListener("click", () => { prefs.reset(); toast("Settings are back to their defaults"); });
+  field.live.addEventListener("change", () => app.setLiveCheck(field.live.checked));
+  $("#set-reset").addEventListener("click", () => { app.setLiveCheck(false, false); field.live.checked = false; prefs.reset(); toast("Settings are back to their defaults"); });
   $("#set-shortcuts").addEventListener("click", () => { setDlg.close(); openShortcuts(); });
 
   function openSettings() { menu.close(false); palette.close(false); syncSettings(); if (!setDlg.open) setDlg.showModal(); }

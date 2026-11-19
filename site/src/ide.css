@@ -54,6 +54,8 @@ body.ide-page footer.site{display:none}
 .toolbar{display:flex;flex-wrap:wrap;gap:.3rem;padding:.45rem .6rem}
 .ide .toolbar .mini:disabled{opacity:.45;cursor:not-allowed}
 .hint{font-size:.75rem;margin:.1rem .75rem .4rem}
+.livenote{margin:0;padding:.3rem .9rem;font-size:.8rem;border-bottom:1px solid var(--line);flex:none}
+.livenote[hidden]{display:none}
 .askbar{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.5rem .6rem 0;padding:.5rem;border:1px solid var(--brand);border-radius:.65rem;background:var(--bg)}
 .askbar[hidden]{display:none}
 .askbar label{flex:1 1 100%;font-size:.75rem;color:var(--mut)}

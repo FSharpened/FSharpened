@@ -93,6 +93,7 @@ export function buildCommands(app) {
     { id: "view.whitespace", title: "Toggle Render Whitespace", category: "View", run: toggle("renderWhitespace", "Render whitespace") },
     { id: "view.lineNumbers", title: "Toggle Line Numbers", category: "View", run: toggle("lineNumbers", "Line numbers") },
     { id: "view.breadcrumbs", title: "Toggle Breadcrumbs", category: "View", run: toggle("breadcrumbs", "Breadcrumbs") },
+    { id: "view.liveCheck", title: "Toggle Live Check (ask the compiler as you type)", category: "View", run: () => app.setLiveCheck(!app.liveCheckOn()) },
     { id: "view.autoClose", title: "Toggle Auto-Closing Brackets", category: "View", run: toggle("autoCloseBrackets", "Auto-closing brackets") },
     { id: "view.zoomIn", title: "Zoom In (Editor Font)", category: "View", run: () => app.zoom(1) },
     { id: "view.zoomOut", title: "Zoom Out (Editor Font)", category: "View", run: () => app.zoom(-1) },

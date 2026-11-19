@@ -11,6 +11,7 @@ import { exportProjectZip, exportFolderZip, exportVsCodeZip, importArchive, impo
 import { decodeText } from "./archive.js";
 import { createPrefs } from "./settings.js";
 import { createWorkbench } from "./workbench.js";
+import { createLiveCheck, readLiveEnabled, writeLiveEnabled, retryAfterMs } from "./livecheck.js";
 
 const GATEWAY = __GATEWAY__;
 useManifestName(Core.manifestName);
@@ -101,7 +102,7 @@ function projectFromShare(d) {
 const ui = {
   work: $("#work"), side: $("#side"), sideBtn: $("#btn-side"), ftabs: $("#ftabs"), compiler: $("#compiler"), compilerWrap: $("#compiler-wrap"), options: $("#options"), optionsWrap: $("#options-wrap"),
   template: $("#template"), templateWrap: $("#template-wrap"), run: $("#btn-run"), snap: $("#btn-snap"), share: $("#btn-share"),
-  summary: $("#summary"), runinfo: $("#runinfo"), steps: $("#steps"), stdout: $("#stdout"), stderr: $("#stderr"), problems: $("#problems"), pcount: $("#pcount"),
+  summary: $("#summary"), runinfo: $("#runinfo"), steps: $("#steps"), stdout: $("#stdout"), stderr: $("#stderr"), problems: $("#problems"), pcount: $("#pcount"), livenote: $("#livenote"),
   timeline: $("#timeline"), tcount: $("#tcount"), stdin: $("#stdin"), status: $("#status"), diff: $("#diff"), empty: $("#empty"),
   tabs: [...document.querySelectorAll(".ptabs button")], panels: [...document.querySelectorAll(".panel")],
   stabs: [...document.querySelectorAll(".stabs [role=tab]")], spanels: [...document.querySelectorAll(".spanel")],
@@ -118,7 +119,8 @@ let tree;
 let prefs;                                       // editor settings, imported themes and snippets (settings.js)
 let wb;                                          // the workbench: palette, menus, search, outline, status bar (workbench.js)
 let backing;                                     // the storage everything is kept in: localStorage, or memory when blocked
-let shown = null;                                // the run result on screen: { path, source, diagnostics }
+let shown = null;                                // the result on screen: { path, source, diagnostics, live? }
+const live = createLiveCheck({ onState: (s) => showLiveState(s) });   // the opt-in compiler check as you type (ADR-0025)
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2600); }
 function setStatus(text) { ui.status.textContent = text; }
@@ -764,7 +766,7 @@ ui.pAdd.addEventListener("click", async () => addToProject(await pick(ui.pickFil
 // ---------------------------------------------------------------- the editor's problems and run output
 // The run result currently on screen, and the exact source it was produced from. Live checks must never overwrite
 // compiler diagnostics that still describe the text in the editor.
-function clearOutput() { shown = null; ui.summary.textContent = ""; ui.summary.className = ""; ui.stdout.textContent = ""; ui.stderr.textContent = ""; ui.runinfo.replaceChildren(); ui.steps.replaceChildren(); ui.steps.hidden = true; }
+function clearOutput() { shown = null; live.cancel(); ui.summary.textContent = ""; ui.summary.className = ""; ui.stdout.textContent = ""; ui.stderr.textContent = ""; ui.runinfo.replaceChildren(); ui.steps.replaceChildren(); ui.steps.hidden = true; }
 
 /** `path` is the file the list describes: its markers go in the editor only while that file is the one open. */
 function renderProblems(list, path) {
@@ -799,11 +801,53 @@ function liveChecks(delay = 350) {
   liveTimer = setTimeout(() => {
     const path = cur.active, text = activeText();
     // live problems only replace the list when no run result still describes the text in the editor
-    if (shown && shown.path === path && shown.source === text) { renderProblems(shown.diagnostics, path); return; }
+    if (shown && shown.path === path && shown.source === text) { live.cancel(); renderProblems(shown.diagnostics, path); return; }
     const lang = pathLang(path);
-    renderProblems(lang ? Core.localChecks(lang, text) : [], path);
+    let list = lang ? Core.localChecks(lang, text) : [];
+    // an import that cannot be found is known offline: say so as you type, not only when Run is pressed
+    const made = lang ? Core.bundleMake(cur.project, path) : null;
+    if (made && !made.ok) list = [...bundleDiagnostics(made.problems, path), ...list];
+    renderProblems(list, path);
     if (text.length > limits.fileChars) setStatus(`${path} is over ${limits.fileChars.toLocaleString()} characters: it cannot be run, and an import would leave it out`);
+    if (lang && made?.ok && !running) liveCompile(path, lang, text, made.bundle); else live.cancel();
   }, delay);
+}
+
+/** Asks the compiler about the text in the editor, if the person turned live checking on. Only the preferred engine, never a fallback. */
+function liveCompile(path, lang, text, bundle) {
+  if (!live.enabled) return;
+  const step = Core.chain(lang, cur.prefs.compiler[lang]).find((x) => x.kind === "compiler");
+  if (!step) return;
+  const options = step.compiler.id === cur.prefs.compiler[lang] ? cur.prefs.options[lang] ?? "" : step.compiler.defaultOptions;
+  const source = bundle.source, stdin = cur.stdin, rec = cur;
+  const key = Core.fingerprint(["live", lang, step.compiler.id, options, source, stdin]);
+  live.request(key, async (signal) => {
+    const r = await callGateway(step.compiler.id, options, source, stdin, signal);
+    if (r.status === 429) return { rateLimited: true, retryAfterMs: r.retryAfter };
+    if (r.status !== 200) return { checked: false, message: `Live check unavailable: ${r.body.error || "HTTP " + r.status}` };
+    const rep = Core.interpret(lang, { engine: step.compiler.label, buildFailed: r.body.buildFailed, buildOutput: r.body.buildOutput, stdout: r.body.stdout, stderr: r.body.stderr, exitCode: r.body.exitCode, timedOut: r.body.timedOut, durationMs: r.body.durationMs, cached: !!r.body.cached });
+    if (rep.phase === "infrastructure") return { checked: false, message: "Live check unavailable: " + rep.summary };
+    // the text moved on, another project opened or a run began while the answer was on its way: it describes something else now
+    if (cur !== rec || running || cur.active !== path || activeText() !== text) return { checked: false, message: "" };
+    const diagnostics = relocate(Core, bundle, path, rep);
+    shown = { path, source: text, diagnostics, live: true };
+    renderProblems(diagnostics, path);
+    const n = diagnostics.filter((d) => d.severity === "error").length;
+    return { message: n ? `Checked on ${step.compiler.label}: ${n} ${n === 1 ? "error" : "errors"}` : `Checked on ${step.compiler.label}: no errors` };
+  });
+}
+
+function showLiveState({ phase, message }) {
+  ui.livenote.hidden = !live.enabled;
+  ui.livenote.textContent = live.enabled ? "Live check: " + (message || (phase === "idle" ? "on" : phase)) : "";
+  if (phase === "paused" || phase === "error") setStatus(message);
+}
+function setLiveCheck(on, announce = true) {
+  live.setEnabled(on);
+  writeLiveEnabled(backing, on);
+  showLiveState({ phase: "idle", message: "on" });
+  if (on) { liveChecks(); if (announce) toast("Live check is on: after you pause typing, your code is sent to the compiler service and run, like Run does"); }
+  else if (announce) toast("Live check is off");
 }
 function onChange(text) {
   const f = fileAt(cur.active);
@@ -897,14 +941,16 @@ function applyState(s) {
 }
 
 // ---------------------------------------------------------------- running (fallback chain from the F# core)
-async function callGateway(compilerId, options, source, stdin) {
+async function callGateway(compilerId, options, source, stdin, outer) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 35000);
+  const onOuter = () => ctrl.abort();
+  if (outer) { if (outer.aborted) ctrl.abort(); else outer.addEventListener("abort", onOuter, { once: true }); }
   try {
     const res = await fetch(GATEWAY + "/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: Core.requestJson(compilerId, options, source, stdin), signal: ctrl.signal });
     const body = await res.json().catch(() => ({}));
-    return { status: res.status, body };
-  } finally { clearTimeout(timer); }
+    return { status: res.status, body, retryAfter: retryAfterMs(res.headers.get("retry-after")) };
+  } finally { clearTimeout(timer); outer?.removeEventListener("abort", onOuter); }
 }
 
 /** The open file when it is source code, otherwise the project's entry file. */
@@ -1135,6 +1181,7 @@ const app = {
   run, runPipeline, pipelineSteps: () => cur.project.pipeline, inPipeline: (p) => cur.project.pipeline.includes(p), pipelineAdd, pipelineRemovePath: (p) => pipelineRemove(cur.project.pipeline.indexOf(p)),
   snapshot: () => { snapshot("Snapshot"); toast("Statepoint saved"); }, share: shareLink, canRun,
   copyOutput, clearOutputNow, setEol, applyReplaced, snapshotNow,
+  liveCheckOn: () => live.enabled, setLiveCheck,
 };
 
 // ---------------------------------------------------------------- wiring
@@ -1151,6 +1198,8 @@ async function init() {
   persistent = !!storage || kind === "indexeddb";
   store.keepPersistent();                         // ask the browser not to evict the projects under storage pressure
   prefs = createPrefs(Core, backing);
+  live.setEnabled(readLiveEnabled(backing));
+  showLiveState({ phase: "idle", message: "on" });
   prefs.apply();
   editor = createEditor($("#editor"), {
     onChange, onRun: run, onCursor: (i) => wb?.cursor(i),
