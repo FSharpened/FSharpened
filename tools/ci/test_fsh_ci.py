@@ -181,7 +181,7 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(ci.PROFILES["full"], ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build",
                                               "test", "aot", "rust", "benchmarks"])
         self.assertEqual(ci.PROFILES["all"][:len(ci.PROFILES["full"])], ci.PROFILES["full"])
-        self.assertEqual(set(ci.PROFILES["all"]) - set(ci.PROFILES["full"]), {"web", "gateway", "hub", "site"})
+        self.assertEqual(set(ci.PROFILES["all"]) - set(ci.PROFILES["full"]), {"web", "gateway", "hub", "site", "web-e2e"})
         workflow = (ci.ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         self.assertIn("--profile full", workflow)
 
@@ -198,7 +198,7 @@ class ProfileTests(unittest.TestCase):
     def test_the_javascript_stages_match_the_folders_the_workflows_build(self):
         wf = ci.ROOT / ".github" / "workflows"
         text = "\n".join(p.read_text(encoding="utf-8") for p in wf.glob("*.yml"))
-        for folder in ("gateway", "ide/web", "worker"):
+        for folder in ("gateway", "ide/web", "ide/e2e", "worker"):
             self.assertIn(f"working-directory: {folder}", text)
         self.assertIn("gateway/**", ci.STAGES["gateway"]["inputs"])
         self.assertIn("worker/**", ci.STAGES["hub"]["inputs"])
@@ -318,6 +318,75 @@ class NodeStageTests(unittest.TestCase):
     def test_preflight_node_check_follows_the_same_rule(self):
         self.assertEqual(ci.check_node(self.ctx(False))[0], ci.WARN)
         self.assertEqual(ci.check_node(self.ctx(True))[0], ci.FAIL)
+
+
+class WebE2eStageTests(unittest.TestCase):
+    """The browser tests (ADR-0024): skip with a warning without Chromium, fail with --require-browser, never cache a skip."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.tmp.name)
+        (self.root / "site" / "public" / "ide").mkdir(parents=True)
+        (self.root / "site" / "public" / "ide" / "index.html").write_text("<!doctype html>", encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def ctx(self, **kw):
+        return ci.Ctx(run_dir=self.root, env={"PATH": ""}, rid="linux-x64", require_aot=False, no_cache=True, **kw)
+
+    def run_stage(self, ctx, outputs):
+        """outputs: what run_cmd answers, in order: (exit code, text)."""
+        calls = []
+
+        def fake_run(c, stage, cmd, **kw):
+            calls.append(cmd)
+            return outputs[len(calls) - 1]
+
+        patches = (mock.patch.object(ci, "ROOT", self.root), mock.patch.object(ci, "node_ready", return_value=None),
+                   mock.patch.object(ci, "npm_install", return_value=None), mock.patch.object(ci, "run_cmd", side_effect=fake_run))
+        with patches[0], patches[1], patches[2], patches[3]:
+            return ci.stage_web_e2e(ctx), calls
+
+    def test_it_is_part_of_all_after_the_site_it_serves_and_not_part_of_full(self):
+        self.assertIn("web-e2e", ci.PROFILES["all"])
+        self.assertNotIn("web-e2e", ci.PROFILES["full"])
+        self.assertLess(ci.PROFILES["all"].index("site"), ci.PROFILES["all"].index("web-e2e"))
+        self.assertEqual(ci.STAGES["web-e2e"]["deps"], ["site"])
+        self.assertIn("web-e2e", ci.CACHEABLE)
+        for glob in ("ide/e2e/**", "site/**", "ide/web/**"):
+            self.assertIn(glob, ci.STAGES["web-e2e"]["inputs"])
+
+    def test_without_node_it_skips_or_fails_when_node_is_required(self):
+        self.assertEqual(ci.stage_web_e2e(self.ctx()).status, ci.SKIP)
+        self.assertEqual(ci.stage_web_e2e(self.ctx(require_node=True)).status, ci.FAIL)
+
+    def test_without_chromium_it_skips_with_a_warning_and_fails_when_required(self):
+        r, calls = self.run_stage(self.ctx(), [(3, "not installed")])
+        self.assertEqual(r.status, ci.SKIP)  # a SKIP is never stored in the cache, a WARN would be
+        self.assertIn("npx playwright install chromium", r.detail)
+        self.assertEqual(len(calls), 1)
+        r, _ = self.run_stage(self.ctx(require_browser=True), [(3, "not installed")])
+        self.assertEqual(r.status, ci.FAIL)
+        self.assertIn("--require-browser", r.detail)
+
+    def test_a_missing_page_is_a_failure_that_names_the_site_build(self):
+        (self.root / "site" / "public" / "ide" / "index.html").unlink()
+        r, _ = self.run_stage(self.ctx(), [])
+        self.assertEqual(r.status, ci.FAIL)
+        self.assertIn("build.py", r.detail)
+
+    def test_it_counts_passed_tests_and_a_green_run_with_none_is_a_failure(self):
+        r, calls = self.run_stage(self.ctx(), [(0, "chromium: x"), (0, "Running 18 tests" + chr(10) + "  18 passed (11.7s)" + chr(10))])
+        self.assertEqual((r.status, r.metrics["browser_tests"]), (ci.PASS, 18))
+        self.assertEqual(calls[1], ["npm", "test"])
+        r, _ = self.run_stage(self.ctx(), [(0, "chromium: x"), (0, "No tests found")])
+        self.assertEqual(r.status, ci.FAIL)
+
+    def test_a_failing_browser_test_fails_the_stage_with_the_output(self):
+        r, _ = self.run_stage(self.ctx(), [(0, "chromium: x"), (1, "1 failed" + chr(10) + "  1 passed")])
+        self.assertEqual(r.status, ci.FAIL)
+        self.assertIn("1 failed", r.detail)
 
 
 class ResilientRunTests(unittest.TestCase):
@@ -712,6 +781,15 @@ class ReportingTests(unittest.TestCase):
         with mock.patch.object(ci, "git_lines", lambda *a: []):
             summary = ci.write_reports(self.ctx(), "full", results, ["build"], 1.0)
         self.assertEqual(summary["rids_verified_locally"], [])
+
+
+class GitEnvironmentTests(unittest.TestCase):
+    def test_stages_do_not_inherit_the_repository_a_git_hook_points_at(self):
+        with mock.patch.dict(os.environ, {"GIT_DIR": "/somewhere/.git", "GIT_INDEX_FILE": "/somewhere/index", "GIT_WORK_TREE": "/w"}):
+            env = ci.base_env()
+        for name in ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE"):
+            self.assertNotIn(name, env)
+        self.assertEqual(env["CI"], "true")
 
 
 class HookTests(unittest.TestCase):

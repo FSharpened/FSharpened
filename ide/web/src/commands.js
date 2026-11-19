@@ -93,6 +93,7 @@ export function buildCommands(app) {
     { id: "view.whitespace", title: "Toggle Render Whitespace", category: "View", run: toggle("renderWhitespace", "Render whitespace") },
     { id: "view.lineNumbers", title: "Toggle Line Numbers", category: "View", run: toggle("lineNumbers", "Line numbers") },
     { id: "view.breadcrumbs", title: "Toggle Breadcrumbs", category: "View", run: toggle("breadcrumbs", "Breadcrumbs") },
+    { id: "view.liveCheck", title: "Toggle Live Check (ask the compiler as you type)", category: "View", run: () => app.setLiveCheck(!app.liveCheckOn()) },
     { id: "view.autoClose", title: "Toggle Auto-Closing Brackets", category: "View", run: toggle("autoCloseBrackets", "Auto-closing brackets") },
     { id: "view.zoomIn", title: "Zoom In (Editor Font)", category: "View", run: () => app.zoom(1) },
     { id: "view.zoomOut", title: "Zoom Out (Editor Font)", category: "View", run: () => app.zoom(-1) },
@@ -102,6 +103,9 @@ export function buildCommands(app) {
     { id: "view.resetSettings", title: "Reset Settings to Defaults", category: "Preferences", run: () => app.resetSettings() },
     // ---- run
     { id: "run.run", title: "Run", category: "Run", keys: "Mod+Enter", run: () => app.run() },
+    { id: "run.pipeline", title: "Run Pipeline", category: "Run", when: () => app.pipelineSteps().length > 0, run: () => app.runPipeline() },
+    { id: "file.pipelineAdd", title: "Add File to Pipeline", category: "File", when: () => hasSource() && !app.inPipeline(app.activePath()), run: () => app.pipelineAdd(app.activePath()) },
+    { id: "file.pipelineRemove", title: "Remove File from Pipeline", category: "File", when: () => app.inPipeline(app.activePath()), run: () => app.pipelineRemovePath(app.activePath()) },
     { id: "run.snapshot", title: "Save Statepoint (Snapshot)", category: "Run", keys: "Mod+S", run: () => app.snapshot() },
     { id: "run.share", title: "Copy Share Link", category: "Run", run: () => app.share() },
     { id: "run.copyOutput", title: "Copy Output", category: "Run", run: () => app.copyOutput("out") },

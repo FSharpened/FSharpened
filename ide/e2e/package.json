@@ -1,0 +1,17 @@
+{
+  "name": "fsharpened-ide-e2e",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Browser end-to-end and accessibility tests for the built IDE page (ADR-0024). Chromium only, served from site/public, gateway mocked.",
+  "scripts": {
+    "test": "playwright test",
+    "check-browser": "node support/check-browser.mjs",
+    "install-browser": "playwright install chromium",
+    "install-browser:ci": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.1"
+  }
+}

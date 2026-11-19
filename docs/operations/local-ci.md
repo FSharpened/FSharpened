@@ -22,7 +22,7 @@ python tools/ci/fsh_ci.py install-hooks        # pre-commit = fast, pre-push = f
 |---|---|---|
 | `fast` | preflight, docs-drift, selftest, tools-restore, format | the pre-commit gate, about 10 s |
 | `full` | fast + restore, build (strict), test, aot, rust, benchmarks | exactly what `ci.yml` runs on each RID. Keep it identical to that workflow |
-| `all` | full + web, gateway, hub, site | everything GitHub runs across `ci.yml`, `ide.yml`, `hub.yml` and `site.yml`; the JavaScript stages skip with a warning when Node is missing |
+| `all` | full + web, web-e2e, gateway, hub, site | everything GitHub runs across `ci.yml`, `ide.yml`, `hub.yml` and `site.yml`; the JavaScript stages skip with a warning when Node is missing |
 | `release` | full + pack, bundle (requires NativeAOT; cache off) | a verified `artifacts/release/<commit>-<rid>/` bundle. Publishing it is a human step |
 
 ## Preflight (nothing else runs if it fails)
@@ -43,6 +43,7 @@ Python >= 3.10; git state; `dotnet` found and SDK >= the `global.json` pin (the 
 | `pack` | NuGet packages for every project (release) |
 | `bundle` | copies this run's packages and native binary into `artifacts/release/<commit>-<rid>/`, writes `SHA256SUMS`, `provenance.json` (commit, branch, SDK, RID, per-stage results, `"published": false`) and `RELEASE_NOTES.md` (from CHANGELOG `[Unreleased]`), then verifies the folder. Refuses a tree with uncommitted tracked changes (`--allow-dirty` overrides) |
 | `web` | the browser IDE: Fable compiles the F# core, esbuild bundles it, `node --test` checks it reads compiler output like .NET does, and the bundle is over 100 KB (`ide.yml`, job `web`) |
+| `web-e2e` | the built IDE page in headless Chromium (`ide/e2e`, Playwright): files, palette, search, themes, share links, `.zip`, multi-file runs and the pipeline, storage, and axe accessibility checks in four themes, 87 tests. The gateway is mocked and every other request is blocked, so no test touches the network. Needs the `site` stage's output and `npx playwright install chromium`; skipped with a warning when the browser is missing (the skip is not cached), failing with `--require-browser`. Zero tests executed counts as failure (`ide.yml`, job `e2e`) |
 | `gateway` | the IDE gateway worker: `tsc --noEmit` and vitest (`ide.yml`, job `gateway`) |
 | `hub` | the hub worker: `tsc --noEmit` and vitest (`hub.yml`) |
 | `site` | icons current, site built, links/metadata/manifests/service-worker precache/CSP-safe markup checked, service-worker behaviour tests (`site.yml`) |
@@ -72,7 +73,7 @@ Python >= 3.10; git state; `dotnet` found and SDK >= the `global.json` pin (the 
 `run --profile release` builds from scratch, packs, runs the native binary, and writes the bundle described under `bundle`. `verify [DIR]` re-hashes every file against `SHA256SUMS`, fails on a changed, missing or extra file, checks the provenance lists the same files and says `published: false` (`--strict-head` also requires the bundle to be built from HEAD). **There is no publish command**: a person reviews the bundle and uploads it (AGENTS.md: never publish a package or model artifact without human approval). Only the host RID is built and verified locally; the bundle's provenance says so.
 
 ## GitHub Actions
-`.github/workflows/ci.yml` runs `fsh_ci.py run --profile full --ci --require-aot --require-rust` on `win-x64`, `win-arm64` (experimental), `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, uploads each run's logs and writes `report.md` to the job summary. `ide.yml`, `hub.yml` and `site.yml` run the JavaScript checks that `--profile all` runs locally through the `web`, `gateway`, `hub` and `site` stages.
+`.github/workflows/ci.yml` runs `fsh_ci.py run --profile full --ci --require-aot --require-rust` on `win-x64`, `win-arm64` (experimental), `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, uploads each run's logs and writes `report.md` to the job summary. `ide.yml`, `hub.yml` and `site.yml` run the JavaScript checks that `--profile all` runs locally through the `web`, `web-e2e`, `gateway`, `hub` and `site` stages.
 
 ## Extending
 Add a function returning `Result`, register it in `STAGES` (deps, cache inputs, exclusivity), add it to the profiles, add a self-test (`tools/ci/test_fsh_ci.py` checks every profile stage has its dependencies, the graph is acyclic and `full` still matches `ci.yml`), update this page. Pure logic that decides something (the governor, failure classification, lazy planning) belongs in `fsh_runtime.py` with a table test, not inside a stage.

@@ -6,7 +6,7 @@ One entrypoint used identically on a developer machine, in a git hook, and in Gi
 
   python tools/ci/fsh_ci.py run [--profile fast|full|all|release] [--only S ...] [--skip S ...]
                                 [--no-cache] [--keep-going] [--jobs N] [--rid RID]
-                                [--require-aot] [--require-rust] [--require-node] [--ignore-resources] [--allow-dirty]
+                                [--require-aot] [--require-rust] [--require-node] [--require-browser] [--ignore-resources] [--allow-dirty]
   python tools/ci/fsh_ci.py preflight      # checks only
   python tools/ci/fsh_ci.py doctor [--fix] # the machine: memory, toolchains, state, hooks; --fix tidies what it safely can
   python tools/ci/fsh_ci.py status         # the last run, stage by stage
@@ -88,8 +88,16 @@ def augment_path(env: dict) -> dict:
     return env
 
 
+# Git exports these to a hook so that `git` commands inside it act on the repository being pushed. A test that makes a plain
+# temporary folder and asks git about it must not be answered with this repository's branch (the Host tooling test did).
+GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                     "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_QUARANTINE_PATH", "GIT_NAMESPACE")
+
+
 def base_env() -> dict:
     env = augment_path(dict(os.environ))
+    for name in GIT_LOCATION_VARS:
+        env.pop(name, None)
     env.update(
         {
             "CI": "true",  # strict mode: warnings are errors (Directory.Build.props)
@@ -178,6 +186,7 @@ class Ctx:
     sdk_version: str = ""
     require_rust: bool = False
     require_node: bool = False
+    require_browser: bool = False
     allow_dirty: bool = False
     ignore_resources: bool = False
     requested_jobs: int = 2
@@ -754,6 +763,39 @@ def stage_site(ctx: Ctx) -> Result:
     return Result(PASS, f"site built and checked, {m.group(1) if m else '?'} service-worker tests passed")
 
 
+E2E_DIR = "ide/e2e"
+
+
+def stage_web_e2e(ctx: Ctx) -> Result:
+    """Browser end-to-end and accessibility tests of the built IDE page (ADR-0024): Playwright with Chromium only, the page
+    served from site/public by a static server inside the tests, the gateway mocked (no network). Skips with a warning (never cached) when
+    Chromium is not installed (`cd ide/e2e && npx playwright install chromium`), fails with --require-browser. Mirrors the
+    `e2e` job of ide.yml."""
+    skip = node_ready(ctx)
+    if skip:
+        return skip
+    page = ROOT / "site" / "public" / "ide" / "index.html"
+    if not page.exists():
+        return Result(FAIL, "site/public/ide/index.html is missing: the site stage builds it (python tools/site/build.py --require-ide)")
+    bad = npm_install(ctx, "web-e2e", E2E_DIR)
+    if bad:
+        return bad
+    rc, out = run_cmd(ctx, "web-e2e", ["npm", "run", "-s", "check-browser"], timeout=120, cwd=ROOT / E2E_DIR, append=True)
+    if rc != 0:
+        msg = "Playwright's Chromium is not installed (cd ide/e2e && npx playwright install chromium); the browser tests did not run"
+        # SKIP, not WARN: a warning is cached like a pass, and a later run with the browser installed must run the tests
+        return Result(FAIL, msg + " (--require-browser)") if ctx.require_browser else Result(SKIP, "skipped with a warning: " + msg)
+    rc, out = run_cmd(ctx, "web-e2e", ["npm", "test"], timeout=900, cwd=ROOT / E2E_DIR, append=True)
+    out = rt.strip_ansi(out)
+    if rc != 0:
+        return Result(FAIL, "browser tests failed:\n" + tail(out, 25))
+    passed = re.search(r"(\d+) passed", out)
+    n = int(passed.group(1)) if passed else 0
+    if n == 0:
+        return Result(FAIL, "zero browser tests executed (a green run with no tests is a failure)")
+    return Result(PASS, f"{n} browser tests passed (Chromium, gateway mocked)", metrics={"browser_tests": n})
+
+
 def stage_bundle(ctx: Ctx) -> Result:
     """Collect this run's packages and native binary into artifacts/release/<commit>-<rid>/ with SHA256SUMS,
     provenance.json and release notes, then verify the folder. Publishes nothing."""
@@ -819,20 +861,21 @@ STAGES: dict[str, dict] = {
     "gateway": dict(fn=stage_gateway, deps=["preflight"], inputs=["gateway/**"], excl=False),
     "hub": dict(fn=stage_hub, deps=["preflight"], inputs=["worker/**"], excl=False),
     "site": dict(fn=stage_site, deps=["web"], inputs=["site/**", "tools/site/**", "branding/**", "worker/admin/**", *WEB_INPUTS], excl=False),
+    "web-e2e": dict(fn=stage_web_e2e, deps=["site"], inputs=["ide/e2e/**", "site/**", "tools/site/**", "branding/**", *WEB_INPUTS], excl=False),
 }
 FULL = ["preflight", "docs-drift", "selftest", "tools-restore", "format", "restore", "build", "test", "aot", "rust", "benchmarks"]
 PROFILES = {
     "fast": ["preflight", "docs-drift", "selftest", "tools-restore", "format"],
     # what ci.yml runs on each of the six RIDs: keep this list identical to what GitHub's matrix expects
     "full": FULL,
-    # everything GitHub runs across all its workflows: full, plus the browser IDE, gateway, hub and site jobs
-    "all": FULL + ["web", "gateway", "hub", "site"],
+    # everything GitHub runs across all its workflows: full, plus the browser IDE, gateway, hub, site and browser-test jobs
+    "all": FULL + ["web", "gateway", "hub", "site", "web-e2e"],
     "release": FULL + ["pack", "bundle"],
 }
 # A cache hit is only trusted for stages whose outputs are not consumed by a later stage in the same run.
-CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot", "web", "gateway", "hub", "site"}
+CACHEABLE = {"docs-drift", "selftest", "format", "test", "aot", "web", "gateway", "hub", "site", "web-e2e"}
 # Stages that start dotnet or compile a lot: they wait (briefly) for memory before they begin.
-HEAVY = {"restore", "build", "test", "aot", "pack", "web"}
+HEAVY = {"restore", "build", "test", "aot", "pack", "web", "web-e2e"}
 
 
 # --------------------------------------------------------------------------- scheduler
@@ -1140,7 +1183,7 @@ def cmd_run(args) -> int:
         run_dir = STATE / "runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
         ctx = Ctx(run_dir=run_dir, env=base_env(), rid=args.rid or host_rid(), require_aot=args.require_aot, no_cache=args.no_cache or args.ci,
-                  require_rust=args.require_rust, require_node=args.require_node, allow_dirty=args.allow_dirty,
+                  require_rust=args.require_rust, require_node=args.require_node, require_browser=args.require_browser, allow_dirty=args.allow_dirty,
                   ignore_resources=args.ignore_resources, requested_jobs=args.jobs, profile=args.profile,
                   trigger="hook" if args.hook else ("ci" if args.ci else "manual"), hang_timeout_s=args.hang_timeout)
         if ctx.require_rust:
@@ -1420,6 +1463,7 @@ def add_run_options(r: argparse.ArgumentParser, default_profile: str = "full") -
     r.add_argument("--require-aot", action="store_true", help="fail (not skip) when the NativeAOT toolchain is missing")
     r.add_argument("--require-rust", action="store_true", help="fail (not skip) when cargo is missing; also makes the Interop.Rust tests fail without it")
     r.add_argument("--require-node", action="store_true", help="fail (not skip) when node is missing for the web, gateway, hub and site stages")
+    r.add_argument("--require-browser", action="store_true", help="fail (not skip with a warning) when Playwright's Chromium is not installed for the web-e2e stage")
     r.add_argument("--ignore-resources", action="store_true", help="run even when free memory is below the safe minimum")
     r.add_argument("--allow-dirty", action="store_true", help="let the release bundle name a commit although tracked files are modified")
     r.add_argument("--hang-timeout", type=int, default=300, help="seconds one test may run before it is named as a hang and killed")

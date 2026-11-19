@@ -1,5 +1,5 @@
 /* IDE page. Loaded after site.css, so it reuses its tokens. Built into assets/h/ide.<hash>.css. */
-:root{--ed-bg:#fff;--syn-keyword:#7c3aed;--syn-string:#047857;--syn-number:#b45309;--syn-comment:#64748b;--syn-type:#0e7490;--syn-function:#1d4ed8;--syn-meta:#be185d;--syn-op:#475569;--bad:#dc2626;--warn:#d97706;--ok:#16a34a}
+:root{--ed-bg:#fff;--syn-keyword:#7c3aed;--syn-string:#047857;--syn-number:#b45309;--syn-comment:#5b6b80;--syn-type:#0e7490;--syn-function:#1d4ed8;--syn-meta:#be185d;--syn-op:#475569;--bad:#dc2626;--warn:#d97706;--ok:#16a34a}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--ed-bg:#0b1020;--syn-keyword:#c4b5fd;--syn-string:#6ee7b7;--syn-number:#fbbf24;--syn-comment:#7c8aaa;--syn-type:#67e8f9;--syn-function:#93c5fd;--syn-meta:#f9a8d4;--syn-op:#9aa6c4;--bad:#f87171;--warn:#fbbf24;--ok:#4ade80}}
 :root[data-theme=dark]{--ed-bg:#0b1020;--syn-keyword:#c4b5fd;--syn-string:#6ee7b7;--syn-number:#fbbf24;--syn-comment:#7c8aaa;--syn-type:#67e8f9;--syn-function:#93c5fd;--syn-meta:#f9a8d4;--syn-op:#9aa6c4;--bad:#f87171;--warn:#fbbf24;--ok:#4ade80}
 
@@ -54,6 +54,8 @@ body.ide-page footer.site{display:none}
 .toolbar{display:flex;flex-wrap:wrap;gap:.3rem;padding:.45rem .6rem}
 .ide .toolbar .mini:disabled{opacity:.45;cursor:not-allowed}
 .hint{font-size:.75rem;margin:.1rem .75rem .4rem}
+.livenote{margin:0;padding:.3rem .9rem;font-size:.8rem;border-bottom:1px solid var(--line);flex:none}
+.livenote[hidden]{display:none}
 .askbar{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.5rem .6rem 0;padding:.5rem;border:1px solid var(--brand);border-radius:.65rem;background:var(--bg)}
 .askbar[hidden]{display:none}
 .askbar label{flex:1 1 100%;font-size:.75rem;color:var(--mut)}
@@ -192,6 +194,7 @@ body.ide-page footer.site{display:none}
 .srrow input,.srmore input{flex:1;min-width:0;font:inherit;font-size:.8125rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:.5rem;padding:.35rem .5rem;font-family:ui-monospace,Consolas,monospace}
 .srtoggles{display:flex;gap:.15rem;flex:none}
 .srtoggles button{font:inherit;font-size:.75rem;font-family:ui-monospace,Consolas,monospace;min-width:1.9rem;padding:.3rem .3rem;color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:.4rem;cursor:pointer;touch-action:manipulation}
+.srtoggles button::before{content:attr(data-glyph)}
 .srtoggles button[aria-pressed=true]{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
 .srmore summary{cursor:pointer;font-size:.75rem;color:var(--mut)}
 .srmore label{display:flex;flex-direction:column;gap:.15rem;font-size:.75rem;color:var(--mut);margin-top:.3rem}
@@ -280,7 +283,18 @@ dialog.dlg[open]{display:flex}
 .ctx-check{width:1rem;flex:none;text-align:center;font-size:.75rem}
 .ctx-label{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ctx-keys,.ctx-arrow{margin-left:1.5rem;font-size:.6875rem;opacity:.75;flex:none}
+.ctx-item.danger:not(:hover):not(:focus) .ctx-keys{opacity:1}
 .ctx-sep{height:1px;background:var(--line);margin:.25rem .3rem}
 @media (pointer:coarse){.ctx-item{min-height:2.75rem}.pal-row{min-height:2.75rem}.srtoggles button{min-height:2.25rem;min-width:2.25rem}.stbtn{min-height:2rem}}
 @media (forced-colors:active){.ctx-item:hover,.ctx-item:focus,.pal-row.on{forced-color-adjust:none;background:Highlight;color:HighlightText}.srtoggles button[aria-pressed=true]{forced-color-adjust:none;background:Highlight;color:HighlightText}.ol-row[aria-current=true]{border-left-color:Highlight}dialog.pal,dialog.dlg,.ctx{border-color:CanvasText}mark{background:Mark;color:MarkText}}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
+.pipe{padding:0 .6rem .4rem}.pipe h3{margin:.5rem .15rem .1rem;font-size:.8125rem}
+.pipelist{margin:0 0 .25rem;padding:0 0 0 1.4rem;font-size:.8125rem}.pipelist li{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;margin-bottom:.25rem}
+.pipelist .mini.link{border-color:transparent;text-decoration:underline;overflow-wrap:anywhere;text-align:left}
+.pipelist .bad{color:var(--bad);font-size:.75rem}
+.pipe .toolbar{padding:.25rem 0}.pipe-support{font-size:.75rem;margin:.25rem 0 .5rem}.pipe-support summary{cursor:pointer}
+.support{border-collapse:collapse;width:100%;font-size:.6875rem}.support th,.support td{border-top:1px solid var(--line);padding:.2rem .3rem;text-align:left;vertical-align:top}
+.runinfo p{margin:.1rem 0;font-size:.75rem;overflow-wrap:anywhere}
+.steps{list-style:none;margin:0 0 .5rem;padding:0;font-size:.8125rem}.step{margin:.15rem 0}.step summary{cursor:pointer}
+.step-mark{display:inline-block;width:1.2em;font-weight:700}.step.ok .step-mark{color:var(--ok)}.step.fail .step-mark{color:var(--bad)}.step-path{font-weight:600}.step .step-sum{color:var(--mut)}
+.step pre{margin:.25rem 0 .5rem 1.4rem}

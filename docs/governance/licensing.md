@@ -22,6 +22,8 @@ Licenses below are the project's current understanding and **must be verified ag
 | Fable.Core | MIT | Compatible | Attribution | C |
 | CodeMirror 6 (`@codemirror/*`, `@lezer/*`) | MIT | Compatible | Attribution (shipped in `ide.js`) | C |
 | esbuild (build tool) | MIT | Compatible | Not shipped | C |
+| Playwright (`@playwright/test`, `ide/e2e` devDependency) | Apache-2.0 | Compatible | Not shipped; downloads Chromium in CI only | C |
+| axe-core and `@axe-core/playwright` (`ide/e2e` devDependency) | MPL-2.0 | Compatible | Not shipped; used unmodified | C |
 | Wrangler, Workers types (dev tools) | Apache-2.0 / MIT (verify) | Compatible | Not shipped | C |
 | Compiler Explorer public API (service, not code) | Service terms apply (verify) | Pending | Attribution on the IDE page; keep rate limit; no abuse; plan self-hosting if usage grows | C |
 | Wandbox public API (service, not code) | Service terms apply (verify) | Pending | Named on the IDE page next to Compiler Explorer; the gateway rate-limits and caches; plan self-hosting if usage grows (ADR-0020) | C |

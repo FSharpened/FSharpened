@@ -17,6 +17,12 @@
     <Compile Include="Diff.fs" />
     <Compile Include="Workspace.fs" />
     <Compile Include="Project.fs" />
+    <Compile Include="Scan.fs" />
+    <Compile Include="BundleKit.fs" />
+    <Compile Include="BundleJs.fs" />
+    <Compile Include="BundleLangs.fs" />
+    <Compile Include="Bundle.fs" />
+    <Compile Include="Pipeline.fs" />
     <Compile Include="Timeline.fs" />
     <Compile Include="ProjectState.fs" />
     <Compile Include="Fuzzy.fs" />

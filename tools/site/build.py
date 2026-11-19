@@ -261,7 +261,7 @@ ide_body = """<div class="ide" id="ide">
   <div class="spanel" data-s="search" hidden>
     <form id="sr-form" class="srform" role="search" aria-label="Search the project">
       <div class="srrow"><input id="sr-q" type="text" placeholder="Search" aria-label="Search the project for" spellcheck="false" autocapitalize="off" autocomplete="off" maxlength="500">
-        <span class="srtoggles"><button id="sr-case" type="button" aria-pressed="false" title="Match case (Alt+C)" aria-label="Match case">Aa</button><button id="sr-word" type="button" aria-pressed="false" title="Whole word (Alt+W)" aria-label="Whole word">ab</button><button id="sr-re" type="button" aria-pressed="false" title="Regular expression (Alt+R)" aria-label="Regular expression">.*</button></span></div>
+        <span class="srtoggles"><button id="sr-case" type="button" aria-pressed="false" title="Match case (Alt+C)" aria-label="Match case" data-glyph="Aa"></button><button id="sr-word" type="button" aria-pressed="false" title="Whole word (Alt+W)" aria-label="Whole word" data-glyph="ab"></button><button id="sr-re" type="button" aria-pressed="false" title="Regular expression (Alt+R)" aria-label="Regular expression" data-glyph=".*"></button></span></div>
       <div class="srrow"><input id="sr-r" type="text" placeholder="Replace" aria-label="Replace with" spellcheck="false" autocapitalize="off" autocomplete="off" maxlength="500"><button id="sr-replace-all" class="mini" type="button" disabled title="Replace every match in the project">Replace all</button></div>
       <details id="sr-more" class="srmore"><summary>Files to include or exclude</summary>
         <label>Include <input id="sr-inc" type="text" placeholder="src/**, *.rs" spellcheck="false" autocapitalize="off" autocomplete="off"></label>
@@ -291,6 +291,18 @@ ide_body = """<div class="ide" id="ide">
       <button id="p-add" class="mini" type="button" title="Add files to the open project">Add files</button>
     </div>
     <p class="muted hint">Drop a .zip, files or a folder anywhere on the editor to import it.</p>
+    <p id="p-storage" class="muted hint"></p>
+    <section class="pipe" aria-labelledby="pipe-h">
+      <h3 id="pipe-h">Pipeline</h3>
+      <p id="pipe-hint" class="muted hint"></p>
+      <ol id="pipe-list" class="pipelist"></ol>
+      <div class="toolbar" role="toolbar" aria-label="Pipeline actions">
+        <button id="pipe-add" class="mini" type="button" title="Add the open file as the next step">Add open file</button>
+        <button id="pipe-run" class="mini" type="button" title="Run every step in order">Run pipeline</button>
+        <button id="pipe-clear" class="mini" type="button">Clear</button>
+      </div>
+      <details class="pipe-support"><summary>Which languages can run several files</summary><div id="pipe-support"></div></details>
+    </section>
     <ul id="plist" class="plist"></ul>
     <div id="report" class="report" hidden></div>
   </div>
@@ -332,7 +344,8 @@ ide_body = """<div class="ide" id="ide">
       <button data-p="timeline" aria-selected="false" role="tab" type="button">Timeline <span id="tcount" class="badge"></span></button>
       <button data-p="stdin" aria-selected="false" role="tab" type="button">Input</button>
     </div>
-    <div class="panel" data-p="output"><div id="summary" role="status"></div><pre id="stdout" tabindex="0"></pre><pre id="stderr" class="err" tabindex="0"></pre></div>
+    <p id="livenote" class="muted livenote" role="status" hidden></p>
+    <div class="panel" data-p="output"><div id="summary" role="status"></div><div id="runinfo" class="runinfo"></div><ol id="steps" class="steps" hidden></ol><pre id="stdout" tabindex="0"></pre><pre id="stderr" class="err" tabindex="0"></pre></div>
     <div class="panel" data-p="problems" hidden><div id="problems"></div></div>
     <div class="panel" data-p="timeline" hidden><p class="muted">Every run and snapshot is a <strong>statepoint</strong> of the whole project, from FSharpened.Statepoints. Restore rolls back; Fork branches without touching the source.</p><ul id="timeline"></ul><div id="diff" hidden></div></div>
     <div class="panel" data-p="stdin" hidden><label for="stdin">Standard input for your program</label><textarea id="stdin" rows="6" spellcheck="false"></textarea></div>
@@ -348,7 +361,7 @@ ide_body = """<div class="ide" id="ide">
     <button id="st-eol" class="stbtn" type="button" title="Change the end-of-line sequence of this file">LF</button>
     <span class="stenc">UTF-8</span>
   </span>
-  <span class="muted note">Runs on <a href="https://godbolt.org" rel="noopener">Compiler Explorer</a> and <a href="https://wandbox.org" rel="noopener">Wandbox</a> sandboxes. Your code is sent to the one that serves your language when you press Run; do not paste secrets.</span></div>
+  <span class="muted note">Runs on <a href="https://godbolt.org" rel="noopener">Compiler Explorer</a> and <a href="https://wandbox.org" rel="noopener">Wandbox</a> sandboxes. Your code is sent to the one that serves your language when you press Run, and, only if you turn on Live check in Settings, after you pause typing; do not paste secrets.</span></div>
 <dialog id="palette" class="pal" aria-labelledby="pal-title">
   <h2 id="pal-title" class="sr-only">Command palette</h2>
   <input id="pal-input" type="text" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Type to search">
@@ -369,6 +382,8 @@ ide_body = """<div class="ide" id="ide">
       <label class="setcheck"><input id="set-ws" type="checkbox"> Show whitespace</label>
       <label class="setcheck"><input id="set-close" type="checkbox"> Close brackets and quotes automatically</label>
       <label class="setcheck"><input id="set-crumbs" type="checkbox"> Breadcrumbs above the editor</label>
+      <label class="setcheck"><input id="set-live" type="checkbox" aria-describedby="set-live-note"> Live check: ask the compiler as I type</label>
+      <p id="set-live-note" class="muted hint">Off by default. When on, a moment after you stop typing your code is sent to Compiler Explorer or Wandbox and <em>run</em> there, the same as pressing Run, so errors show as you write. At most 4 checks a minute share the gateway's limit with Run; it pauses when asked to, and an edit cancels the check in progress.</p>
       <p class="muted hint">Settings stay in this browser. Colour themes from VS Code can be added in the VS Code tab.</p>
     </div>
     <div class="dlgfoot"><button type="button" id="set-reset" class="mini">Reset to defaults</button><button type="button" id="set-shortcuts" class="mini">Keyboard shortcuts</button><button value="close" class="mini">Close</button></div>

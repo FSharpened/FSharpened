@@ -3,6 +3,7 @@
 import * as Core from "../fable_out/Api.js";
 import { createEditor } from "./editor.js";
 import { $, el, fill, safe } from "./dom.js";
+import { relocate, bundleDiagnostics, bundleNotes, renderSteps, renderPipelineList, renderSupport } from "./pipeline.js";
 import { createStore } from "./store.js";
 import { createTree } from "./tree.js";
 import { download, copyText, readFiles, classify, filesFromDrop, pick } from "./transfer.js";
@@ -10,6 +11,7 @@ import { exportProjectZip, exportFolderZip, exportVsCodeZip, importArchive, impo
 import { decodeText } from "./archive.js";
 import { createPrefs } from "./settings.js";
 import { createWorkbench } from "./workbench.js";
+import { createLiveCheck, readLiveEnabled, writeLiveEnabled, retryAfterMs } from "./livecheck.js";
 
 const GATEWAY = __GATEWAY__;
 useManifestName(Core.manifestName);
@@ -49,8 +51,16 @@ let warnedSave = false;
 function flush() {
   clearTimeout(saveTimer);
   const r = store.save(cur);
-  if (!r.ok && !warnedSave) { warnedSave = true; toast(r.error); }
-  if (r.ok) warnedSave = false;
+  watchSave(r);
+}
+/** A write can fail now (localStorage) or when IndexedDB commits it (`done`); either way say so once, until a write works again. */
+function watchSave(r) {
+  const report = (res) => {
+    if (!res.ok && !warnedSave) { warnedSave = true; toast(res.error); refreshStorageNote(); }
+    if (res.ok) warnedSave = false;
+  };
+  report(r);
+  r.done?.then(report);
 }
 /** Typing saves after a short pause (a large project is not rewritten on every key); everything else saves at once. */
 function persist(now = false) {
@@ -92,12 +102,13 @@ function projectFromShare(d) {
 const ui = {
   work: $("#work"), side: $("#side"), sideBtn: $("#btn-side"), ftabs: $("#ftabs"), compiler: $("#compiler"), compilerWrap: $("#compiler-wrap"), options: $("#options"), optionsWrap: $("#options-wrap"),
   template: $("#template"), templateWrap: $("#template-wrap"), run: $("#btn-run"), snap: $("#btn-snap"), share: $("#btn-share"),
-  summary: $("#summary"), stdout: $("#stdout"), stderr: $("#stderr"), problems: $("#problems"), pcount: $("#pcount"),
+  summary: $("#summary"), runinfo: $("#runinfo"), steps: $("#steps"), stdout: $("#stdout"), stderr: $("#stderr"), problems: $("#problems"), pcount: $("#pcount"), livenote: $("#livenote"),
   timeline: $("#timeline"), tcount: $("#tcount"), stdin: $("#stdin"), status: $("#status"), diff: $("#diff"), empty: $("#empty"),
   tabs: [...document.querySelectorAll(".ptabs button")], panels: [...document.querySelectorAll(".panel")],
   stabs: [...document.querySelectorAll(".stabs [role=tab]")], spanels: [...document.querySelectorAll(".spanel")],
   tree: $("#tree"), projName: $("#proj-name"), projMeta: $("#proj-meta"), plist: $("#plist"), report: $("#report"),
   fNew: $("#f-new"), fRename: $("#f-rename"), fDelete: $("#f-delete"), fEntry: $("#f-entry"), fCopy: $("#f-copy"), fDownload: $("#f-download"),
+  pipeList: $("#pipe-list"), pipeHint: $("#pipe-hint"), pipeAdd: $("#pipe-add"), pipeRun: $("#pipe-run"), pipeClear: $("#pipe-clear"), pipeSupport: $("#pipe-support"),
   pNew: $("#p-new"), pStarter: $("#p-starter"), pDup: $("#p-dup"), pRename: $("#p-rename"), pDelete: $("#p-delete"), pZip: $("#p-zip"),
   pImportZip: $("#p-import-zip"), pImportFolder: $("#p-import-folder"), pAdd: $("#p-add"),
   pickZip: $("#pick-zip"), pickFolder: $("#pick-folder"), pickFiles: $("#pick-files"), pickExt: $("#pick-ext"),
@@ -108,7 +119,8 @@ let tree;
 let prefs;                                       // editor settings, imported themes and snippets (settings.js)
 let wb;                                          // the workbench: palette, menus, search, outline, status bar (workbench.js)
 let backing;                                     // the storage everything is kept in: localStorage, or memory when blocked
-let shown = null;                                // the run result on screen: { path, source, diagnostics }
+let shown = null;                                // the result on screen: { path, source, diagnostics, live? }
+const live = createLiveCheck({ onState: (s) => showLiveState(s) });   // the opt-in compiler check as you type (ADR-0025)
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2600); }
 function setStatus(text) { ui.status.textContent = text; }
@@ -196,6 +208,7 @@ function renderTree() {
   ui.projMeta.textContent = `${n} file${n === 1 ? "" : "s"} · ${langs} language${langs === 1 ? "" : "s"}`;
   tree.set({ rows: listing, collapsed: cur.collapsed, active: cur.active, entry: Core.projectEntry(cur.project) });
   updateToolbar();
+  renderPipeline();
 }
 
 function selectedRow() { const p = tree.selected(); return p ? listing.find((r) => r.path === p) : undefined; }
@@ -208,7 +221,20 @@ function updateToolbar() {
   ui.fDownload.disabled = !row && !cur.active;
 }
 
+/** "Stored in this browser: 1.2 MB of about 3 GB", and a warning when the browser is nearly out of room for this site. */
+let warnedQuota = false;
+async function refreshStorageNote() {
+  const note = $("#p-storage");
+  if (!note || !store) return;
+  const q = await store.quota();
+  const where = store.kind === "indexeddb" ? "IndexedDB" : store.kind === "localStorage" && persistent ? "local storage (about 5 MB)" : "memory only";
+  const mb = (n) => (n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : Math.max(0.1, n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + " MB");
+  note.textContent = q && q.quota ? `Kept in this browser (${where}): ${mb(q.usage)} used of about ${mb(q.quota)} available to this site.` : `Kept in this browser (${where}).`;
+  if (q && q.quota && q.usage / q.quota > 0.8 && !warnedQuota) { warnedQuota = true; toast("The browser is nearly out of room for this site. Download projects you want to keep."); }
+}
+
 function renderProjects() {
+  refreshStorageNote();
   ui.plist.replaceChildren(...store.list().map((r) => {
     const n = r.project.files.length;
     const b = el("button", { type: "button", "data-id": r.id, "aria-current": String(r.id === cur.id) }, el("span", { class: "pn" }, r.project.name), el("span", { class: "pm" }, `${n} file${n === 1 ? "" : "s"} · ${new Date(r.updated).toLocaleDateString()}`));
@@ -223,14 +249,18 @@ function renderTabs() {
     const on = p === cur.active;
     const dup = names.filter((n) => n === names[i]).length > 1;
     const tab = el("button", { type: "button", role: "tab", "aria-selected": String(on), tabindex: on ? "0" : "-1", "data-path": p, title: p + " (Delete closes the tab)" }, names[i], dup ? el("span", { class: "dir" }, " " + (dirOf(p) || "/")) : null);
-    const x = el("button", { type: "button", class: "x", "aria-label": "Close " + p, tabindex: "-1", title: "Close" }, "×");
+    // The close button is a mouse and touch convenience: it is not a tab, so it is kept out of the tablist (aria-hidden) and out of the
+    // tab order. The keyboard closes a tab with Delete, and the palette and the tab menu have Close Editor.
+    const x = el("button", { type: "button", class: "x", "aria-hidden": "true", tabindex: "-1", title: "Close" }, "×");
     tab.addEventListener("click", () => openFile(p));
     x.addEventListener("click", () => closeFile(p));
     tab.addEventListener("auxclick", (e) => { if (e.button === 1) { e.preventDefault(); closeFile(p); } });
-    return el("span", { class: "ftab" + (on ? " on" : "") }, tab, x);
+    return el("span", { class: "ftab" + (on ? " on" : ""), role: "presentation" }, tab, x);
   });
+  const hadFocus = ui.ftabs.contains(document.activeElement);
   ui.ftabs.replaceChildren(...nodes);
   revealActiveTab();
+  if (hadFocus) ui.ftabs.querySelector('[aria-selected="true"]')?.focus(); // the redraw replaced the focused tab: keep the keyboard on the open one
 }
 /** The strip scrolls when many files are open; keep the selected tab in view without scrolling anything else. */
 function revealActiveTab() {
@@ -501,6 +531,10 @@ ui.fNew.addEventListener("click", () => newFile());
 ui.fRename.addEventListener("click", renameSelected);
 ui.fDelete.addEventListener("click", deleteSelected);
 ui.fEntry.addEventListener("click", setEntry);
+ui.pipeAdd.addEventListener("click", () => pipelineAdd(cur.active));
+ui.pipeRun.addEventListener("click", runPipeline);
+ui.pipeClear.addEventListener("click", () => { if (cur.project.pipeline.length) setPipeline([]); });
+renderSupport(ui.pipeSupport, Core, Core.languages());
 ui.fCopy.addEventListener("click", copyFile);
 ui.fDownload.addEventListener("click", downloadSelected);
 
@@ -534,7 +568,7 @@ function switchProject(id) {
   showSide("files");
 }
 
-function savedOrWarn(r) { if (!r.ok) toast(r.error); }
+function savedOrWarn(r) { watchSave(r); }
 
 function newProject() {
   ask({ label: "Name of the new, empty project", value: "", ok: "Create", commit(name) {
@@ -732,20 +766,23 @@ ui.pAdd.addEventListener("click", async () => addToProject(await pick(ui.pickFil
 // ---------------------------------------------------------------- the editor's problems and run output
 // The run result currently on screen, and the exact source it was produced from. Live checks must never overwrite
 // compiler diagnostics that still describe the text in the editor.
-function clearOutput() { shown = null; ui.summary.textContent = ""; ui.summary.className = ""; ui.stdout.textContent = ""; ui.stderr.textContent = ""; }
+function clearOutput() { shown = null; live.cancel(); ui.summary.textContent = ""; ui.summary.className = ""; ui.stdout.textContent = ""; ui.stderr.textContent = ""; ui.runinfo.replaceChildren(); ui.steps.replaceChildren(); ui.steps.hidden = true; }
 
 /** `path` is the file the list describes: its markers go in the editor only while that file is the one open. */
 function renderProblems(list, path) {
   const n = list.filter((d) => d.severity === "error").length, w = list.filter((d) => d.severity === "warning").length;
   ui.pcount.textContent = list.length ? `${n ? n + "E " : ""}${w ? w + "W" : ""}`.trim() || String(list.length) : "";
-  const here = path === cur.active;
-  if (!list.length) { ui.problems.replaceChildren(el("p", { class: "muted" }, "No problems.")); if (here) editor.mark([]); return; }
+  const pathOf = (d) => d.path || path;
+  const here = list.filter((d) => pathOf(d) === cur.active);
+  if (!list.length) { ui.problems.replaceChildren(el("p", { class: "muted" }, "No problems.")); editor.mark([]); return; }
   ui.problems.replaceChildren(...list.map((d) => {
-    const row = el("button", { class: "prob " + d.severity }, el("span", { class: "sev" }, d.severity), el("span", { class: "loc" }, d.line ? `${d.line}:${d.column}` : "–"), el("span", { class: "msg" }, d.message), d.fix ? el("span", { class: "fix" }, "Fix: " + d.fix) : null);
-    row.addEventListener("click", () => { if (path && path !== cur.active) openFile(path); if (d.line) editor.reveal(d.line, d.column); });
+    // a bundled run can report a problem in a file other than the one that was run: say which
+    const where = d.path && d.path !== path ? d.path + ":" : "";
+    const row = el("button", { class: "prob " + d.severity }, el("span", { class: "sev" }, d.severity), el("span", { class: "loc" }, d.line ? `${where}${d.line}:${d.column}` : where ? where.slice(0, -1) : "–"), el("span", { class: "msg" }, d.message), d.fix ? el("span", { class: "fix" }, "Fix: " + d.fix) : null);
+    row.addEventListener("click", () => { const at = pathOf(d); if (at && at !== cur.active && fileAt(at)) openFile(at); if (d.line) editor.reveal(d.line, d.column); });
     return row;
   }));
-  if (here) editor.mark(list);
+  editor.mark(here);
 }
 
 function renderReport(rep, extra, target) {
@@ -764,11 +801,53 @@ function liveChecks(delay = 350) {
   liveTimer = setTimeout(() => {
     const path = cur.active, text = activeText();
     // live problems only replace the list when no run result still describes the text in the editor
-    if (shown && shown.path === path && shown.source === text) { renderProblems(shown.diagnostics, path); return; }
+    if (shown && shown.path === path && shown.source === text) { live.cancel(); renderProblems(shown.diagnostics, path); return; }
     const lang = pathLang(path);
-    renderProblems(lang ? Core.localChecks(lang, text) : [], path);
+    let list = lang ? Core.localChecks(lang, text) : [];
+    // an import that cannot be found is known offline: say so as you type, not only when Run is pressed
+    const made = lang ? Core.bundleMake(cur.project, path) : null;
+    if (made && !made.ok) list = [...bundleDiagnostics(made.problems, path), ...list];
+    renderProblems(list, path);
     if (text.length > limits.fileChars) setStatus(`${path} is over ${limits.fileChars.toLocaleString()} characters: it cannot be run, and an import would leave it out`);
+    if (lang && made?.ok && !running) liveCompile(path, lang, text, made.bundle); else live.cancel();
   }, delay);
+}
+
+/** Asks the compiler about the text in the editor, if the person turned live checking on. Only the preferred engine, never a fallback. */
+function liveCompile(path, lang, text, bundle) {
+  if (!live.enabled) return;
+  const step = Core.chain(lang, cur.prefs.compiler[lang]).find((x) => x.kind === "compiler");
+  if (!step) return;
+  const options = step.compiler.id === cur.prefs.compiler[lang] ? cur.prefs.options[lang] ?? "" : step.compiler.defaultOptions;
+  const source = bundle.source, stdin = cur.stdin, rec = cur;
+  const key = Core.fingerprint(["live", lang, step.compiler.id, options, source, stdin]);
+  live.request(key, async (signal) => {
+    const r = await callGateway(step.compiler.id, options, source, stdin, signal);
+    if (r.status === 429) return { rateLimited: true, retryAfterMs: r.retryAfter };
+    if (r.status !== 200) return { checked: false, message: `Live check unavailable: ${r.body.error || "HTTP " + r.status}` };
+    const rep = Core.interpret(lang, { engine: step.compiler.label, buildFailed: r.body.buildFailed, buildOutput: r.body.buildOutput, stdout: r.body.stdout, stderr: r.body.stderr, exitCode: r.body.exitCode, timedOut: r.body.timedOut, durationMs: r.body.durationMs, cached: !!r.body.cached });
+    if (rep.phase === "infrastructure") return { checked: false, message: "Live check unavailable: " + rep.summary };
+    // the text moved on, another project opened or a run began while the answer was on its way: it describes something else now
+    if (cur !== rec || running || cur.active !== path || activeText() !== text) return { checked: false, message: "" };
+    const diagnostics = relocate(Core, bundle, path, rep);
+    shown = { path, source: text, diagnostics, live: true };
+    renderProblems(diagnostics, path);
+    const n = diagnostics.filter((d) => d.severity === "error").length;
+    return { message: n ? `Checked on ${step.compiler.label}: ${n} ${n === 1 ? "error" : "errors"}` : `Checked on ${step.compiler.label}: no errors` };
+  });
+}
+
+function showLiveState({ phase, message }) {
+  ui.livenote.hidden = !live.enabled;
+  ui.livenote.textContent = live.enabled ? "Live check: " + (message || (phase === "idle" ? "on" : phase)) : "";
+  if (phase === "paused" || phase === "error") setStatus(message);
+}
+function setLiveCheck(on, announce = true) {
+  live.setEnabled(on);
+  writeLiveEnabled(backing, on);
+  showLiveState({ phase: "idle", message: "on" });
+  if (on) { liveChecks(); if (announce) toast("Live check is on: after you pause typing, your code is sent to the compiler service and run, like Run does"); }
+  else if (announce) toast("Live check is off");
 }
 function onChange(text) {
   const f = fileAt(cur.active);
@@ -862,14 +941,16 @@ function applyState(s) {
 }
 
 // ---------------------------------------------------------------- running (fallback chain from the F# core)
-async function callGateway(compilerId, options, source, stdin) {
+async function callGateway(compilerId, options, source, stdin, outer) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 35000);
+  const onOuter = () => ctrl.abort();
+  if (outer) { if (outer.aborted) ctrl.abort(); else outer.addEventListener("abort", onOuter, { once: true }); }
   try {
     const res = await fetch(GATEWAY + "/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: Core.requestJson(compilerId, options, source, stdin), signal: ctrl.signal });
     const body = await res.json().catch(() => ({}));
-    return { status: res.status, body };
-  } finally { clearTimeout(timer); }
+    return { status: res.status, body, retryAfter: retryAfterMs(res.headers.get("retry-after")) };
+  } finally { clearTimeout(timer); outer?.removeEventListener("abort", onOuter); }
 }
 
 /** The open file when it is source code, otherwise the project's entry file. */
@@ -878,59 +959,167 @@ function runTarget() {
   return Core.projectEntry(cur.project);
 }
 
+/**
+ * Runs one source through the fallback chain (the F# core decides the order): the compilers, then a result for identical code
+ * from earlier, then offline checks. `emit(report, extra, status)` is called for each result worth showing; the last report is
+ * returned (null when there was none).
+ */
+async function execute(lang, source, stdin, label, emit) {
+  const options = cur.prefs.options[lang] ?? "";
+  const key = Core.fingerprint([lang, cur.prefs.compiler[lang] || "", options, source, stdin]);
+  const notes = [];
+  let last = null;
+  for (const step of Core.chain(lang, cur.prefs.compiler[lang])) {
+    if (step.kind === "compiler") {
+      setStatus(`Compiling ${label} on ${step.compiler.label}…`);
+      let r;
+      try { r = await callGateway(step.compiler.id, step.compiler.id === cur.prefs.compiler[lang] ? options : step.compiler.defaultOptions, source, stdin); }
+      catch (e) { notes.push(`${step.compiler.label}: ${e.name === "AbortError" ? "timed out" : "unreachable"}`); continue; }
+      if (r.status === 200) {
+        const rep = Core.interpret(lang, { engine: step.compiler.label, buildFailed: r.body.buildFailed, buildOutput: r.body.buildOutput, stdout: r.body.stdout, stderr: r.body.stderr, exitCode: r.body.exitCode, timedOut: r.body.timedOut, durationMs: r.body.durationMs, cached: !!r.body.cached });
+        if (rep.phase !== "infrastructure") warm.set(key, rep);
+        emit(rep, notes.length ? `  (fell back after: ${notes.join("; ")})` : "", `${rep.ok ? "OK" : "Failed"} · ${label} · ${step.compiler.label}`);
+        return rep;
+      }
+      if (r.status === 429) { const rep = Core.infrastructure(r.body.error || "Rate limited. Wait a moment and run again.", []); emit(rep, "", "Rate limited"); return rep; }
+      if (r.status >= 400 && r.status < 500) { const rep = Core.infrastructure("Request rejected: " + (r.body.error || r.status), []); emit(rep, "", "Rejected"); return rep; }
+      notes.push(`${step.compiler.label}: ${r.body.error || "HTTP " + r.status}`);
+    } else if (step.kind === "warm") {
+      const hit = warm.get(key);
+      if (hit) { emit(hit, `  (showing your last result for identical code; engines unavailable: ${notes.join("; ")})`, "Warm result"); return hit; }
+    } else if (step.kind === "local") {
+      const local = Core.localChecks(lang, source);
+      last = Core.infrastructure("Could not reach an execution engine (" + notes.join("; ") + "). Showing offline checks only.", local);
+      emit(last, "", "Offline checks only");
+      if (local.some((d) => d.severity === "error")) return last; // real problems found: that is the useful answer
+    } else if (step.kind === "escalate") {
+      ui.summary.textContent += "  " + step.message;
+      return last;
+    }
+  }
+  return last;
+}
+
+/** Say why a project cannot be run as one source, where the problems are. */
+function refuseBundle(problems, target) {
+  const list = bundleDiagnostics(problems, target);
+  ui.summary.textContent = `Cannot run ${target}: ${problems.length === 1 ? problems[0].message : problems.length + " problems in the project's files"}`;
+  ui.summary.className = "bad";
+  renderProblems(list, target);
+  showPanel("problems");
+  setStatus("Cannot bundle the project");
+}
+
+function showRunInfo(lines) { ui.runinfo.replaceChildren(...lines.map((l) => el("p", { class: "muted" }, l))); }
+
 async function run() {
   if (running) return;
   const target = runTarget();
   const file = target && fileAt(target);
   if (!file) { toast("Nothing to run yet: add or open a source file"); return; }
-  running = true; ui.run.disabled = true; ui.run.textContent = "Running…";
   clearOutput(); showPanel("output");
-  const lang = pathLang(target), source = file.text, stdin = cur.stdin;
-  const options = cur.prefs.options[lang] ?? "";
+  // the file and the files it imports become one source (ADR-0024); a file that imports nothing is sent as it is
+  const made = Core.bundleMake(cur.project, target);
+  if (!made.ok) { refuseBundle(made.problems, target); return; }
+  const bundle = made.bundle;
+  running = true; ui.run.disabled = true; ui.run.textContent = "Running…";
+  const lang = pathLang(target), source = bundle.source, text = file.text, stdin = cur.stdin;
   const rec = cur;
   clearTimeout(liveTimer);
   // Show a result, remembering which text it belongs to. If the user kept typing during the run, the result is
   // still shown, but the editor markers go back to live checks for the newer text.
-  const present = (rep, extra) => {
+  const present = (rep, extra, status) => {
     if (cur !== rec) return; // another project was opened meanwhile: this result is not about it
-    renderReport(rep, extra, target);
-    shown = { path: target, source, diagnostics: rep.diagnostics };
-    if (fileAt(target)?.text !== source) { shown = null; liveChecks(); }
+    const placed = { ...rep, diagnostics: relocate(Core, bundle, target, rep) };
+    renderReport(placed, extra, target);
+    showRunInfo(bundleNotes(bundle));
+    shown = { path: target, source: text, diagnostics: placed.diagnostics };
+    if (fileAt(target)?.text !== text) { shown = null; liveChecks(); }
+    if (status) setStatus(status);
   };
   snapshotNow("Run: " + target);
-  const key = Core.fingerprint([lang, cur.prefs.compiler[lang] || "", options, source, stdin]);
-  const notes = [];
+  try { await execute(lang, source, stdin, target, present); }
+  finally { running = false; ui.run.disabled = false; ui.run.textContent = "▶ Run"; persist(true); }
+}
+
+/** Runs the project's pipeline: each step's output is the next step's input, and the first failure stops the run. */
+async function runPipeline() {
+  if (running) return;
+  const plan = Core.pipelinePlan(cur.project);
+  clearOutput(); showPanel("output");
+  if (!plan.ok) { refuseBundle(plan.problems, plan.problems[0]?.path ?? ""); return; }
+  const paths = plan.stages.map((s) => s.path);
+  const steps = plan.stages.map((s) => ({ path: s.path, language: s.language, state: "skip", summary: "not run yet", stdout: "", stderr: "" }));
+  const finished = [];
+  const rec = cur;
+  running = true; ui.run.disabled = true; ui.run.textContent = "Running…";
+  clearTimeout(liveTimer);
+  snapshotNow("Run pipeline: " + paths.join(" → "));
   try {
-    for (const step of Core.chain(lang, cur.prefs.compiler[lang])) {
-      if (step.kind === "compiler") {
-        setStatus(`Compiling ${target} on ${step.compiler.label}…`);
-        let r;
-        try { r = await callGateway(step.compiler.id, step.compiler.id === cur.prefs.compiler[lang] ? options : step.compiler.defaultOptions, source, stdin); }
-        catch (e) { notes.push(`${step.compiler.label}: ${e.name === "AbortError" ? "timed out" : "unreachable"}`); continue; }
-        if (r.status === 200) {
-          const rep = Core.interpret(lang, { engine: step.compiler.label, buildFailed: r.body.buildFailed, buildOutput: r.body.buildOutput, stdout: r.body.stdout, stderr: r.body.stderr, exitCode: r.body.exitCode, timedOut: r.body.timedOut, durationMs: r.body.durationMs, cached: !!r.body.cached });
-          if (rep.phase !== "infrastructure") warm.set(key, rep);
-          present(rep, notes.length ? `  (fell back after: ${notes.join("; ")})` : "");
-          setStatus(`${rep.ok ? "OK" : "Failed"} · ${target} · ${step.compiler.label}`);
-          return;
-        }
-        if (r.status === 429) { present(Core.infrastructure(r.body.error || "Rate limited. Wait a moment and run again.", []), ""); setStatus("Rate limited"); return; }
-        if (r.status >= 400 && r.status < 500) { present(Core.infrastructure("Request rejected: " + (r.body.error || r.status), []), ""); setStatus("Rejected"); return; }
-        notes.push(`${step.compiler.label}: ${r.body.error || "HTTP " + r.status}`);
-      } else if (step.kind === "warm") {
-        const hit = warm.get(key);
-        if (hit) { present(hit, `  (showing your last result for identical code; engines unavailable: ${notes.join("; ")})`); setStatus("Warm result"); return; }
-      } else if (step.kind === "local") {
-        const local = Core.localChecks(lang, source);
-        const rep = Core.infrastructure("Could not reach an execution engine (" + notes.join("; ") + "). Showing offline checks only.", local);
-        present(rep, ""); setStatus("Offline checks only");
-        if (local.some((d) => d.severity === "error")) return; // real problems found: that is the useful answer
-      } else if (step.kind === "escalate") {
-        ui.summary.textContent += "  " + step.message;
-        return;
+    for (;;) {
+      const next = Core.pipelineNext(paths, finished, cur.stdin);
+      if (next.done) {
+        if (cur !== rec) return;
+        ui.summary.textContent = next.summary;
+        ui.summary.className = next.ok ? "ok" : "bad";
+        const lastRan = [...steps].reverse().find((s) => s.state === "ok" || s.state === "fail");
+        ui.stdout.textContent = lastRan?.stdout ?? "";
+        ui.stderr.textContent = lastRan?.stderr ?? "";
+        setStatus(next.ok ? `OK · pipeline of ${paths.length}` : "Pipeline stopped");
+        break;
       }
+      const stage = plan.stages[next.index];
+      steps[next.index].state = "run"; steps[next.index].summary = "running…";
+      if (cur === rec) { renderSteps(ui.steps, steps); ui.summary.textContent = `Step ${next.index + 1} of ${paths.length}: ${stage.path}…`; ui.summary.className = ""; }
+      let rep = null, extra = "";
+      await execute(stage.language, stage.bundle.source, next.stdin, stage.path, (r, e) => { rep = r; extra = e; });
+      if (cur !== rec) return; // another project was opened meanwhile
+      if (!rep) rep = Core.infrastructure("No result: no engine answered and nothing could be checked offline.", []);
+      const placed = relocate(Core, stage.bundle, stage.path, rep);
+      steps[next.index] = { path: stage.path, language: stage.language, state: rep.ok ? "ok" : "fail", summary: rep.summary + extra, stdout: rep.stdout, stderr: rep.stderr };
+      finished.push({ path: stage.path, ok: rep.ok, stdout: rep.stdout, summary: rep.summary });
+      renderSteps(ui.steps, steps);
+      renderProblems(rep.ok ? [] : placed, stage.path);
     }
+    showRunInfo(plan.stages.flatMap((s) => bundleNotes(s.bundle)));
   } finally { running = false; ui.run.disabled = false; ui.run.textContent = "▶ Run"; persist(true); }
+}
+
+// ---------------------------------------------------------------- the pipeline editor (Projects tab)
+function pipelineProblems() {
+  const bad = new Map();
+  for (const path of cur.project.pipeline) {
+    const r = Core.bundleMake(cur.project, path);
+    if (!r.ok) bad.set(path, r.problems[0].message);
+  }
+  return bad;
+}
+function setPipeline(stages) {
+  const err = apply(Core.projectSetPipeline(cur.project, stages));
+  if (err) { toast(err); return false; }
+  renderPipeline();
+  persist(true);
+  return true;
+}
+function pipelineAdd(path) {
+  if (!path || !fileAt(path) || !pathLang(path)) { toast("Open a source file to add it to the pipeline"); return; }
+  if (setPipeline([...cur.project.pipeline, path])) toast(`${path} is step ${cur.project.pipeline.length} of the pipeline`);
+}
+function pipelineRemove(i) { setPipeline(cur.project.pipeline.filter((_, k) => k !== i)); }
+function pipelineMove(i, by) {
+  const a = [...cur.project.pipeline], j = i + by;
+  if (j < 0 || j >= a.length) return;
+  [a[i], a[j]] = [a[j], a[i]];
+  setPipeline(a);
+}
+function renderPipeline() {
+  const steps = cur.project.pipeline;
+  renderPipelineList(ui.pipeList, steps, { move: pipelineMove, remove: pipelineRemove, open: (p) => openFile(p, { focus: true }) }, pipelineProblems());
+  ui.pipeHint.textContent = steps.length
+    ? "Each step runs on its own, with the files it imports bundled in. Its output is the next step's input; the first failure stops the run."
+    : "Add source files in order and each one's output becomes the next one's input. With no steps, Run uses the open file.";
+  ui.pipeRun.disabled = steps.length === 0;
+  ui.pipeClear.disabled = steps.length === 0;
 }
 
 // ---------------------------------------------------------------- operations the workbench (palette, menus, search) uses
@@ -989,18 +1178,28 @@ const app = {
   revealInTree, collapseAll, expandAll, toggleFolder, isCollapsed,
   newProject, starterProject, duplicateProject, renameProject, deleteProject, downloadProject: () => downloadProject(), downloadForVsCode: () => downloadForVsCode(), projectAction,
   importZip: async () => importAsProject(await pick(ui.pickZip)), importFolder: async () => importAsProject(await pick(ui.pickFolder)), addFiles: async () => addToProject(await pick(ui.pickFiles)),
-  run, snapshot: () => { snapshot("Snapshot"); toast("Statepoint saved"); }, share: shareLink, canRun,
+  run, runPipeline, pipelineSteps: () => cur.project.pipeline, inPipeline: (p) => cur.project.pipeline.includes(p), pipelineAdd, pipelineRemovePath: (p) => pipelineRemove(cur.project.pipeline.indexOf(p)),
+  snapshot: () => { snapshot("Snapshot"); toast("Statepoint saved"); }, share: shareLink, canRun,
   copyOutput, clearOutputNow, setEol, applyReplaced, snapshotNow,
+  liveCheckOn: () => live.enabled, setLiveCheck,
 };
 
 // ---------------------------------------------------------------- wiring
 async function init() {
   const storage = safe(() => { localStorage.setItem("fsharpened.ide.probe", "1"); localStorage.removeItem("fsharpened.ide.probe"); return localStorage; }, null);
-  persistent = !!storage;
-  backing = storage ?? memoryStorage();
-  store = createStore(Core, backing);
-  const { migrated } = store.load();
+  backing = storage ?? memoryStorage();           // settings, themes and snippets: small, kept in localStorage
+  // projects: IndexedDB (a far larger quota, and failures are reported), with localStorage as the fallback (store.js, ADR-0024)
+  store = createStore(Core, backing, Date.now, {
+    indexedDB: safe(() => window.indexedDB, undefined),
+    estimate: () => navigator.storage.estimate(),
+    persist: () => navigator.storage.persist(),
+  });
+  const { migrated, kind } = await store.load();
+  persistent = !!storage || kind === "indexeddb";
+  store.keepPersistent();                         // ask the browser not to evict the projects under storage pressure
   prefs = createPrefs(Core, backing);
+  live.setEnabled(readLiveEnabled(backing));
+  showLiveState({ phase: "idle", message: "on" });
   prefs.apply();
   editor = createEditor($("#editor"), {
     onChange, onRun: run, onCursor: (i) => wb?.cursor(i),

@@ -78,6 +78,11 @@ const highlight = HighlightStyle.define([
   { tag: [t.operator, t.punctuation], color: "var(--syn-op)" },
 ]);
 
+// CodeMirror 6.36 uses Chromium's EditContext API when it exists. With it, Select All then Delete in an empty file throws an
+// uncaught "Invalid change range 0 to 1 (in doc of length 0)" from its textupdate handler (found by the browser tests,
+// ide/e2e). The classic contenteditable path has no such bug and is what every other browser uses, so use it everywhere.
+EditorView.EDIT_CONTEXT = false;
+
 const theme = EditorView.theme({
   "&": { height: "100%", color: "var(--fg)", backgroundColor: "var(--ed-bg)", fontSize: "var(--ed-fs, 14px)" },
   ".cm-scroller": { fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace", lineHeight: "1.55" },
@@ -271,7 +276,8 @@ export function createEditor(parent, { onChange, onRun, onCursor = () => {}, sni
   const prefs = new Compartment();
   let cfg = { ...DEFAULTS };
   let version = 0;
-  const labelOf = (name) => label.of(EditorView.contentAttributes.of({ "aria-label": (name || "No file") + " source code editor" }));
+  // tabindex 0 on the (already focusable) content tells scanners that the scrolling editor can be reached by keyboard
+  const labelOf = (name) => label.of(EditorView.contentAttributes.of({ "aria-label": (name || "No file") + " source code editor", tabindex: "0" }));
   const makeState = (lang, doc, name) => {
     versionOf.set(name, version);
     return EditorState.create({
@@ -365,7 +371,7 @@ export function createEditor(parent, { onChange, onRun, onCursor = () => {}, sni
       }
       langOf.set(to, lang);
       versionOf.set(to, was);
-      const effects = label.reconfigure(EditorView.contentAttributes.of({ "aria-label": to + " source code editor" }));
+      const effects = label.reconfigure(EditorView.contentAttributes.of({ "aria-label": to + " source code editor", tabindex: "0" }));
       if (live) { view.dispatch({ effects }); states.set(to, view.state); }
       else states.set(to, st.update({ effects }).state);
     },
