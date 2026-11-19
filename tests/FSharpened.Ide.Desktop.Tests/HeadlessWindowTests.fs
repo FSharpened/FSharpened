@@ -231,15 +231,28 @@ let ``the search panel lists matches by file and opens one`` () =
 let ``search can be limited by the include and exclude patterns`` () =
     withWindow false sampleFiles (fun s ->
         s.OpenFolder()
+
+        let summary () =
+            (find<TextBlock> s.Window "search-summary").Text
+
+        // what the summary said last, for the failure message of a run on a slow machine
+        let waitForSummary (what: string) (part: string) =
+            try
+                until what 30000 (fun () -> summary().Contains part)
+            with e ->
+                failwithf
+                    "%s (the summary reads '%s', %d rows)"
+                    e.Message
+                    (summary ())
+                    (find<ListBox> s.Window "search-results").ItemCount
+
         s.Shell.Search("hello", "")
-        let results = find<ListBox> s.Window "search-results"
-        until "search results" 5000 (fun () -> results.ItemCount > 0)
+        waitForSummary "the first search to finish" "5 results in 3 files"
         let include' = find<TextBox> s.Window "files-to-include"
         include'.Text <- "*.txt"
         press (find<TextBox> s.Window "find-in-files") Key.Enter KeyModifiers.None
-
-        until "narrowed results" 5000 (fun () ->
-            (find<TextBlock> s.Window "search-summary").Text.Contains "2 results in 1 file"))
+        waitForSummary "the search narrowed to *.txt" "2 results in 1 file"
+        Assert.Equal(3, (find<ListBox> s.Window "search-results").ItemCount))
 
 // ---- theme, panels, status ------------------------------------------------------------------------
 

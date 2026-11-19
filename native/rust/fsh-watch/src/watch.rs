@@ -758,33 +758,63 @@ mod tests {
         false
     }
 
+    /// Polls until `seen` holds (it is told every change of every batch), or fails after a generous time.
+    fn wait_until(w: &Watch, mut seen: impl FnMut(&Change) -> bool) -> bool {
+        wait_for(w, |b| b.overflow || b.changes.iter().any(&mut seen))
+    }
+
     #[test]
     fn a_real_watch_reports_create_change_rename_and_remove() {
         let d = TempDir::new("real");
+        // The folder exists before the watch starts: a file made in a folder that is created at the same moment is
+        // written before the platform (inotify) is watching that folder, and its event is never sent; the folder's
+        // own creation is what arrives then. This test is about what happens to files in a watched folder.
+        fs::create_dir_all(d.path().join("src")).unwrap();
         let w =
             Watch::start(d.path(), vec!["bin".into()], Duration::from_millis(50)).expect("start");
 
+        // A fresh file is reported created (a platform may fold the write into it, so a change is accepted too).
         d.write("src/new.txt", "one");
         assert!(
-            wait_for(&w, |b| b.overflow
-                || b.changes.iter().any(|c| c.path == "src/new.txt")),
+            wait_until(&w, |c| c.path == "src/new.txt"
+                && matches!(c.kind, Kind::Created | Kind::Changed)),
             "create"
         );
 
-        d.write("src/new.txt", "two");
-        assert!(
-            wait_for(&w, |b| b.overflow
-                || b.changes.iter().any(|c| c.path == "src/new.txt")),
-            "change"
-        );
+        // A rewrite is reported for the same path. Events of the first write may still be on their way, so the
+        // write is repeated until the change is seen.
+        let mut round = 0;
+        let mut changed = false;
+        while !changed && round < 5 {
+            round += 1;
+            d.write("src/new.txt", &format!("two {round}"));
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while !changed && Instant::now() < deadline {
+                if let Poll::Batch(b) = w.poll(Duration::from_millis(100)) {
+                    changed = b.overflow
+                        || b.changes
+                            .iter()
+                            .any(|c| c.path == "src/new.txt" && c.kind == Kind::Changed);
+                }
+            }
+        }
+        assert!(changed, "change");
 
+        // A rename arrives as a rename, or, where the platform reports the two halves apart, as the old name
+        // removed and the new one created. Either way both names are accounted for.
         fs::rename(d.path().join("src/new.txt"), d.path().join("src/moved.txt")).unwrap();
+        let (mut renamed, mut old_gone, mut new_there) = (false, false, false);
         assert!(
             wait_for(&w, |b| {
-                b.overflow
-                    || b.changes
-                        .iter()
-                        .any(|c| c.path == "src/moved.txt" || c.path == "src/new.txt")
+                for c in &b.changes {
+                    match (c.kind, c.path.as_str()) {
+                        (Kind::Renamed, "src/moved.txt") => renamed = true,
+                        (Kind::Removed, "src/new.txt") => old_gone = true,
+                        (Kind::Created, "src/moved.txt") => new_there = true,
+                        _ => {}
+                    }
+                }
+                b.overflow || renamed || (old_gone && new_there)
             }),
             "rename"
         );
@@ -799,10 +829,12 @@ mod tests {
         }));
         assert!(!saw_ignored);
 
+        // Let what is left of the writes settle, so the removal is the only thing the next wait can see.
+        while let Poll::Batch(_) = w.poll(Duration::from_millis(300)) {}
+
         fs::remove_file(d.path().join("visible.txt")).unwrap();
         assert!(
-            wait_for(&w, |b| b.overflow
-                || b.changes.iter().any(|c| c.path == "visible.txt")),
+            wait_until(&w, |c| c.path == "visible.txt" && c.kind == Kind::Removed),
             "remove"
         );
 

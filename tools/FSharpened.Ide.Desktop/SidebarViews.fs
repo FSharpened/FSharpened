@@ -90,9 +90,58 @@ type SidebarViews(ui: Ui, appearance: Appearance, statusBar: StatusBar, editorTa
           WholeWord = wordToggle.IsChecked = Nullable true
           Regex = regexToggle.IsChecked = Nullable true }
 
+    // each search gets a number; one that finishes after a newer one was started must not paint over it
+    let searchSeq = ref 0
+
+    let paintSearch (found: FolderSearchResult) =
+        let result = found.Result
+        ui.LastSearchEngine <- FolderSearch.engineLabel found.Engine
+
+        searchResults.Items.Clear()
+
+        if result.Error <> "" then
+            searchSummary.Text <- result.Error
+        else
+            searchSummary.Text <-
+                sprintf
+                    "%d results in %d files%s · %s search"
+                    result.Total
+                    result.Files.Length
+                    (if result.Truncated then " (more not shown)" else "")
+                    (match found.Engine with
+                     | NativeEngine -> "native"
+                     | ManagedEngine _ -> "managed")
+
+            ToolTip.SetTip(searchSummary, ui.LastSearchEngine)
+
+            for f in result.Files do
+                searchResults.Items.Push(
+                    TextBlock(
+                        Text = f.Path,
+                        FontWeight = FontWeight.SemiBold,
+                        Foreground = ui.Roles.Fg,
+                        Margin = Thickness(0.0, 6.0, 0.0, 2.0)
+                    )
+                )
+
+                for h in f.Hits do
+                    let row =
+                        TextBlock(
+                            Text = sprintf "%d:  %s" h.Line (h.Preview.Trim()),
+                            Foreground = ui.Roles.Muted,
+                            FontFamily = monoFont,
+                            FontSize = 12.0,
+                            Tag = (f.Path, h.Line, h.Column),
+                            Margin = Thickness(10.0, 0.0, 0.0, 0.0)
+                        )
+
+                    searchResults.Items.Push row
+
     let runSearch () =
         match ui.Root with
         | Some r when textOf searchBox <> "" ->
+            searchSeq.Value <- searchSeq.Value + 1
+            let mine = searchSeq.Value
             let opts = searchOptions ()
             let inc, exc = textOf includeBox, textOf excludeBox
             let openText = [ for d in docs -> d.Rel, d.Text ]
@@ -101,48 +150,9 @@ type SidebarViews(ui: Ui, appearance: Appearance, statusBar: StatusBar, editorTa
 
             task {
                 let! found = Task.Run(fun () -> FolderSearch.runDefault r opts inc exc openText)
-                let result = found.Result
-                ui.LastSearchEngine <- FolderSearch.engineLabel found.Engine
 
-                searchResults.Items.Clear()
-
-                if result.Error <> "" then
-                    searchSummary.Text <- result.Error
-                else
-                    searchSummary.Text <-
-                        sprintf
-                            "%d results in %d files%s · %s search"
-                            result.Total
-                            result.Files.Length
-                            (if result.Truncated then " (more not shown)" else "")
-                            (match found.Engine with
-                             | NativeEngine -> "native"
-                             | ManagedEngine _ -> "managed")
-
-                    ToolTip.SetTip(searchSummary, ui.LastSearchEngine)
-
-                    for f in result.Files do
-                        searchResults.Items.Push(
-                            TextBlock(
-                                Text = f.Path,
-                                FontWeight = FontWeight.SemiBold,
-                                Foreground = ui.Roles.Fg,
-                                Margin = Thickness(0.0, 6.0, 0.0, 2.0)
-                            )
-                        )
-
-                        for h in f.Hits do
-                            let row =
-                                TextBlock(
-                                    Text = sprintf "%d:  %s" h.Line (h.Preview.Trim()),
-                                    Foreground = ui.Roles.Muted,
-                                    FontFamily = monoFont,
-                                    FontSize = 12.0,
-                                    Tag = (f.Path, h.Line, h.Column),
-                                    Margin = Thickness(10.0, 0.0, 0.0, 0.0)
-                                )
-
-                            searchResults.Items.Push row
+                if mine = searchSeq.Value then
+                    paintSearch found
             }
             |> ignore
         | _ -> ()
