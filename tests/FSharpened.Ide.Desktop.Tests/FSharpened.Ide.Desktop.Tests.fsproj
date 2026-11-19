@@ -8,8 +8,14 @@
 
   <ItemGroup>
     <Compile Include="DesktopTests.fs" />
+    <Compile Include="DecisionTests.fs" />
     <Compile Include="HoverTests.fs" />
+    <Compile Include="DebugViewTests.fs" />
     <Compile Include="GrammarTests.fs" />
+    <Compile Include="TerminalViewTests.fs" />
+    <Compile Include="HeadlessHarness.fs" />
+    <Compile Include="HeadlessWindowTests.fs" />
+    <Compile Include="AccessibilityTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,6 +23,7 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="TextMateSharp.Grammars" />
+    <PackageReference Include="Avalonia.Headless" />
   </ItemGroup>
 
   <ItemGroup>

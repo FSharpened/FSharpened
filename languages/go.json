@@ -111,8 +111,18 @@
   "debug": {
     "adapter": "dlv",
     "args": [
-      "dap"
+      "dap",
+      "--listen=127.0.0.1:{port}"
     ],
-    "install": "go install github.com/go-delve/delve/cmd/dlv@latest"
+    "install": "go install github.com/go-delve/delve/cmd/dlv@latest",
+    "transport": "tcp",
+    "adapterId": "go",
+    "request": "launch",
+    "launch": {
+      "mode": "debug",
+      "program": "{dir}",
+      "cwd": "{dir}",
+      "stopOnEntry": false
+    }
   }
 }

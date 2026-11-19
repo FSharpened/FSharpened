@@ -13,9 +13,17 @@
     <Compile Include="Trust.fs" />
     <Compile Include="DiskWorkspace.fs" />
     <Compile Include="Replace.fs" />
+    <Compile Include="Vt.fs" />
+    <Compile Include="TermKeys.fs" />
+    <Compile Include="NativeLib.fs" />
+    <Compile Include="FolderSearch.fs" />
+    <Compile Include="FolderWatch.fs" />
     <Compile Include="Terminal.fs" />
+    <Compile Include="TermBackend.fs" />
     <Compile Include="Git.fs" />
     <Compile Include="Lsp.fs" />
+    <Compile Include="Rename.fs" />
+    <Compile Include="Dap.fs" />
     <Compile Include="Interpret.fs" />
     <Compile Include="Runner.fs" />
   </ItemGroup>
@@ -23,6 +31,27 @@
   <ItemGroup>
     <ProjectReference Include="..\FSharpened.Ide\FSharpened.Ide.fsproj" />
     <ProjectReference Include="..\..\src\FSharpened.Platform\FSharpened.Platform.fsproj" />
+    <ProjectReference Include="..\..\src\FSharpened.Interop.Rust\FSharpened.Interop.Rust.fsproj" />
   </ItemGroup>
+
+  <!-- The Rust library for file watching and search (native/rust/fsh-watch, PLAN P7.8). When cargo is on the PATH it is
+       built with the release profile and copied next to the program as runtimes/<rid>/native/<file>, the layout the
+       Interop.Rust resolver reads and `dotnet publish` carries along. Without cargo nothing happens: the IDE then
+       uses its managed search and a polling watcher. Set FshSkipRust=true to skip the build even when cargo exists. -->
+  <PropertyGroup>
+    <FshWatchDir>$(MSBuildThisFileDirectory)../../native/rust/fsh-watch/</FshWatchDir>
+    <FshWatchRelease>$(FshWatchDir)target/release/</FshWatchRelease>
+  </PropertyGroup>
+
+  <Target Name="BuildFshWatch" BeforeTargets="AssignTargetPaths" Condition="'$(FshSkipRust)' != 'true' and Exists('$(FshWatchDir)Cargo.toml')">
+    <Exec Command="cargo --version" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" StandardOutputImportance="low" StandardErrorImportance="low" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="FshCargoProbe" />
+    </Exec>
+    <Exec Condition="'$(FshCargoProbe)' == '0'" Command="cargo build --release --locked --manifest-path &quot;$(FshWatchDir)Cargo.toml&quot;" StandardOutputImportance="low" />
+    <ItemGroup Condition="'$(FshCargoProbe)' == '0'">
+      <FshWatchLibrary Include="$(FshWatchRelease)fsh_watch.dll;$(FshWatchRelease)libfsh_watch.so;$(FshWatchRelease)libfsh_watch.dylib" />
+      <None Include="@(FshWatchLibrary)" Condition="Exists('%(FullPath)')" Link="runtimes/$(NETCoreSdkRuntimeIdentifier)/native/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    </ItemGroup>
+  </Target>
 
 </Project>

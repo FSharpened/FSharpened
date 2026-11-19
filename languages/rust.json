@@ -128,6 +128,25 @@
   "debug": {
     "adapter": "lldb-dap",
     "args": [],
-    "install": "install LLVM (lldb-dap)"
+    "install": "install LLVM, which includes lldb-dap: https://github.com/llvm/llvm-project/releases",
+    "adapterId": "lldb-dap",
+    "request": "launch",
+    "build": {
+      "phase": "build",
+      "tool": "rustc",
+      "args": [
+        "-g",
+        "{entry}",
+        "-o",
+        "{out}",
+        "{flags}"
+      ]
+    },
+    "launch": {
+      "program": "{out}",
+      "cwd": "{root}",
+      "args": [],
+      "stopOnEntry": false
+    }
   }
 }
