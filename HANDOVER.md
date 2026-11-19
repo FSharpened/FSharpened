@@ -49,5 +49,31 @@ VS Code-style features in the page (ADR-0022, Proposed; PLAN P7.1 to P7.3): comm
 
 Local pipeline (2026-11-17): hardened for a machine under memory pressure (governor, infrastructure retry, process-tree timeouts, lazy build), with `doctor`, `status`, `watch`, a `--profile all` that also runs the web, gateway, hub and site stages, and a `release` bundle with `verify`; see `docs/operations/local-ci.md`. On win-x64 `full` passes in about 70 s cold and 5 s warm, `all` in about 3 min, with 316 tests.
 
+## Parallel work stack (2026-11-18 and 2026-11-19, paused)
+PR #9 (`fix/aot-advisory-owner` into `main`) is green on all checks and waits for the required human review. PR #10 (local CI hardening) is merged into it. Nine more PRs target `fix/aot-advisory-owner`, each from its own branch; **nothing is merged to `main`, published or deployed**.
+
+| PR | Branch | What it adds | Verified |
+|---|---|---|---|
+| #11 | `claude/desktop-pty-d00b3d` | real pseudo-terminal (ConPTY, Linux pty, pipe fallback) | win-x64 local; an osx-arm64 `ioctl` bug was fixed, macOS unconfirmed |
+| #12 | `claude/rust-watch-search-21dde9` | `fsh-watch` Rust crate: file watching and fast search | win-x64 local |
+| #13 | `claude/lsp-rename-dap-edb053` | LSP rename in the UI, debugging through DAP | fake adapter only; netcoredbg, delve and lldb-dap were not run |
+| #14 | `claude/vscode-ext-e328c9` | VS Code extension in `vscode/` (ADR-0025) | `.vsix` built; not run in a real VS Code |
+| #15 | `feat/workers-ai-completion` | Workers AI module and AI completion provider (ADR-0026) | mocks only; never deployed |
+| #16 | `claude/web-ide-depth-ea416e` | browser IDE: Playwright E2E and axe tests (`web-e2e` stage), IndexedDB storage, multi-file runs and the pipeline (P6.A5) | all checks green except macOS; no real Compiler Explorer or Wandbox call |
+| #17 | `claude/desktop-foundation-527b95` | contains #11, #12 and #13, plus the `MainWindow.fs` split, headless Avalonia UI tests, accessibility names, Windows `.cmd` server shims | win-x64 local; two CI fixes pushed in `154a232` (the `fsh-watch` timing test; a win-arm64 search test whose cause was **not** reproduced, so that fix is a guess) |
+| #18 | `claude/packaging-realservers-386adf` | desktop package in the release bundle, `release-dry-run.yml`, opt-in real language-server and debug-adapter verification | win-x64 only; rust-analyzer passes all five checks once `rust-src` is installed |
+| #19 | `claude/desktop-lsp-git-d5a1d9` | desktop LSP features (references, outline, signature help, quick fixes, server formatting), Git (gutter, Source Control view, branches, blame), multi-cursor, snippets, configurable shortcuts | win-x64 local, 692 tests; its linux-arm64 failure was the `fsh-watch` test fixed in #17 |
+
+**Merge order:** #9 first. #17 supersedes #11, #12 and #13 (merge #17, close those three). #19 is built on #17. #16, #18, #14 and #15 are independent. macOS checks are red on #16 to #19 and are deliberately ignored (macOS is deferred).
+
+**Paused with uncommitted work, resume with `SendMessage` to the session:**
+- `web-ide-depth` (`local_a5a46795-609a-470c-a473-0e271a1745c6`, worktree `.claude/worktrees/web-ide-depth-ea416e`): live diagnostics as you type, a Problems list and ADR-0025 "ide-live-check" (`ide/web/src/livecheck.js`, `ide/e2e/tests/live.spec.mjs`), mocked backend only. Not built to completion, not tested, not committed.
+- `desktop-lsp-git` (`local_0c9398d8-546d-4211-ad4f-35062b573aef`, worktree `.claude/worktrees/desktop-lsp-git-d5a1d9`): split editors, minimap and VS Code settings and keybindings import. Not complete, not committed. When PR #17's fixes land it should merge `claude/desktop-foundation-527b95`.
+- Note: two branches use the number ADR-0025 (the VS Code extension and live check); renumber one when merging.
+
+**Known gaps:** the desktop IDE has not been run by hand on Linux (WSL was unresponsive); win-arm64 and linux are covered only by CI; no installer signing or auto-update; the debugger was tested against a fake adapter; Windows commit headroom is about 2 GB while unrelated `llama-server` processes run (`fsh_ci.py doctor` explains).
+
+**Needs a human:** the review and merge of #9 and the stack above; the nightly scheduled task (`docs/operations/local-ci.md`, "Unattended runs"); a real-VS-Code test of the extension; deciding whether the draft ADRs 0019 to 0026 are accepted; signing and publishing anything.
+
 ## Exact Next Action
-Run `dotnet fantomas --check .` (after `dotnet tool restore`) and fix formatting; then copy `pipelines/github-actions/ci.yml` to `.github/workflows/`, fix whatever the six-RID matrix and per-RID `PublishAot` publish expose (the CLI may need trimming/AOT fixes), and record per-RID results here. Then start P0.5.2 (thread-safe `StatepointGraph`).
+Review PR #9 (guide: `.fsharpened/review-pr9.md` in the working tree, also posted as a comment on the PR), then merge the stack in the order above, running `python tools/ci/fsh_ci.py run --profile all` on each branch first. After that, resume `web-ide-depth` and `desktop-lsp-git`, then the remaining Phase 6 and 7 items in `PLAN.md`.
