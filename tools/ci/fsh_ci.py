@@ -88,8 +88,25 @@ def augment_path(env: dict) -> dict:
     return env
 
 
+# Git exports these into hooks. A stage that runs git in a temporary folder (the Git tests do)
+# would then see this repository instead of a plain folder, so a hook run and a shell run
+# would disagree. Stages must not inherit them.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_PREFIX",
+    "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+)
+
+
 def base_env() -> dict:
     env = augment_path(dict(os.environ))
+    for name in GIT_LOCATION_VARS:
+        env.pop(name, None)
     env.update(
         {
             "CI": "true",  # strict mode: warnings are errors (Directory.Build.props)
