@@ -186,9 +186,10 @@ class ProfileTests(unittest.TestCase):
         self.assertIn("--profile full", workflow)
 
     def test_release_ends_with_the_bundle_and_only_the_release_profile_has_it(self):
-        self.assertEqual(ci.PROFILES["release"][-2:], ["pack", "bundle"])
+        self.assertEqual(ci.PROFILES["release"][-3:], ["pack", "desktop-package", "bundle"])
         for name in ("fast", "full", "all"):
             self.assertNotIn("bundle", ci.PROFILES[name])
+            self.assertNotIn("desktop-package", ci.PROFILES[name])
 
     def test_only_cached_stages_declare_inputs(self):
         for name, spec in ci.STAGES.items():

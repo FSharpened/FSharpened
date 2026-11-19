@@ -51,3 +51,6 @@ Local pipeline (2026-11-17): hardened for a machine under memory pressure (gover
 
 ## Exact Next Action
 Run `dotnet fantomas --check .` (after `dotnet tool restore`) and fix formatting; then copy `pipelines/github-actions/ci.yml` to `.github/workflows/`, fix whatever the six-RID matrix and per-RID `PublishAot` publish expose (the CLI may need trimming/AOT fixes), and record per-RID results here. Then start P0.5.2 (thread-safe `StatepointGraph`).
+
+## Desktop packaging and real-server checks (added 2026-11-18)
+`run --profile release` now also writes `artifacts/release/<commit>-<rid>/desktop/fsharpened-desktop-<version>-<rid>.zip|tar.gz` (self-contained, `--selftest`-checked, unsigned, deterministic on one machine; `packaging/` has installer inputs and the human steps; signing, notarisation and publishing are human gates). `run --profile verify` runs the language-server client against real servers installed here; results and the bugs found are in `docs/operations/desktop.md`. Workflows `release-dry-run.yml` (manual) and `realservers.yml` (manual and weekly) have never run on GitHub. **Next:** the debug-adapter half of `realservers` needs PR #13 (`Dap.fs`); the Linux and macOS archives are unrun; clangd and lua-language-server are fixture design only.

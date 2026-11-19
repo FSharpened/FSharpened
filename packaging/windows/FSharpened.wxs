@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WiX Toolset 5 description of the per-user MSI for the desktop IDE. Input only: a person builds and signs it
+     (packaging/README.md). Placeholders: {{VERSION}} four-part numeric version, {{SOURCE_DIR}} the unpacked archive folder. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="FSharpened" Manufacturer="FSharpened" Version="{{VERSION}}"
+           UpgradeCode="5f0c6a52-6a6c-4a52-9b88-7d7f1d6d9f01" Scope="perUser" Compressed="yes">
+    <MediaTemplate EmbedCab="yes" />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="FSharpened">
+        <!-- every file of the archive, in place; the app finds languages/, grammars/ and runtimes/ next to itself -->
+        <Files Include="{{SOURCE_DIR}}\**" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="3b8e2e0a-1c1a-4a53-8a8e-0e8f6f4f6b11">
+        <Shortcut Id="AppShortcut" Name="FSharpened" Target="[INSTALLFOLDER]FSharpened.Ide.Desktop.exe" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\FSharpened" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <Feature Id="Main" Title="FSharpened">
+      <ComponentGroupRef Id="INSTALLFOLDER" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+  </Package>
+</Wix>

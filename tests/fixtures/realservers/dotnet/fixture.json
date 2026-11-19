@@ -1,0 +1,28 @@
+{
+  "id": "dotnet",
+  "pack": "csharp",
+  "server": null,
+  "languageId": "csharp",
+  "files": [],
+  "debug": {
+    "adapter": "netcoredbg",
+    "build": [
+      [
+        "dotnet",
+        "build",
+        "-nologo",
+        "-v",
+        "q"
+      ]
+    ],
+    "program": "bin/Debug/net8.0/fixture.dll",
+    "breakpoint": {
+      "file": "Program.cs",
+      "line": 8
+    },
+    "variable": {
+      "name": "text",
+      "contains": "hello world"
+    }
+  }
+}

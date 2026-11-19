@@ -1,0 +1,31 @@
+{
+  "id": "typescript",
+  "pack": "typescript",
+  "server": "typescript-language-server",
+  "languageId": "typescript",
+  "files": [
+    "main.ts",
+    "util.ts",
+    "bad.ts"
+  ],
+  "diagnostic": {
+    "file": "bad.ts"
+  },
+  "completion": {
+    "file": "main.ts",
+    "at": "console.lo|g",
+    "expect": "log"
+  },
+  "definition": {
+    "file": "main.ts",
+    "at": "console.log(gre|et",
+    "expectFile": [
+      "util.ts"
+    ]
+  },
+  "hover": {
+    "file": "main.ts",
+    "at": "console.log(gre|et",
+    "contains": "greet"
+  }
+}

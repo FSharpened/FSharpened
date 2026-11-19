@@ -1,0 +1,43 @@
+{
+  "id": "go",
+  "pack": "go",
+  "server": "gopls",
+  "languageId": "go",
+  "files": [
+    "main.go",
+    "greet.go",
+    "bad.go"
+  ],
+  "diagnostic": {
+    "file": "bad.go"
+  },
+  "completion": {
+    "file": "main.go",
+    "at": "fmt.Prin|tln",
+    "expect": "Println"
+  },
+  "definition": {
+    "file": "main.go",
+    "at": "Gre|et(\"world\")",
+    "expectFile": [
+      "greet.go"
+    ]
+  },
+  "hover": {
+    "file": "main.go",
+    "at": "Gre|et(\"world\")",
+    "contains": "Greet"
+  },
+  "debug": {
+    "adapter": "dlv",
+    "program": "main.go",
+    "breakpoint": {
+      "file": "greet.go",
+      "line": 5
+    },
+    "variable": {
+      "name": "name",
+      "contains": "world"
+    }
+  }
+}

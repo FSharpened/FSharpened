@@ -67,9 +67,10 @@ def changelog_section(text: str, heading: str = "Unreleased") -> str:
 
 
 def build_provenance(*, commit: str, branch: str, dirty: bool, sdk: str, rid: str, python: str, profile: str,
-                     stages: dict, rids_verified: list[str], files: dict[str, int], now: Optional[dt.datetime] = None) -> dict:
+                     stages: dict, rids_verified: list[str], files: dict[str, int], desktop: Optional[dict] = None,
+                     now: Optional[dt.datetime] = None) -> dict:
     now = now or dt.datetime.now(dt.timezone.utc)
-    return {
+    prov = {
         "schema": SCHEMA,
         "generated_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "commit": commit,
@@ -85,6 +86,10 @@ def build_provenance(*, commit: str, branch: str, dirty: bool, sdk: str, rid: st
         "published": False,
         "note": "Built and checked locally by fsh-ci. Not published. Publishing needs human approval.",
     }
+    if desktop:
+        # the desktop IDE archive: unsigned, self-contained, smoke-run by its own --selftest (see docs/operations/desktop.md)
+        prov["desktop"] = dict(desktop, signed=False, notarised=False, installer=False)
+    return prov
 
 
 def verify_bundle(root: pathlib.Path, head: Optional[str] = None) -> list[str]:
@@ -123,6 +128,15 @@ def verify_bundle(root: pathlib.Path, head: Optional[str] = None) -> list[str]:
             for rel in prov.get("files", {}):
                 if rel not in expected:
                     problems.append(f"{PROVENANCE} lists {rel}, which is not in {SUMS}")
+            desk = prov.get("desktop")
+            if desk:
+                path = desk.get("path", "")
+                if path not in expected:
+                    problems.append(f"{PROVENANCE} names the desktop archive {path}, which is not in {SUMS}")
+                elif expected[path] != desk.get("archive_sha256"):
+                    problems.append(f"{PROVENANCE} gives a different SHA-256 for {path} than {SUMS}")
+                if desk.get("selftest") != "passed":
+                    problems.append(f"{PROVENANCE} does not record a passed self-test for the desktop archive")
             if head and prov.get("commit") and not head.startswith(prov["commit"]) and not prov["commit"].startswith(head):
                 problems.append(f"built from {prov['commit'][:10]}, HEAD is {head[:10]}")
     return problems

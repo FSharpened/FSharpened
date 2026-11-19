@@ -90,10 +90,39 @@ module LspWire =
     /// `file:///C:/work/a.go` for a path.
     let toUri (path: string) : string = Uri(Path.GetFullPath path).AbsoluteUri
 
+    /// A Windows drive letter is upper case (`C:\`), whatever case the server wrote it in: rust-analyzer and others send
+    /// `file:///c:/...`, and a lower-case drive would not compare equal to the path the editor opened. Other paths are
+    /// left as they are.
+    let normalizeDrive (path: string) : string =
+        if
+            path.Length >= 3
+            && Char.IsAsciiLetterLower path[0]
+            && path[1] = ':'
+            && (path[2] = '\\' || path[2] = '/')
+        then
+            string (Char.ToUpperInvariant path[0]) + path.Substring 1
+        else
+            path
+
     /// The path of a `file:` URI, or "" for any other kind.
     let ofUri (uri: string) : string =
         match Uri.TryCreate(uri, UriKind.Absolute) with
-        | true, u when u.IsFile -> u.LocalPath
+        | true, u when u.IsFile ->
+            let local = u.LocalPath
+            // `file:///c%3A/x` (how VS Code-style servers write a drive) unescapes to `/c:/x`: drop the leading slash
+            let local =
+                if
+                    OperatingSystem.IsWindows()
+                    && local.Length >= 3
+                    && local[0] = '/'
+                    && Char.IsAsciiLetter local[1]
+                    && local[2] = ':'
+                then
+                    local.Substring(1).Replace('/', Path.DirectorySeparatorChar)
+                else
+                    local
+
+            normalizeDrive local
         | _ -> ""
 
 module internal LspText =

@@ -12,6 +12,8 @@
     <Compile Include="TerminalTests.fs" />
     <Compile Include="RunTests.fs" />
     <Compile Include="ToolingTests.fs" />
+    <Compile Include="RealServers.fs" />
+    <Compile Include="RealServerSupportTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
