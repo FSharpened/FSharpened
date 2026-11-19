@@ -20,7 +20,7 @@
   "server": {
     "command": "rust-analyzer",
     "args": [],
-    "install": "rustup component add rust-analyzer"
+    "install": "rustup component add rust-analyzer rust-src"
   },
   "tools": [
     {

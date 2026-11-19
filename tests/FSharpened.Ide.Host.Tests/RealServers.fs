@@ -344,7 +344,7 @@ let private assertAll (id: string) =
 [<RealServerFact("gopls", "go install golang.org/x/tools/gopls@latest")>]
 let ``gopls: initialize, diagnostics, completion, definition, hover`` () = assertAll "go"
 
-[<RealServerFact("rust-analyzer", "rustup component add rust-analyzer")>]
+[<RealServerFact("rust-analyzer", "rustup component add rust-analyzer rust-src")>]
 let ``rust-analyzer: initialize, diagnostics, completion, definition, hover`` () = assertAll "rust"
 
 [<RealServerFact("pyright-langserver", "npm install -g pyright")>]
